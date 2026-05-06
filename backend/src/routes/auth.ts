@@ -1,0 +1,389 @@
+import { Router, Request, Response } from 'express';
+import { body, validationResult } from 'express-validator';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import mongoose from 'mongoose';
+import { User } from '../models/User';
+import { Rider } from '../models/Rider';
+import { Admin } from '../models/Admin';
+import { LoyaltyTransaction } from '../models/LoyaltyTransaction';
+import { createOTP, verifyOTP } from '../services/otpService';
+import { sendSMS, SMS_TEMPLATES } from '../services/notificationService';
+
+const REFERRAL_REWARD_POINTS = 200;
+
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  // Already E.164 without +: 233XXXXXXXXX
+  if (digits.startsWith('233') && digits.length === 12) return '+' + digits;
+  // Local with leading 0: 0XXXXXXXXX
+  if (digits.startsWith('0') && digits.length === 10) return '+233' + digits.slice(1);
+  // 9 digits only
+  if (digits.length === 9) return '+233' + digits;
+  // Already has + prefix stored as string
+  if (phone.startsWith('+')) return phone;
+  return phone;
+}
+ // points awarded to both referrer and new user
+
+function generateReferralCode(): string {
+  return crypto.randomBytes(4).toString('hex').toUpperCase(); // e.g. "A3F2B1C4"
+}
+
+const router = Router();
+
+function signToken(payload: object, expiresIn = '7d'): string {
+  return jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn } as jwt.SignOptions);
+}
+
+function ve(req: Request, res: Response): boolean {
+  const e = validationResult(req);
+  if (!e.isEmpty()) { res.status(400).json({ success: false, errors: e.array() }); return true; }
+  return false;
+}
+
+// User OTP
+/**
+ * @swagger
+ * /api/v1/auth/user/send-otp:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Send OTP to user phone
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SendOTPRequest'
+ *     responses:
+ *       200:
+ *         description: OTP sent
+ *       400:
+ *         description: Validation error
+ */
+router.post('/user/send-otp',
+  [body('phone').trim().isMobilePhone('any'), body('purpose').isIn(['registration','login'])],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const { phone, purpose } = req.body;
+    
+    console.log('📞 [AUTH] Send OTP request:', { phone, purpose });
+    
+    try {
+      const code = await createOTP(phone, purpose);
+      console.log('📤 [AUTH] Sending SMS with OTP...');
+      await sendSMS(phone, SMS_TEMPLATES.otpVerification(code));
+      console.log('✅ [AUTH] OTP sent successfully to:', phone);
+      res.json({ success: true, message: 'OTP sent', ...(process.env.NODE_ENV === 'development' && { _devCode: code }) });
+    } catch (error: any) {
+      console.error('❌ [AUTH] Send OTP failed:', error?.response?.data || error?.message || error);
+      res.status(500).json({ success: false, message: 'Failed to send OTP', error: error?.message });
+    }
+  }
+);
+
+// User Verify OTP
+/**
+ * @swagger
+ * /api/v1/auth/user/verify-otp:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Verify OTP and login or register user
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VerifyOTPRequest'
+ *     responses:
+ *       200:
+ *         description: Auth token + user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       400:
+ *         description: Invalid OTP
+ */
+router.post('/user/verify-otp',
+  [body('phone').trim().isMobilePhone('any'), body('code').isLength({ min:4, max:6 }), body('purpose').isIn(['registration','login'])],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const { phone, code, purpose, name, referralCode } = req.body;
+    try {
+      await verifyOTP(phone, code, purpose);
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message || 'Invalid OTP' });
+    }
+
+    let user = await User.findOne({ phone });
+    const isNewUser = !user;
+
+    if (!user) {
+      const safeName = typeof name === 'string' && name.trim() ? name.trim() : `User ${phone.slice(-4)}`;
+
+      // Resolve referrer
+      let referredBy: mongoose.Types.ObjectId | undefined;
+      if (referralCode) {
+        const referrer = await User.findOne({ referralCode: referralCode.toUpperCase().trim() });
+        if (referrer) referredBy = referrer._id;
+      }
+
+      // Generate unique referral code for new user
+      let newCode = generateReferralCode();
+      while (await User.exists({ referralCode: newCode })) {
+        newCode = generateReferralCode();
+      }
+
+      user = await User.create({
+        phone,
+        name: safeName,
+        isVerified: true,
+        referralCode: newCode,
+        referredBy,
+      });
+
+      // Reward both parties if referred
+      if (referredBy) {
+        const referrer = await User.findById(referredBy);
+        if (referrer) {
+          // Reward new user
+          user.loyaltyPoints = (user.loyaltyPoints ?? 0) + REFERRAL_REWARD_POINTS;
+          await user.save();
+          await LoyaltyTransaction.create({
+            userId: user._id,
+            type: 'adjustment',
+            points: REFERRAL_REWARD_POINTS,
+            balanceAfter: user.loyaltyPoints,
+            description: `Referral bonus — joined via ${referrer.name || referrer.phone}'s code`,
+          });
+
+          // Reward referrer
+          referrer.loyaltyPoints = (referrer.loyaltyPoints ?? 0) + REFERRAL_REWARD_POINTS;
+          referrer.referralCount = (referrer.referralCount ?? 0) + 1;
+          await referrer.save();
+          await LoyaltyTransaction.create({
+            userId: referrer._id,
+            type: 'adjustment',
+            points: REFERRAL_REWARD_POINTS,
+            balanceAfter: referrer.loyaltyPoints,
+            description: `Referral bonus — ${safeName} joined using your code`,
+          });
+        }
+      }
+    } else {
+      user.isVerified = true;
+      await user.save();
+    }
+
+    const token = signToken({ id: user._id, role: 'user', phone: user.phone });
+    res.json({
+      success: true,
+      token,
+      user: { id: user._id, name: user.name, phone: user.phone, role: 'user' },
+      ...(isNewUser && { referralCode: user.referralCode }),
+    });
+  }
+);
+
+// Rider Register
+router.post('/rider/register',
+  [body('name').trim().notEmpty(), body('phone').trim().isMobilePhone('any'),
+   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+   body('nationalId').trim().notEmpty(), body('vehicleType').isIn(['motorbike','tricycle','van']),
+   body('vehiclePlate').trim().notEmpty()],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const { name, password, nationalId, vehicleType, vehiclePlate } = req.body;
+    const phone = normalizePhone(req.body.phone);
+    if (await Rider.findOne({ phone })) return res.status(409).json({ success: false, message: 'Phone already registered' });
+    await Rider.create({ name, phone, passwordHash: password, nationalId, vehicleType, vehiclePlate });
+    res.status(201).json({ success: true, message: 'Registration submitted. Await admin approval.' });
+  }
+);
+
+// Rider Login (phone + password)
+router.post('/rider/login',
+  [body('phone').trim().isMobilePhone('any'), body('password').notEmpty()],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const phone = normalizePhone(req.body.phone);
+    const { password } = req.body;
+    const rider = await Rider.findOne({ phone });
+    if (!rider) return res.status(404).json({ success: false, message: 'Rider not found' });
+    if (rider.kycStatus !== 'approved') return res.status(403).json({ success: false, message: 'Your account is pending admin approval' });
+    const valid = await rider.comparePassword(password);
+    if (!valid) return res.status(401).json({ success: false, message: 'Invalid phone or password' });
+    const token = signToken({ id: rider._id, role: 'rider', phone });
+    res.json({ success: true, token, rider: { id: rider._id, name: rider.name, phone, kycStatus: rider.kycStatus, status: rider.status } });
+  }
+);
+
+// Admin Login
+router.post('/admin/login',
+  [body('phone').trim().notEmpty(), body('password').notEmpty()],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const { phone, password } = req.body;
+    const admin = await Admin.findOne({ $or: [{ phone }, { email: phone }], isActive: true });
+    if (!admin || !(await admin.comparePassword(password))) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+    const token = signToken({ id: admin._id, role: 'admin', phone: admin.phone }, '7d');
+    res.json({ success: true, token, admin: { id: admin._id, name: admin.name, email: admin.email, role: admin.role } });
+  }
+);
+
+// Station Register
+/**
+ * @swagger
+ * /api/v1/auth/station/register:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Register a new station owner + station
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, phone, stationName, address, city, lat, lng]
+ *             properties:
+ *               name:        { type: string, example: Kofi Boateng }
+ *               phone:       { type: string, example: '+233244123456' }
+ *               stationName: { type: string, example: Kofi Gas Station }
+ *               address:     { type: string, example: 45 Ring Road, Accra }
+ *               city:        { type: string, example: Accra }
+ *               lat:         { type: number, example: 5.6037 }
+ *               lng:         { type: number, example: -0.1870 }
+ *     responses:
+ *       201:
+ *         description: Registration submitted, OTP sent
+ *       409:
+ *         description: Phone already registered
+ */
+router.post('/station/register',
+  [
+    body('name').trim().notEmpty(),
+    body('phone').trim().isMobilePhone('any'),
+    body('stationName').trim().notEmpty(),
+    body('address').trim().notEmpty(),
+    body('city').trim().notEmpty(),
+    body('lat').isFloat({ min: -90, max: 90 }),
+    body('lng').isFloat({ min: -180, max: 180 }),
+  ],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const { name, phone, stationName, address, city, lat, lng } = req.body;
+
+    if (await User.findOne({ phone })) {
+      return res.status(409).json({ success: false, message: 'Phone already registered' });
+    }
+
+    const { Station } = await import('../models/Station');
+    const { encodeGeohash } = await import('../services/geoService');
+
+    // Create owner user account
+    const user = await User.create({ phone, name, isVerified: false });
+
+    // Create station in pending state (admin must approve)
+    await Station.create({
+      ownerId: user._id,
+      name: stationName,
+      address,
+      city,
+      lat,
+      lng,
+      geohash: encodeGeohash(lat, lng, 7),
+    });
+
+    const code = await createOTP(phone, 'registration');
+    await sendSMS(phone, SMS_TEMPLATES.otpVerification(code));
+    res.status(201).json({ success: true, message: 'Registration submitted. Verify your phone. Await admin approval.', ...(process.env.NODE_ENV === 'development' && { _devCode: code }) });
+  }
+);
+
+// Station Send OTP
+router.post('/station/send-otp',
+  [body('phone').trim().isMobilePhone('any')],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const { phone } = req.body;
+    
+    console.log('🏢 [STATION AUTH] Send OTP request:', { phone });
+
+    // Verify a station owner account exists for this phone
+    const user = await User.findOne({ phone });
+    if (!user) {
+      console.log('❌ [STATION AUTH] User not found for phone:', phone);
+      return res.status(404).json({ success: false, message: 'Account not found' });
+    }
+    
+    const { Station } = await import('../models/Station');
+    const station = await Station.findOne({ ownerId: user._id });
+    if (!station) {
+      console.log('❌ [STATION AUTH] No station found for user:', user._id);
+      return res.status(404).json({ success: false, message: 'No station associated with this account' });
+    }
+    
+    console.log('✅ [STATION AUTH] Station found:', { stationId: station._id, stationName: station.name });
+
+    try {
+      const code = await createOTP(phone, 'login');
+      console.log('📤 [STATION AUTH] Sending SMS with OTP...');
+      await sendSMS(phone, SMS_TEMPLATES.otpVerification(code));
+      console.log('✅ [STATION AUTH] OTP sent successfully to:', phone);
+      res.json({ success: true, ...(process.env.NODE_ENV === 'development' && { _devCode: code }) });
+    } catch (error) {
+      console.error('❌ [STATION AUTH] Send OTP failed:', error);
+      res.status(500).json({ success: false, message: 'Failed to send OTP' });
+    }
+  }
+);
+
+// Station Verify OTP
+router.post('/station/verify-otp',
+  [body('phone').trim().isMobilePhone('any'), body('code').isLength({ min: 4, max: 6 }), body('purpose').isIn(['registration', 'login'])],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const { phone, code, purpose } = req.body;
+    try {
+      await verifyOTP(phone, code, purpose);
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message || 'Invalid OTP' });
+    }
+
+    const user = await User.findOne({ phone });
+    if (!user) return res.status(404).json({ success: false, message: 'Account not found' });
+
+    const { Station } = await import('../models/Station');
+    const station = await Station.findOne({ ownerId: user._id });
+    if (!station) return res.status(403).json({ success: false, message: 'No station associated with this account' });
+
+    if (station.status === 'pending') {
+      return res.status(403).json({ success: false, message: 'Your station is pending admin approval' });
+    }
+    if (station.status === 'suspended' || station.status === 'banned') {
+      return res.status(403).json({ success: false, message: `Station is ${station.status}` });
+    }
+
+    // Mark user as verified on first login
+    if (!user.isVerified) {
+      user.isVerified = true;
+      await user.save();
+    }
+
+    const token = signToken({ id: user._id, role: 'station', stationId: station._id, phone });
+    res.json({
+      success: true,
+      token,
+      user: { id: user._id, name: user.name, phone },
+      station: { id: station._id, name: station.name, status: station.status },
+    });
+  }
+);
+
+export default router;
