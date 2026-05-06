@@ -17,7 +17,7 @@ import type { PickedLocation } from '@/components/LocationPicker';
 
 const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
 
-const QUICK_SIZES = [6, 7, 10, 12, 15, 19];
+const QUICK_SIZES = [3, 6, 12];
 
 interface Listing {
   size: number;

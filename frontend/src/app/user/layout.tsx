@@ -1,7 +1,8 @@
 'use client';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, ClipboardList, MapPin, User, LogOut, Sun, Moon, Flame } from 'lucide-react';
+import Image from 'next/image';
+import { Home, ClipboardList, MapPin, User, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
 import { cn } from '@/lib/utils';

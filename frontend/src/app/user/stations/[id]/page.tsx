@@ -21,7 +21,7 @@ const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ss
 
 const ORDER_TYPES = [
   { type: 'delivery' as OrderType, icon: Truck, label: 'New Delivery', desc: 'Get a pre-filled cylinder delivered' },
-  { type: 'exchange' as OrderType, icon: RefreshCw, label: 'Exchange', desc: 'Coming soon', disabled: true },
+  { type: 'exchange' as OrderType, icon: RefreshCw, label: 'Cylinder Exchange', desc: 'Coming soon', disabled: true },
 ];
 
 const PAYMENT_METHODS = [
@@ -42,7 +42,7 @@ const STEPS = ['Choose', 'Details', 'Confirm'];
 
 function StepBar({ step }: { step: number }) {
   return (
-    <div className="flex items-center gap-0 px-4 py-3 bg-white border-b border-gray-100">
+    <div className="flex items-center gap-0 px-4 py-3 bg-[var(--bg-card)] border-b border-[var(--border)]">
       {STEPS.map((label, i) => (
         <div key={label} className="flex items-center flex-1 last:flex-none">
           <div className="flex flex-col items-center gap-1">
@@ -50,16 +50,16 @@ function StepBar({ step }: { step: number }) {
               'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
               i < step ? 'bg-brand-500 text-white' :
                 i === step ? 'bg-brand-500 text-white ring-4 ring-brand-100' :
-                  'bg-gray-100 text-gray-400'
+                  'bg-[var(--bg-card2)] text-[var(--text-muted)]'
             )}>
               {i < step ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
             </div>
-            <span className={cn('text-[10px] font-semibold', i <= step ? 'text-brand-600' : 'text-gray-400')}>
+            <span className={cn('text-[10px] font-semibold', i <= step ? 'text-brand-500' : 'text-[var(--text-muted)]')}>
               {label}
             </span>
           </div>
           {i < STEPS.length - 1 && (
-            <div className={cn('flex-1 h-0.5 mx-1 mb-4 rounded-full transition-colors', i < step ? 'bg-brand-500' : 'bg-gray-100')} />
+            <div className={cn('flex-1 h-0.5 mx-1 mb-4 rounded-full transition-colors', i < step ? 'bg-brand-500' : 'bg-[var(--border)]')} />
           )}
         </div>
       ))}
@@ -73,13 +73,13 @@ function StepBar({ step }: { step: number }) {
 
 function LoadingSkeleton() {
   return (
-    <div className="animate-pulse px-4 py-5 space-y-4">
-      <div className="h-5 bg-gray-200 rounded w-1/3" />
+    <div className="animate-pulse px-4 py-5 space-y-4 bg-[var(--bg)] min-h-screen">
+      <div className="h-5 bg-[var(--bg-card2)] rounded w-1/3" />
       <div className="grid grid-cols-2 gap-2">
-        <div className="h-24 bg-gray-200 rounded-2xl" />
-        <div className="h-24 bg-gray-200 rounded-2xl" />
+        <div className="h-24 bg-[var(--bg-card2)] rounded-2xl" />
+        <div className="h-24 bg-[var(--bg-card2)] rounded-2xl" />
       </div>
-      {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-gray-200 rounded-2xl" />)}
+      {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-[var(--bg-card2)] rounded-2xl" />)}
     </div>
   );
 }
@@ -175,7 +175,7 @@ export default function StationDetailPage() {
       const { data } = await ordersApi.create({
         stationId: id,
         cylinders: cartItems.map(({ size, quantity }) => ({ size, quantity })),
-        orderType,
+        orderType: 'delivery', // exchange disabled until further notice
         deliveryAddress: { street, city, lat: lat ?? 0, lng: lng ?? 0 },
         paymentMethod,
         paymentProvider: paymentMethod === 'mobile_money' ? mobileProvider : undefined,
@@ -198,9 +198,9 @@ export default function StationDetailPage() {
 
   if (!station) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64 bg-[var(--bg)]">
         <div className="text-center">
-          <p className="text-gray-500 mb-2">Station not found</p>
+          <p className="text-[var(--text-muted)] mb-2">Station not found</p>
           <Link href="/user" className="text-brand-500 text-sm font-medium">← Go back</Link>
         </div>
       </div>
@@ -208,7 +208,7 @@ export default function StationDetailPage() {
   }
 
   return (
-    <div className="min-h-full bg-gray-50 pb-28 lg:pb-0">
+    <div className="min-h-full bg-[var(--bg)] pb-28 lg:pb-0">
 
       {showPicker && (
         <LocationPicker
@@ -217,28 +217,28 @@ export default function StationDetailPage() {
         />
       )}
       {/* ── Station header ── */}
-      <div className="bg-white border-b border-gray-100 px-4 lg:px-8 pt-5 pb-4">
+      <div className="bg-[var(--bg-card)] border-b border-[var(--border)] px-4 lg:px-8 pt-5 pb-4">
         <div className="max-w-5xl mx-auto">
-          <Link href="/user" className="inline-flex items-center gap-1.5 text-gray-400 hover:text-gray-700 text-sm mb-3 transition-colors">
+          <Link href="/user" className="inline-flex items-center gap-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm mb-3 transition-colors">
             <ArrowLeft className="w-4 h-4" /> All stations
           </Link>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-lg font-black text-gray-900">{station.name}</h1>
-              <div className="flex items-center gap-1.5 text-gray-500 text-sm mt-0.5 mb-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-lg font-black text-[var(--text-primary)]">{station.name}</h1>
+              <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-sm mt-0.5 mb-2">
                 <MapPin className="w-3.5 h-3.5 text-brand-500 shrink-0" />
                 <span className="truncate">{station.address}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-1 bg-amber-50 border border-amber-100 rounded-full px-3 py-1">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 py-1">
                 <Star className="w-3.5 h-3.5 text-amber-400 fill-current" />
-                <span className="text-amber-700 text-xs font-bold">{station.ratingAvg.toFixed(1)}</span>
-                <span className="text-amber-500 text-xs">({station.totalOrders})</span>
+                <span className="text-amber-400 text-xs font-bold">{station.ratingAvg.toFixed(1)}</span>
+                <span className="text-amber-400/70 text-xs">({station.totalOrders})</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-green-50 border border-green-100 rounded-full px-3 py-1">
+              <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 rounded-full px-3 py-1">
                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                <span className="text-green-700 text-xs font-medium">Open · 8AM–6PM</span>
+                <span className="text-green-500 text-xs font-medium">Open · 8AM–6PM</span>
               </div>
             </div>
           </div>
@@ -260,7 +260,7 @@ export default function StationDetailPage() {
               <>
                 {/* Order type */}
                 <div>
-                  <h2 className="text-sm font-bold text-gray-900 mb-2.5">Order Type</h2>
+                  <h2 className="text-sm font-bold text-[var(--text-primary)] mb-2.5">Order Type</h2>
                   <div className="grid grid-cols-2 gap-2.5">
                     {ORDER_TYPES.map(({ type, icon: Icon, label, desc, disabled }) => (
                       <button
@@ -269,17 +269,17 @@ export default function StationDetailPage() {
                         disabled={disabled}
                         className={cn(
                           'p-4 rounded-2xl border-2 text-left transition-all relative',
-                          disabled ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed' :
-                          orderType === type ? 'border-brand-500 bg-brand-50' : 'border-gray-100 bg-white hover:border-gray-200'
+                          disabled ? 'border-[var(--border)] bg-[var(--bg-card2)] opacity-60 cursor-not-allowed' :
+                          orderType === type ? 'border-brand-500 bg-brand-500/10' : 'border-[var(--border)] bg-[var(--bg-card)] hover:border-brand-500/50'
                         )}
                       >
-                        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center mb-2.5', orderType === type && !disabled ? 'bg-brand-500' : 'bg-gray-100')}>
-                          <Icon className={cn('w-4 h-4', orderType === type && !disabled ? 'text-white' : 'text-gray-400')} />
+                        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center mb-2.5', orderType === type && !disabled ? 'bg-brand-500' : 'bg-[var(--bg-card2)]')}>
+                          <Icon className={cn('w-4 h-4', orderType === type && !disabled ? 'text-white' : 'text-[var(--text-muted)]')} />
                         </div>
-                        <p className={cn('text-sm font-bold', disabled ? 'text-gray-400' : orderType === type ? 'text-brand-700' : 'text-gray-800')}>{label}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                        <p className={cn('text-sm font-bold', disabled ? 'text-[var(--text-muted)]' : orderType === type ? 'text-brand-500' : 'text-[var(--text-primary)]')}>{label}</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-0.5">{desc}</p>
                         {disabled && (
-                          <span className="absolute top-2 right-2 text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">Soon</span>
+                          <span className="absolute top-2 right-2 text-[10px] font-bold text-[var(--text-muted)] bg-[var(--bg-card2)] px-1.5 py-0.5 rounded-full">Soon</span>
                         )}
                       </button>
                     ))}
@@ -288,12 +288,12 @@ export default function StationDetailPage() {
 
                 {/* Cylinder sizes */}
                 <div>
-                  <h2 className="text-sm font-bold text-gray-900 mb-1">Select Cylinders</h2>
-                  <p className="text-xs text-gray-400 mb-2.5">Tick to select, use +/− to adjust quantity</p>
+                  <h2 className="text-sm font-bold text-[var(--text-primary)] mb-1">Select Cylinders</h2>
+                  <p className="text-xs text-[var(--text-muted)] mb-2.5">Tick to select, use +/− to adjust quantity</p>
                   {available.length === 0 ? (
-                    <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-center">
                       <span className="text-2xl">📦</span>
-                      <p className="text-sm font-bold text-red-600 mt-2">Station is out of stock</p>
+                      <p className="text-sm font-bold text-red-500 mt-2">Station is out of stock</p>
                       <p className="text-xs text-red-400 mt-1">No cylinders are currently available at this station</p>
                     </div>
                   ) : (
@@ -308,19 +308,14 @@ export default function StationDetailPage() {
                           <div
                             key={listing.size}
                             className={cn(
-                              'bg-white rounded-2xl border-2 p-4 transition-all',
-                              checked ? 'border-brand-500 bg-brand-50 shadow-lg shadow-brand-500/10' : 'border-gray-100 hover:border-gray-200'
+                              'bg-[var(--bg-card)] rounded-2xl border-2 p-4 transition-all',
+                              checked ? 'border-brand-500 bg-brand-500/10' : 'border-[var(--border)] hover:border-brand-500/50'
                             )}
                           >
                             <div className="flex items-center gap-3">
-                              {/* Checkbox */}
-                              <button
-                                onClick={() => checked ? setQty(listing.size, -qty) : setQty(listing.size, 1)}
-                                className="shrink-0"
-                              >
-                                <div className={cn(
-                                  'w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
-                                  checked ? 'bg-brand-500 border-brand-500' : 'border-gray-300 bg-white'
+                              <button onClick={() => checked ? setQty(listing.size, -qty) : setQty(listing.size, 1)} className="shrink-0">
+                                <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
+                                  checked ? 'bg-brand-500 border-brand-500' : 'border-[var(--text-muted)] bg-[var(--bg-card2)]'
                                 )}>
                                   {checked && (
                                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -329,56 +324,43 @@ export default function StationDetailPage() {
                                   )}
                                 </div>
                               </button>
-
-                              {/* Cylinder icon */}
-                              <div className={cn(
-                                'w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0',
-                                checked ? 'bg-brand-500' : 'bg-gray-50'
+                              <div className={cn('w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0',
+                                checked ? 'bg-brand-500' : 'bg-[var(--bg-card2)]'
                               )}>
-                                <span className={cn('text-lg font-black leading-none', checked ? 'text-white' : 'text-gray-700')}>{listing.size}</span>
-                                <span className={cn('text-[10px] font-bold', checked ? 'text-white/70' : 'text-gray-400')}>kg</span>
+                                <span className={cn('text-lg font-black leading-none', checked ? 'text-white' : 'text-[var(--text-primary)]')}>{listing.size}</span>
+                                <span className={cn('text-[10px] font-bold', checked ? 'text-white/70' : 'text-[var(--text-muted)]')}>kg</span>
                               </div>
-
-                              {/* Info */}
                               <div className="flex-1 min-w-0">
-                                <p className="font-bold text-gray-900 text-sm">{listing.size}kg &middot; {formatCurrency(unitPrice)}</p>
+                                <p className="font-bold text-[var(--text-primary)] text-sm">{listing.size}kg &middot; {formatCurrency(unitPrice)}</p>
                                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                  <span className={cn(
-                                    'text-[11px] font-semibold px-2 py-0.5 rounded-full',
-                                    lowStock ? 'text-amber-700 bg-amber-50' : 'text-green-700 bg-green-50'
+                                  <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full',
+                                    lowStock ? 'text-amber-500 bg-amber-500/10' : 'text-green-500 bg-green-500/10'
                                   )}>
                                     {lowStock ? `Only ${listing.stockCount} left` : `${listing.stockCount} in stock`}
                                   </span>
                                   {savings > 0 && (
-                                    <span className="text-[11px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                    <span className="text-[11px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
                                       Save {formatCurrency(savings)}
                                     </span>
                                   )}
                                 </div>
                               </div>
-
-                              {/* Quantity stepper — only visible when checked */}
                               {checked && (
                                 <div className="flex items-center gap-2 shrink-0">
-                                  <button
-                                    onClick={() => setQty(listing.size, -1)}
-                                    className="w-7 h-7 rounded-full border-2 border-brand-200 bg-white flex items-center justify-center text-brand-600 font-bold hover:bg-brand-100 transition-all"
+                                  <button onClick={() => setQty(listing.size, -1)}
+                                    className="w-7 h-7 rounded-full border-2 border-brand-500/30 bg-[var(--bg-card)] flex items-center justify-center text-brand-500 font-bold hover:bg-brand-500/10 transition-all"
                                   >−</button>
-                                  <span className="w-5 text-center font-black text-sm text-brand-600">{qty}</span>
-                                  <button
-                                    onClick={() => setQty(listing.size, 1)}
-                                    disabled={qty >= listing.stockCount}
-                                    className="w-7 h-7 rounded-full border-2 border-brand-200 bg-white flex items-center justify-center text-brand-600 font-bold hover:bg-brand-100 transition-all disabled:opacity-30"
+                                  <span className="w-5 text-center font-black text-sm text-brand-500">{qty}</span>
+                                  <button onClick={() => setQty(listing.size, 1)} disabled={qty >= listing.stockCount}
+                                    className="w-7 h-7 rounded-full border-2 border-brand-500/30 bg-[var(--bg-card)] flex items-center justify-center text-brand-500 font-bold hover:bg-brand-500/10 transition-all disabled:opacity-30"
                                   >+</button>
                                 </div>
                               )}
                             </div>
-
-                            {/* Subtotal row */}
                             {checked && (
-                              <div className="mt-3 pt-3 border-t border-brand-100 flex justify-between text-xs">
-                                <span className="text-brand-600">{qty} × {formatCurrency(unitPrice)}</span>
-                                <span className="font-bold text-brand-700">{formatCurrency(unitPrice * qty)}</span>
+                              <div className="mt-3 pt-3 border-t border-brand-500/20 flex justify-between text-xs">
+                                <span className="text-brand-500">{qty} × {formatCurrency(unitPrice)}</span>
+                                <span className="font-bold text-brand-500">{formatCurrency(unitPrice * qty)}</span>
                               </div>
                             )}
                           </div>
@@ -391,19 +373,18 @@ export default function StationDetailPage() {
                 {/* Out of stock */}
                 {station.cylinderListings.some((l) => !l.isAvailable || l.stockCount === 0) && (
                   <div>
-                    <h2 className="text-sm font-bold text-gray-400 mb-2">Out of Stock</h2>
+                    <h2 className="text-sm font-bold text-[var(--text-muted)] mb-2">Out of Stock</h2>
                     <div className="space-y-2">
                       {station.cylinderListings.filter((l) => !l.isAvailable || l.stockCount === 0).map((l) => (
-                        <div key={l.size} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 opacity-50">
-                          <div className="w-16 h-16 rounded-2xl bg-gray-100 flex flex-col items-center justify-center shrink-0">
-                            <span className="text-2xl font-black text-gray-400">{l.size}</span>
-                            <span className="text-[11px] text-gray-400">kg</span>
+                        <div key={l.size} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 flex items-center gap-4 opacity-50">
+                          <div className="w-12 h-12 rounded-2xl bg-[var(--bg-card2)] flex flex-col items-center justify-center shrink-0">
+                            <span className="text-lg font-black text-[var(--text-muted)]">{l.size}</span>
+                            <span className="text-[11px] text-[var(--text-muted)]">kg</span>
                           </div>
                           <div>
-                            <p className="font-bold text-gray-500 text-sm">{l.size}kg Cylinder</p>
-                            <p className="text-xs text-gray-400">{CYLINDER_LABELS[l.size]}</p>
+                            <p className="font-bold text-[var(--text-muted)] text-sm">{l.size}kg Cylinder</p>
                           </div>
-                          <span className="ml-auto text-xs text-red-400 bg-red-50 px-2.5 py-1 rounded-full font-medium">Out of stock</span>
+                          <span className="ml-auto text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full font-medium">Out of stock</span>
                         </div>
                       ))}
                     </div>
@@ -417,14 +398,14 @@ export default function StationDetailPage() {
               <>
                 {/* Cart recap */}
                 {totalQty > 0 && (
-                  <div className="bg-brand-50 border border-brand-100 rounded-2xl p-4 space-y-2">
+                  <div className="bg-brand-500/10 border border-brand-500/20 rounded-2xl p-4 space-y-2">
                     {cartItems.map((item) => (
                       <div key={item.size} className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-brand-500 rounded-xl flex flex-col items-center justify-center shrink-0">
                           <span className="text-white font-black text-sm leading-none">{item.size}</span>
                           <span className="text-white/70 text-[10px]">kg</span>
                         </div>
-                        <p className="flex-1 font-bold text-gray-900 text-sm">{item.size}kg × {item.quantity}</p>
+                        <p className="flex-1 font-bold text-[var(--text-primary)] text-sm">{item.size}kg × {item.quantity}</p>
                         <p className="font-black text-brand-600">{formatCurrency(item.subtotal)}</p>
                       </div>
                     ))}
@@ -432,8 +413,8 @@ export default function StationDetailPage() {
                 )}
 
                 {/* Delivery address */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm space-y-3">
-                  <h2 className="text-sm font-bold text-gray-900">Delivery Address</h2>
+                <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 space-y-3">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">Delivery Address</h2>
 
                   {/* Saved addresses */}
                   {savedAddresses.length > 0 && (
@@ -453,23 +434,23 @@ export default function StationDetailPage() {
                             }}
                             className={cn(
                               'w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
-                              selected ? 'border-brand-500 bg-brand-50' : 'border-gray-100 hover:border-gray-200'
+                              selected ? 'border-brand-500 bg-brand-500/10' : 'border-[var(--border)] hover:border-brand-500/50'
                             )}
                           >
                             <div className={cn(
                               'w-8 h-8 rounded-xl flex items-center justify-center shrink-0',
-                              selected ? 'bg-brand-500' : 'bg-gray-100'
+                              selected ? 'bg-brand-500' : 'bg-[var(--bg-card2)]'
                             )}>
-                              <MapPin className={cn('w-3.5 h-3.5', selected ? 'text-white' : 'text-gray-400')} />
+                              <MapPin className={cn('w-3.5 h-3.5', selected ? 'text-white' : 'text-[var(--text-muted)]')} />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-gray-900">{addr.label}</p>
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">{addr.label}</p>
                                 {addr.isDefault && (
                                   <span className="text-[10px] font-bold text-brand-600 bg-brand-50 border border-brand-100 px-1.5 py-0.5 rounded-full">Default</span>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-400 truncate">{addr.street}, {addr.city}</p>
+                              <p className="text-xs text-[var(--text-muted)] truncate">{addr.street}, {addr.city}</p>
                             </div>
                             {selected && (
                               <svg className="w-4 h-4 text-brand-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -480,9 +461,9 @@ export default function StationDetailPage() {
                         );
                       })}
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 h-px bg-gray-100" />
-                        <span className="text-xs text-gray-400">or use a different location</span>
-                        <div className="flex-1 h-px bg-gray-100" />
+                        <div className="flex-1 h-px bg-[var(--border)]" />
+                        <span className="text-xs text-[var(--text-muted)]">or use a different location</span>
+                        <div className="flex-1 h-px bg-[var(--border)]" />
                       </div>
                     </div>
                   )}
@@ -494,27 +475,27 @@ export default function StationDetailPage() {
                     className={cn(
                       'w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
                       locationLabel && !savedAddresses.some((a: any) => a.street === street)
-                        ? 'border-brand-500 bg-brand-50'
-                        : 'border-dashed border-gray-200 hover:border-brand-300'
+                        ? 'border-brand-500 bg-brand-500/10'
+                        : 'border-dashed border-[var(--border)] hover:border-brand-500/50'
                     )}
                   >
                     <div className={cn(
                       'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
-                      locationLabel && !savedAddresses.some((a: any) => a.street === street) ? 'bg-brand-500' : 'bg-gray-100'
+                      locationLabel && !savedAddresses.some((a: any) => a.street === street) ? 'bg-brand-500' : 'bg-[var(--bg-card2)]'
                     )}>
-                      <MapPin className={cn('w-4 h-4', locationLabel && !savedAddresses.some((a: any) => a.street === street) ? 'text-white' : 'text-gray-400')} />
+                      <MapPin className={cn('w-4 h-4', locationLabel && !savedAddresses.some((a: any) => a.street === street) ? 'text-white' : 'text-[var(--text-muted)]')} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-500">Pick a different location</p>
-                      <p className="text-xs text-gray-400">Open map to search or pin</p>
+                      <p className="text-sm font-semibold text-[var(--text-muted)]">Pick a different location</p>
+                      <p className="text-xs text-[var(--text-muted)]">Open map to search or pin</p>
                     </div>
                     <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
                   </button>
                 </div>
 
                 {/* Payment method */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-                  <h2 className="text-sm font-bold text-gray-900 mb-3">Payment Method</h2>
+                <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)] mb-3">Payment Method</h2>
                   <div className="space-y-2">
                     {PAYMENT_METHODS.map(({ method, icon: Icon, label, desc }) => (
                       <button
@@ -522,15 +503,15 @@ export default function StationDetailPage() {
                         onClick={() => setPaymentMethod(method)}
                         className={cn(
                           'w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
-                          paymentMethod === method ? 'border-brand-500 bg-brand-50' : 'border-gray-100 hover:border-gray-200'
+                          paymentMethod === method ? 'border-brand-500 bg-brand-500/10' : 'border-[var(--border)] hover:border-brand-500/50'
                         )}
                       >
-                        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', paymentMethod === method ? 'bg-brand-500' : 'bg-gray-100')}>
-                          <Icon className={cn('w-4 h-4', paymentMethod === method ? 'text-white' : 'text-gray-500')} />
+                        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', paymentMethod === method ? 'bg-brand-500' : 'bg-[var(--bg-card2)]')}>
+                          <Icon className={cn('w-4 h-4', paymentMethod === method ? 'text-white' : 'text-[var(--text-muted)]')} />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-900">{label}</p>
-                          <p className="text-xs text-gray-400">{desc}</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{label}</p>
+                          <p className="text-xs text-[var(--text-muted)]">{desc}</p>
                         </div>
                         {paymentMethod === method && <CheckCircle2 className="w-4 h-4 text-brand-500 shrink-0" />}
                       </button>
@@ -544,7 +525,7 @@ export default function StationDetailPage() {
                           onClick={() => setMobileProvider(value)}
                           className={cn(
                             'py-2 px-3 rounded-xl text-xs font-semibold border-2 transition-all',
-                            mobileProvider === value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                            mobileProvider === value ? 'border-brand-500 bg-brand-500/10 text-brand-500' : 'border-[var(--border)] text-[var(--text-muted)] hover:border-brand-500/50'
                           )}
                         >
                           {label}
@@ -559,80 +540,70 @@ export default function StationDetailPage() {
             {/* ── Step 2: Review & confirm ── */}
             {step === 2 && totalQty > 0 && (
               <>
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
-                  <h2 className="text-sm font-bold text-gray-900">Order Review</h2>
-
-                  {/* Cylinders */}
+                <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 space-y-4">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">Order Review</h2>
                   <div className="space-y-2">
                     {cartItems.map((item) => (
-                      <div key={item.size} className="flex items-center gap-3 bg-brand-50 rounded-xl p-3">
+                      <div key={item.size} className="flex items-center gap-3 bg-brand-500/10 rounded-xl p-3">
                         <div className="w-10 h-10 bg-brand-500 rounded-xl flex flex-col items-center justify-center shrink-0">
                           <span className="text-white font-black text-sm leading-none">{item.size}</span>
                           <span className="text-white/70 text-[10px]">kg</span>
                         </div>
                         <div className="flex-1">
-                          <p className="font-bold text-gray-900 text-sm">{item.size}kg × {item.quantity}</p>
-                          <p className="text-xs text-brand-600 font-medium">{ORDER_TYPE_LABELS[orderType]}</p>
+                          <p className="font-bold text-[var(--text-primary)] text-sm">{item.size}kg × {item.quantity}</p>
+                          <p className="text-xs text-brand-500 font-medium">{ORDER_TYPE_LABELS[orderType]}</p>
                         </div>
-                        <p className="font-bold text-brand-600">{formatCurrency(item.subtotal)}</p>
+                        <p className="font-bold text-brand-500">{formatCurrency(item.subtotal)}</p>
                       </div>
                     ))}
                   </div>
-
-                  {/* Address */}
                   <div className="flex items-start gap-2.5 text-sm">
                     <MapPin className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" />
                     <div>
-                      <p className="font-semibold text-gray-900">{street}</p>
-                      <p className="text-gray-500">{city}</p>
+                      <p className="font-semibold text-[var(--text-primary)]">{street}</p>
+                      <p className="text-[var(--text-muted)]">{city}</p>
                     </div>
                   </div>
-
-                  {/* Payment */}
                   <div className="flex items-center gap-2.5 text-sm">
                     {(() => {
                       const pm = PAYMENT_METHODS.find((p) => p.method === paymentMethod)!;
                       const Icon = pm.icon;
                       return (
                         <>
-                          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                            <Icon className="w-4 h-4 text-gray-500" />
+                          <div className="w-8 h-8 bg-[var(--bg-card2)] rounded-lg flex items-center justify-center shrink-0">
+                            <Icon className="w-4 h-4 text-[var(--text-muted)]" />
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-900">{pm.label}</p>
+                            <p className="font-semibold text-[var(--text-primary)]">{pm.label}</p>
                             {paymentMethod === 'mobile_money' && (
-                              <p className="text-xs text-gray-500">{MOBILE_PROVIDERS.find((p) => p.value === mobileProvider)?.label}</p>
+                              <p className="text-xs text-[var(--text-muted)]">{MOBILE_PROVIDERS.find((p) => p.value === mobileProvider)?.label}</p>
                             )}
                           </div>
                         </>
                       );
                     })()}
                   </div>
-
-                  {/* Price breakdown */}
-                  <div className="border-t border-gray-100 pt-4 space-y-2.5">
-                    <div className="flex justify-between text-sm text-gray-500">
+                  <div className="border-t border-[var(--border)] pt-4 space-y-2.5">
+                    <div className="flex justify-between text-sm text-[var(--text-muted)]">
                       <span>Cylinders ({totalQty})</span>
-                      <span className="font-semibold text-gray-800">{formatCurrency(cylinderSubtotal)}</span>
+                      <span className="font-semibold text-[var(--text-primary)]">{formatCurrency(cylinderSubtotal)}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-gray-500">
+                    <div className="flex justify-between text-sm text-[var(--text-muted)]">
                       <span>Delivery fee</span>
-                      <span className="font-semibold text-gray-800">{formatCurrency(deliveryFee)}</span>
+                      <span className="font-semibold text-[var(--text-primary)]">{formatCurrency(deliveryFee)}</span>
                     </div>
-                    <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-                      <span className="font-bold text-gray-900">Total</span>
-                      <span className="font-black text-brand-600 text-xl">{formatCurrency(total)}</span>
+                    <div className="flex justify-between items-center pt-1 border-t border-[var(--border)]">
+                      <span className="font-bold text-[var(--text-primary)]">Total</span>
+                      <span className="font-black text-brand-500 text-xl">{formatCurrency(total)}</span>
                     </div>
                   </div>
                 </div>
-
-                {/* Trust badges */}
                 <div className="space-y-2">
                   {[
                     { icon: ShieldCheck, text: 'Payment held in escrow until delivery' },
                     { icon: Zap, text: 'Delivered within 30–60 minutes' },
                   ].map(({ icon: Icon, text }) => (
-                    <div key={text} className="flex items-center gap-2 text-xs text-gray-500">
+                    <div key={text} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                       <Icon className="w-3.5 h-3.5 text-brand-500 shrink-0" />
                       {text}
                     </div>
@@ -644,10 +615,8 @@ export default function StationDetailPage() {
             {/* ── Desktop inline nav buttons ── */}
             <div className="hidden lg:flex gap-3 pt-2">
               {step > 0 && (
-                <button
-                  onClick={() => setStep((s) => s - 1)}
-                  className="h-12 px-5 rounded-xl border-2 border-gray-200 text-gray-700 font-bold text-sm flex items-center gap-1.5 hover:border-gray-300 transition-all"
-                >
+                <button onClick={() => setStep((s) => s - 1)}
+                  className="h-12 px-5 rounded-xl border-2 border-[var(--border)] text-[var(--text-primary)] font-bold text-sm flex items-center gap-1.5 hover:border-brand-500/50 transition-all">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
               )}
@@ -678,53 +647,49 @@ export default function StationDetailPage() {
           {/* ── Desktop sticky order summary sidebar ── */}
           {totalQty > 0 && (
             <div className="hidden lg:block w-80 shrink-0">
-              <div className="sticky top-24 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-                <h3 className="text-sm font-bold text-gray-900">Order Summary</h3>
-
+              <div className="sticky top-24 bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 space-y-4">
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Order Summary</h3>
                 <div className="space-y-2">
                   {cartItems.map((item) => (
-                    <div key={item.size} className="flex items-center gap-3 bg-brand-50 rounded-xl p-3">
+                    <div key={item.size} className="flex items-center gap-3 bg-brand-500/10 rounded-xl p-3">
                       <div className="w-10 h-10 bg-brand-500 rounded-xl flex flex-col items-center justify-center shrink-0">
                         <span className="text-white font-black text-sm leading-none">{item.size}</span>
                         <span className="text-white/70 text-[10px]">kg</span>
                       </div>
-                      <p className="flex-1 font-bold text-gray-900 text-sm">{item.size}kg × {item.quantity}</p>
-                      <p className="font-bold text-brand-600 text-sm">{formatCurrency(item.subtotal)}</p>
+                      <p className="flex-1 font-bold text-[var(--text-primary)] text-sm">{item.size}kg × {item.quantity}</p>
+                      <p className="font-bold text-brand-500 text-sm">{formatCurrency(item.subtotal)}</p>
                     </div>
                   ))}
                 </div>
-
                 {street && (
                   <div className="flex items-start gap-2 text-sm">
                     <MapPin className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" />
                     <div>
-                      <p className="font-semibold text-gray-900">{street}</p>
-                      <p className="text-gray-500">{city}</p>
+                      <p className="font-semibold text-[var(--text-primary)]">{street}</p>
+                      <p className="text-[var(--text-muted)]">{city}</p>
                     </div>
                   </div>
                 )}
-
-                <div className="border-t border-gray-100 pt-4 space-y-2.5">
-                  <div className="flex justify-between text-sm text-gray-500">
+                <div className="border-t border-[var(--border)] pt-4 space-y-2.5">
+                  <div className="flex justify-between text-sm text-[var(--text-muted)]">
                     <span>Cylinders ({totalQty})</span>
-                    <span className="font-semibold text-gray-800">{formatCurrency(cylinderSubtotal)}</span>
+                    <span className="font-semibold text-[var(--text-primary)]">{formatCurrency(cylinderSubtotal)}</span>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-500">
+                  <div className="flex justify-between text-sm text-[var(--text-muted)]">
                     <span>Delivery fee</span>
-                    <span className="font-semibold text-gray-800">{formatCurrency(deliveryFee)}</span>
+                    <span className="font-semibold text-[var(--text-primary)]">{formatCurrency(deliveryFee)}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-                    <span className="font-bold text-gray-900">Total</span>
-                    <span className="font-black text-brand-600 text-xl">{formatCurrency(total)}</span>
+                  <div className="flex justify-between items-center pt-1 border-t border-[var(--border)]">
+                    <span className="font-bold text-[var(--text-primary)]">Total</span>
+                    <span className="font-black text-brand-500 text-xl">{formatCurrency(total)}</span>
                   </div>
                 </div>
-
                 <div className="space-y-2 pt-1">
                   {[
                     { icon: ShieldCheck, text: 'Payment held in escrow' },
                     { icon: Zap, text: 'Delivered in 30–60 minutes' },
                   ].map(({ icon: Icon, text }) => (
-                    <div key={text} className="flex items-center gap-2 text-xs text-gray-500">
+                    <div key={text} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                       <Icon className="w-3.5 h-3.5 text-brand-500 shrink-0" />
                       {text}
                     </div>
@@ -737,13 +702,11 @@ export default function StationDetailPage() {
       </div>
 
       {/* ── Sticky bottom nav (mobile only) ── */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 px-4 py-3 z-40">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 bg-[var(--bg-card)] border-t border-[var(--border)] px-4 py-3 z-40">
         <div className="flex gap-3 max-w-lg mx-auto">
           {step > 0 && (
-            <button
-              onClick={() => setStep((s) => s - 1)}
-              className="h-12 px-5 rounded-xl border-2 border-gray-200 text-gray-700 font-bold text-sm flex items-center gap-1.5 hover:border-gray-300 transition-all"
-            >
+            <button onClick={() => setStep((s) => s - 1)}
+              className="h-12 px-5 rounded-xl border-2 border-[var(--border)] text-[var(--text-primary)] font-bold text-sm flex items-center gap-1.5 transition-all">
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
           )}

@@ -1,7 +1,8 @@
 'use client';
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flame, ArrowRight, ChevronLeft } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, ChevronLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/lib/auth';
 import { authApi } from '@/lib/api';
@@ -136,6 +137,16 @@ function LoginForm() {
       const res = await authApi.verifyOTP(e164Ref.current, code, 'login');
       const { token, user } = res.data;
       login(token, user);
+      // Request location permission after login
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => {
+            localStorage.setItem('user_lat', String(coords.latitude));
+            localStorage.setItem('user_lng', String(coords.longitude));
+          },
+          () => {} // silent fail
+        );
+      }
       router.push(ROLE_HOME[user.role] ?? '/user');
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Incorrect OTP. Please try again.';
@@ -225,9 +236,7 @@ export default function LoginPage() {
         <div className="absolute bottom-0 right-0 w-[300px] h-[300px] bg-brand-600/10 rounded-full blur-[80px] pointer-events-none" />
 
         <div className="flex items-center gap-3 relative z-10">
-          <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30">
-            <Flame className="w-5 h-5 text-white" />
-          </div>
+          <Image src="/logo.png" alt="GasGo" width={40} height={40} className="rounded-xl" />
           <span className="text-white font-bold text-lg tracking-tight">GasGo</span>
         </div>
 
@@ -268,9 +277,7 @@ export default function LoginPage() {
 
           {/* Mobile logo — centred */}
           <div className="flex lg:hidden flex-col items-center gap-2 text-center">
-            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
-              <Flame className="w-5 h-5 text-white" />
-            </div>
+            <Image src="/logo.png" alt="GasGo" width={40} height={40} className="rounded-xl" />
             <span className="font-black text-gray-900 text-lg">GasGo</span>
           </div>
 
