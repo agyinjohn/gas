@@ -2,17 +2,22 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  MapPin, Search, Flame, Star, ChevronRight,
-  SlidersHorizontal, AlertCircle, Loader2, Navigation,
+  MapPin, ChevronDown, Bell, User, Flame,
+  Plus, Navigation, AlertCircle, Loader2, Star, Gift, Map,
+  Sun, Moon, SlidersHorizontal,
 } from 'lucide-react';
-import { stationsApi } from '@/lib/api';
+import { stationsApi, ordersApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useTheme } from '@/components/shared/ThemeProvider';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { PickedLocation } from '@/components/LocationPicker';
 
 const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
+
+const QUICK_SIZES = [6, 7, 10, 12, 15, 19];
 
 interface Listing {
   size: number;
@@ -33,98 +38,59 @@ interface Station {
   cylinderListings: Listing[];
 }
 
-// ─── Station card ─────────────────────────────────────────────────────────────
+// ─── Nearby Station Card (Figma style) ───────────────────────────────────────
 
 function StationCard({ station }: { station: Station }) {
   const available = station.cylinderListings.filter((l) => l.isAvailable);
   const allOutOfStock = station.cylinderListings.length > 0 && available.length === 0;
-  const minPrice  = available.length ? Math.min(...available.map((l) => l.fillPrice)) : null;
+  const minPrice = available.length ? Math.min(...available.map((l) => l.fillPrice)) : null;
 
   return (
     <Link href={`/user/stations/${station.id}`}>
       <div className={cn(
-        'bg-white rounded-2xl border p-4 hover:shadow-md transition-all cursor-pointer h-full',
-        allOutOfStock ? 'border-gray-100 opacity-60' : 'border-gray-100 hover:border-gray-200'
+        'bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 h-full transition-all',
+        allOutOfStock ? 'opacity-60' : 'active:scale-[0.98]'
       )}>
-        <div className="flex items-start gap-3">
-          {/* Icon */}
-          <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center shrink-0', allOutOfStock ? 'bg-gray-100' : 'bg-brand-50')}>
-            <Flame className={cn('w-5 h-5', allOutOfStock ? 'text-gray-300' : 'text-brand-500')} />
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="font-bold text-gray-900 text-sm leading-snug">{station.name}</h3>
-              {allOutOfStock
-                ? <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full shrink-0">Out of stock</span>
-                : <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mt-0.5" />
-              }
-            </div>
-
-            <div className="flex items-center gap-1 mt-0.5 mb-2">
-              <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
-              <p className="text-xs text-gray-400 truncate">{station.address}</p>
-            </div>
-
-            {/* Meta */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="flex items-center gap-1 text-xs font-medium text-gray-600">
-                <MapPin className="w-3 h-3 text-brand-400" />
-                {station.distanceKm} km
-              </span>
-              <span className="flex items-center gap-1 text-xs font-medium text-amber-500">
-                <Star className="w-3 h-3 fill-current" />
-                {station.ratingAvg.toFixed(1)}
-              </span>
-              {minPrice && (
-                <span className="text-xs font-bold text-brand-600 ml-auto">
-                  from GH₵{minPrice}
-                </span>
-              )}
-            </div>
-
-            {/* Size pills */}
-            {available.length > 0 ? (
-              <div className="flex gap-1.5 mt-2 flex-wrap">
-                {available.map((l) => (
-                  <span key={l.size} className="text-[11px] font-semibold text-brand-700 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded-full">
-                    {l.size}kg
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <span className="text-[11px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full mt-2 inline-block">
-                ⚠️ Out of stock
-              </span>
-            )}
-          </div>
+        {/* Icon */}
+        <div className={cn(
+          'w-10 h-10 rounded-xl flex items-center justify-center mb-3',
+          allOutOfStock ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
+        )}>
+          <Flame className={cn('w-5 h-5', allOutOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
         </div>
+
+        <h3 className="font-semibold text-[var(--text-primary)] text-sm leading-snug mb-0.5 truncate">
+          {station.name}
+        </h3>
+        <p className="text-xs text-[var(--text-muted)] truncate mb-2">{station.address}</p>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+            <MapPin className="w-3 h-3" />{station.distanceKm} km
+          </span>
+          <span className="flex items-center gap-1 text-xs text-amber-500">
+            <Star className="w-3 h-3 fill-current" />{station.ratingAvg.toFixed(1)}
+          </span>
+        </div>
+
+        {minPrice && (
+          <p className="text-xs font-bold text-brand-500 mt-2">From GHS {minPrice}</p>
+        )}
+        {allOutOfStock && (
+          <p className="text-xs font-bold text-red-500 mt-2">Out of stock</p>
+        )}
       </div>
     </Link>
   );
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-
 function StationSkeleton() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
-      <div className="flex gap-3">
-        <div className="w-11 h-11 bg-gray-200 rounded-xl shrink-0" />
-        <div className="flex-1 space-y-2">
-          <div className="h-4 bg-gray-200 rounded w-2/3" />
-          <div className="h-3 bg-gray-100 rounded w-1/2" />
-          <div className="flex gap-2">
-            <div className="h-3 bg-gray-100 rounded w-12" />
-            <div className="h-3 bg-gray-100 rounded w-10" />
-          </div>
-          <div className="flex gap-1.5">
-            <div className="h-5 bg-gray-100 rounded-full w-10" />
-            <div className="h-5 bg-gray-100 rounded-full w-10" />
-          </div>
-        </div>
-      </div>
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 animate-pulse">
+      <div className="w-10 h-10 bg-[var(--bg-card2)] rounded-xl mb-3" />
+      <div className="h-4 bg-[var(--bg-card2)] rounded w-3/4 mb-1.5" />
+      <div className="h-3 bg-[var(--bg-card2)] rounded w-1/2 mb-2" />
+      <div className="h-3 bg-[var(--bg-card2)] rounded w-1/3" />
     </div>
   );
 }
@@ -133,24 +99,20 @@ function StationSkeleton() {
 
 export default function UserHomePage() {
   const { user } = useAuth();
+  const { theme, toggle } = useTheme();
+  const router = useRouter();
+
   const [coords, setCoords]               = useState<{ lat: number; lng: number } | null>(null);
   const [locationState, setLocationState] = useState<'detecting' | 'granted' | 'denied' | 'manual'>('detecting');
   const [showPicker, setShowPicker]       = useState(false);
-  const [locationLabel, setLocationLabel] = useState('');
-  const [radius, setRadius]               = useState(25);
-  const [search, setSearch]               = useState('');
+  const [locationLabel, setLocationLabel] = useState('Location goes here...');
+  const [radius, setRadius]               = useState(10);
 
   useEffect(() => {
     if (!navigator.geolocation) { setLocationState('denied'); return; }
-
-    // Check permission state first if API is available
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-        if (result.state === 'denied') {
-          setLocationState('denied');
-          return;
-        }
-        // 'granted' or 'prompt' — try to get position
+        if (result.state === 'denied') { setLocationState('denied'); return; }
         requestLocation();
         result.onchange = () => {
           if (result.state === 'granted') requestLocation();
@@ -167,40 +129,48 @@ export default function UserHomePage() {
       ({ coords: c }) => {
         setCoords({ lat: c.latitude, lng: c.longitude });
         setLocationState('granted');
+        setLocationLabel('Current location');
       },
-      (err) => {
-        // code 1 = PERMISSION_DENIED, others are timeout/unavailable — keep prompting
-        if (err.code === 1) setLocationState('denied');
-        else setLocationState('denied'); // still show manual option
-      },
+      () => setLocationState('denied'),
       { timeout: 15000, enableHighAccuracy: true, maximumAge: 60000 }
     );
   }
 
   function handleLocationConfirm(loc: PickedLocation) {
     setCoords({ lat: loc.lat, lng: loc.lng });
-    setLocationLabel(loc.formatted);
+    setLocationLabel(loc.formatted.split(',')[0]);
     setLocationState('manual');
     setShowPicker(false);
   }
 
-  const { data, isLoading } = useQuery({
+  // Nearby stations
+  const { data: stationsData, isLoading: stationsLoading } = useQuery({
     queryKey: ['stations', 'nearby', coords, radius],
     queryFn:  () => stationsApi.getNearby(coords!.lat, coords!.lng, radius).then((r) => r.data),
     enabled:  !!coords,
   });
 
-  const allStations: Station[] = data?.stations ?? [];
-  const stations = allStations.filter((s) =>
-    search ? s.name.toLowerCase().includes(search.toLowerCase()) : true
+  // Active order (first in-progress order)
+  const { data: ordersData } = useQuery({
+    queryKey: ['orders', 'active'],
+    queryFn:  () => ordersApi.list().then((r) => r.data),
+    refetchInterval: 30000,
+  });
+
+  const stations: Station[] = stationsData?.stations ?? [];
+  const activeOrder = ordersData?.orders?.find(
+    (o: any) => !['delivered', 'cancelled'].includes(o.status)
   );
 
-  const firstName = user?.name && user.name !== 'GasGo User'
-    ? user.name.split(' ')[0]
-    : null;
+  const STATUS_LABELS: Record<string, string> = {
+    pending:    'Order Placed',
+    accepted:   'Accepted',
+    at_station: 'Being Prepared',
+    en_route:   'Out for Delivery',
+  };
 
   return (
-    <div className="min-h-full bg-gray-50">
+    <div className="min-h-full bg-[var(--bg)]">
 
       {showPicker && (
         <LocationPicker
@@ -210,141 +180,219 @@ export default function UserHomePage() {
         />
       )}
 
-      {/* ── Top bar ── */}
-      <div className="bg-white border-b border-gray-100 px-4 lg:px-8 py-4 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto">
-
-          {/* Greeting + location status */}
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-base font-black text-gray-900">
-                {firstName ? `Hey, ${firstName} 👋` : 'Find gas near you'}
-              </h1>
-            </div>
+      {/* ── Header ── */}
+      <div className="px-4 pt-12 pb-4 lg:pt-6">
+        <div className="flex items-center justify-between">
+          {/* Location */}
+          <div>
+            <p className="text-xs text-[var(--text-muted)] mb-1">Current location</p>
             <button
               onClick={() => setShowPicker(true)}
-              className="flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-full px-3 py-1.5"
             >
-              {locationState === 'detecting' && (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" /><span className="text-gray-400">Detecting…</span></>
+              {locationState === 'detecting' ? (
+                <Loader2 className="w-3.5 h-3.5 text-[var(--text-muted)] animate-spin" />
+              ) : locationState === 'denied' ? (
+                <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+              ) : (
+                <MapPin className="w-3.5 h-3.5 text-brand-500" />
               )}
-              {locationState === 'granted' && (
-                <><MapPin className="w-3.5 h-3.5 text-brand-500" /><span className="text-green-600 font-medium">Location detected</span></>
-              )}
-              {locationState === 'manual' && (
-                <><MapPin className="w-3.5 h-3.5 text-brand-500" /><span className="text-brand-600 font-medium truncate max-w-[140px]">{locationLabel.split(',')[0]}</span></>
-              )}
-              {locationState === 'denied' && (
-                <><AlertCircle className="w-3.5 h-3.5 text-amber-500" /><span className="text-amber-600 font-medium">Set location</span></>
-              )}
+              <span className="text-sm text-[var(--text-primary)] font-medium max-w-[160px] truncate">
+                {locationState === 'detecting' ? 'Detecting…' :
+                 locationState === 'denied'    ? 'Set location' :
+                 locationLabel}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
             </button>
           </div>
 
-          {/* Search + radius filter */}
+          {/* Right icons */}
           <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search gas stations…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
-              />
-            </div>
-            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 shrink-0">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
-              {[5, 10, 25].map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRadius(r)}
-                  className={cn(
-                    'px-2.5 py-1 rounded-lg text-xs font-medium transition-colors',
-                    radius === r ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'
-                  )}
-                >
-                  {r}km
-                </button>
-              ))}
-            </div>
+            {/* Theme toggle — mobile only */}
+            <button
+              onClick={toggle}
+              className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center lg:hidden"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark'
+                ? <Sun className="w-4 h-4 text-[var(--text-muted)]" />
+                : <Moon className="w-4 h-4 text-[var(--text-muted)]" />
+              }
+            </button>
+            <button
+              className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center"
+              aria-label="Notifications"
+            >
+              <Bell className="w-4 h-4 text-[var(--text-muted)]" />
+            </button>
+            <Link
+              href="/user/profile"
+              className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center"
+            >
+              <User className="w-4 h-4 text-[var(--text-muted)]" />
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* ── Station list ── */}
-      <div className="px-4 lg:px-8 py-5 max-w-4xl mx-auto">
+      <div className="px-4 space-y-6 pb-8">
 
-        {/* Section header */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-gray-900">
-            Nearby Stations
-            {!isLoading && stations.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-gray-400">{stations.length} found</span>
-            )}
-          </h2>
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="text-xs text-brand-500 font-medium hover:underline"
-            >
-              Clear
-            </button>
+        {/* ── Active Order Banner ── */}
+        {activeOrder && (
+          <div className="bg-brand-500 rounded-2xl p-4">
+            <p className="text-white/70 text-xs mb-1">Order #{activeOrder.orderNumber ?? activeOrder._id?.slice(-8).toUpperCase()}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white font-bold text-lg leading-tight">
+                  {STATUS_LABELS[activeOrder.status] ?? activeOrder.status}
+                </p>
+                {activeOrder.estimatedArrival && (
+                  <p className="text-white/80 text-xs mt-0.5">
+                    Est. arrival: {activeOrder.estimatedArrival}
+                  </p>
+                )}
+              </div>
+              <Link
+                href={`/user/track/${activeOrder._id ?? activeOrder.id}`}
+                className="flex items-center gap-1.5 bg-[var(--bg-card)] dark:bg-dark-bg text-[var(--text-primary)] text-sm font-bold px-3 py-2 rounded-xl"
+              >
+                <span>Track</span>
+                <Map className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* ── Quick Order ── */}
+        <div>
+          <h2 className="text-base font-bold text-[var(--text-primary)] mb-3">Quick Order</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+
+            {/* New Gas Refill card */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 flex flex-col items-center gap-3">
+              <div className="w-12 h-12 rounded-full border-2 border-[var(--border)] flex items-center justify-center">
+                <Plus className="w-6 h-6 text-[var(--text-primary)]" />
+              </div>
+              <p className="text-sm font-semibold text-[var(--text-primary)] text-center">New Gas Refill</p>
+              <button
+                onClick={() => router.push('/user/checkout?source=quick')}
+                className="w-full bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold py-2 rounded-xl transition-colors"
+              >
+                Place an Order
+              </button>
+            </div>
+
+            {/* Size cards */}
+            {QUICK_SIZES.map((size) => (
+              <div
+                key={size}
+                className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 flex flex-col items-center gap-3"
+              >
+                <div className="w-12 h-12 rounded-xl bg-[var(--bg-card2)] flex items-center justify-center">
+                  <Flame className="w-6 h-6 text-[var(--text-muted)]" />
+                </div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{size}kg Refill</p>
+                <button
+                  onClick={() => router.push(`/user/checkout?source=quick&size=${size}`)}
+                  className="w-full bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold py-2 rounded-xl transition-colors"
+                >
+                  Order
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Nearby Stations ── */}
+        <div>
+          <div className="mb-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-[var(--text-primary)]">
+                Nearby Stations
+                {!stationsLoading && stations.length > 0 && (
+                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">{stations.length} found</span>
+                )}
+              </h2>
+            </div>
+            {/* Radius filter — always visible below title */}
+            <div className="flex items-center gap-2 mt-2">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
+              <div className="flex items-center gap-1.5">
+                {[5, 10, 25].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setRadius(r)}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-xs font-semibold border transition-all',
+                      radius === r
+                        ? 'bg-brand-500 border-brand-500 text-white'
+                        : 'bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-muted)] hover:border-brand-500 hover:text-brand-500'
+                    )}
+                  >
+                    {r} km
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* No location */}
+          {!coords && locationState === 'denied' && (
+            <div className="text-center py-10">
+              <div className="w-14 h-14 bg-brand-500/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Navigation className="w-7 h-7 text-brand-500" />
+              </div>
+              <p className="text-sm font-bold text-[var(--text-primary)]">Where are you?</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1 mb-4">Set your location to find nearby stations.</p>
+              <button
+                onClick={() => setShowPicker(true)}
+                className="inline-flex items-center gap-2 bg-brand-500 text-white text-sm font-bold px-5 py-3 rounded-xl"
+              >
+                <MapPin className="w-4 h-4" /> Set My Location
+              </button>
+            </div>
+          )}
+
+          {/* Skeletons */}
+          {(locationState === 'detecting' || stationsLoading) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[1, 2, 3, 4].map((i) => <StationSkeleton key={i} />)}
+            </div>
+          )}
+
+          {/* Empty */}
+          {!stationsLoading && stations.length === 0 && coords && (
+            <div className="text-center py-10">
+              <Flame className="w-8 h-8 text-[var(--text-muted)] mx-auto mb-2" />
+              <p className="text-sm text-[var(--text-muted)]">No stations found nearby</p>
+            </div>
+          )}
+
+          {/* Grid */}
+          {!stationsLoading && stations.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {stations.map((station) => (
+                <StationCard key={station.id} station={station} />
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Detecting skeleton */}
-        {locationState === 'detecting' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {[1, 2, 3, 4].map((i) => <StationSkeleton key={i} />)}
-          </div>
-        )}
-
-        {/* Skeletons while loading */}
-        {isLoading && locationState !== 'detecting' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {[1, 2, 3, 4].map((i) => <StationSkeleton key={i} />)}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!isLoading && stations.length === 0 && coords && (
-          <div className="text-center py-20">
-            <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <Flame className="w-7 h-7 text-gray-300" />
-            </div>
-            <p className="text-sm font-medium text-gray-600">No stations found</p>
-            <p className="text-xs text-gray-400 mt-1">
-              {search ? 'Try a different search term' : 'Try expanding the radius'}
+        {/* ── Refer & Earn ── */}
+        <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 flex items-center gap-4 border-l-4 border-l-brand-500">
+          <div className="flex-1">
+            <p className="font-bold text-[var(--text-primary)] text-sm">Refer &amp; Earn GHS 20</p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              Invite friends to GasGo and get discount on your next refill
             </p>
           </div>
-        )}
-
-        {/* No location set */}
-        {!coords && locationState === 'denied' && (
-          <div className="text-center py-20">
-            <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Navigation className="w-8 h-8 text-brand-400" />
+          <Link href="/user/loyalty">
+            <div className="w-10 h-10 bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">
+              <Gift className="w-5 h-5 text-brand-500" />
             </div>
-            <p className="text-sm font-bold text-gray-800">Where are you?</p>
-            <p className="text-xs text-gray-400 mt-1 mb-5">We couldn't detect your location automatically.<br/>Set it manually to find nearby stations.</p>
-            <button
-              onClick={() => setShowPicker(true)}
-              className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold px-5 py-3 rounded-xl transition-all shadow-lg shadow-brand-500/25"
-            >
-              <MapPin className="w-4 h-4" />
-              Set My Location
-            </button>
-          </div>
-        )}
+          </Link>
+        </div>
 
-        {/* Station grid */}
-        {!isLoading && stations.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {stations.map((station) => (
-              <StationCard key={station.id} station={station} />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
