@@ -27,4 +27,4 @@ firebase-service-account.json
 ## Misc
 *.log
 .turbo
-backend/
+
