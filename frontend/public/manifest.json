@@ -1,0 +1,43 @@
+{
+  "name": "GasGo — On-Demand Gas Delivery",
+  "short_name": "GasGo",
+  "description": "Get LPG cylinders delivered to your door in minutes",
+  "start_url": "/user",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#F97316",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["utilities", "shopping"],
+  "shortcuts": [
+    {
+      "name": "Order Gas",
+      "url": "/user",
+      "description": "Browse stations and order gas"
+    },
+    {
+      "name": "My Orders",
+      "url": "/user/orders",
+      "description": "Track your current orders"
+    }
+  ]
+}
