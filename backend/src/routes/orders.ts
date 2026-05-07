@@ -14,6 +14,29 @@ import { sendPushNotification, sendSMS, SMS_TEMPLATES, ORDER_STATUS_MESSAGES } f
 import { CONSTANTS } from '../config/constants';
 import { Payout } from '../models/Payout';
 import { LoyaltyTransaction, LOYALTY_EARN_RATE, LOYALTY_REDEEM_RATE, LOYALTY_MIN_REDEEM } from '../models/LoyaltyTransaction';
+import { Notification } from '../models/Notification';
+
+// Notification templates per status
+const NOTIF: Record<string, { title: string; body: (o: any) => string; type: string }> = {
+  pending:    { type: 'order_placed',   title: 'Order Placed 📦',          body: (o) => `Your order #${o._id.toString().slice(-8).toUpperCase()} has been placed and is being processed.` },
+  accepted:   { type: 'rider_assigned', title: 'Rider Assigned 🏍️',       body: (o) => `A rider has accepted your order and is heading to the station.` },
+  at_station: { type: 'at_station',     title: 'Being Prepared 🔥',        body: (o) => `Your gas cylinders are being prepared at the station.` },
+  en_route:   { type: 'en_route',       title: 'On the Way! 🙌',           body: (o) => `Your rider is on the way. Get ready to receive your gas!` },
+  delivered:  { type: 'delivered',      title: 'Delivered ✅',               body: (o) => `Order #${o._id.toString().slice(-8).toUpperCase()} delivered. Enjoy your gas!` },
+  cancelled:  { type: 'cancelled',      title: 'Order Cancelled',          body: (o) => `Your order #${o._id.toString().slice(-8).toUpperCase()} has been cancelled.` },
+};
+
+async function createUserNotification(order: any, status: string) {
+  const tpl = NOTIF[status];
+  if (!tpl) return;
+  await Notification.create({
+    userId:  order.userId,
+    orderId: order._id,
+    type:    tpl.type,
+    title:   tpl.title,
+    body:    tpl.body(order),
+  });
+}
 
 const router = Router();
 
@@ -279,6 +302,9 @@ router.post(
       dispatchOrder(order._id.toString()).catch(console.error);
     }
 
+    // Notify user
+    await createUserNotification(order, scheduledFor ? 'scheduled' : 'pending').catch(console.error);
+
     res.status(201).json({
       success: true,
       order: {
@@ -365,11 +391,15 @@ router.get('/:id', [param('id').isMongoId()], async (req: AuthRequest, res: Resp
 
   if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-  // Ownership check
+  // Ownership check — use _id when field is populated
   const { role, id } = req.user!;
-  const ownedByUser    = role === 'user'    && order.userId.toString()    === id;
-  const ownedByRider   = role === 'rider'   && order.riderId?.toString()  === id;
-  const ownedByStation = role === 'station' && order.stationId.toString() === (req.user as any).stationId;
+  const userIdStr    = (order.userId as any)?._id?.toString() ?? order.userId.toString();
+  const riderIdStr   = (order.riderId as any)?._id?.toString() ?? order.riderId?.toString();
+  const stationIdStr = (order.stationId as any)?._id?.toString() ?? order.stationId.toString();
+
+  const ownedByUser    = role === 'user'    && userIdStr    === id;
+  const ownedByRider   = role === 'rider'   && riderIdStr   === id;
+  const ownedByStation = role === 'station' && stationIdStr === (req.user as any).stationId;
   const isAdmin        = role === 'admin';
 
   if (!ownedByUser && !ownedByRider && !ownedByStation && !isAdmin) {
@@ -520,6 +550,9 @@ router.patch(
 
     // Real-time broadcast
     emitOrderStatus(order._id.toString(), status);
+
+    // In-app notification for user
+    await createUserNotification(order, status).catch(console.error);
 
     // Push notification to user
     const msgTemplate = ORDER_STATUS_MESSAGES[status];
@@ -726,9 +759,33 @@ router.post(
     }
 
     emitOrderStatus(order._id.toString(), 'delivered');
+    await createUserNotification(order, 'delivered').catch(console.error);
 
     // TODO: trigger Paystack payout to station
     res.json({ success: true, message: 'Delivery confirmed. Thank you!' });
+  }
+);
+
+// ─── Report Issue ────────────────────────────────────────────────────────────
+
+router.post(
+  '/:id/report-issue',
+  [
+    param('id').isMongoId(),
+    body('category').isIn(['wrong_item', 'not_delivered', 'damaged', 'late_delivery', 'payment_issue', 'rider_not_reachable', 'wrong_location', 'other']),
+    body('description').trim().isLength({ min: 10, max: 500 }),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    if (ve(req, res)) return;
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (order.userId.toString() !== req.user!.id)
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    if ((order as any).issue?.reportedAt)
+      return res.status(400).json({ success: false, message: 'Issue already reported for this order' });
+    (order as any).issue = { category: req.body.category, description: req.body.description, reportedAt: new Date() };
+    await order.save();
+    res.json({ success: true, message: 'Issue reported. Our team will contact you shortly.' });
   }
 );
 

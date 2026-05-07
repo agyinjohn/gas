@@ -1,210 +1,328 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
-  MapPin, Phone, Clock, Package, 
-  Navigation, User, CheckCircle 
-} from 'lucide-react';
+import { Phone, MessageCircle, Headphones, ArrowLeft, Loader2, Flame, ClipboardList, Store, Bike, CheckCircle2 } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import { getSocket } from '@/hooks/useSocket';
-import { Card, Button, Badge } from '@/components/ui';
-import { formatCurrency, formatRelativeTime, formatCylinders } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth';
 
+const ACCRA = { lat: 5.6037, lng: -0.187 };
+const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!;
+
+const STEPS = [
+  { key: 'pending',   label: 'Order Placed',    Icon: ClipboardList },
+  { key: 'accepted',  label: 'Vendor Accepted', Icon: Store         },
+  { key: 'en_route',  label: 'On Route',        Icon: Bike          },
+  { key: 'delivered', label: 'Delivered',       Icon: CheckCircle2  },
+];
+const STATUS_ORDER = ['pending', 'accepted', 'at_station', 'en_route', 'delivered'];
+
+const PAYMENT_LABEL: Record<string, string> = {
+  mobile_money: 'Paid via MoMO',
+  card:         'Paid via Card',
+  cash:         'Cash on Delivery',
+};
+
+// ─── Map component ────────────────────────────────────────────────────────────
+function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
+  riderLocation: { lat: number; lng: number } | null;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  className?: string;
+}) {
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const mapRef    = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const initMap = useCallback(() => {
+    if (!mapDivRef.current) return;
+    const center = riderLocation ?? (deliveryLat && deliveryLng ? { lat: deliveryLat, lng: deliveryLng } : ACCRA);
+    mapRef.current = new google.maps.Map(mapDivRef.current, {
+      center, zoom: 15,
+      disableDefaultUI: true,
+      zoomControl: false,
+      clickableIcons: false,
+      styles: [
+        { elementType: 'geometry', stylers: [{ color: '#212121' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#373737' }] },
+        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#8a8a8a' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] },
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+      ],
+    });
+    if (center !== ACCRA) {
+      markerRef.current = new google.maps.Marker({
+        position: center,
+        map: mapRef.current,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#E87722', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+      });
+    }
+    setReady(true);
+  }, [riderLocation, deliveryLat, deliveryLng]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if ((window as any).google?.maps) { initMap(); return; }
+    const existing = document.getElementById('gmaps-script');
+    if (existing) { existing.addEventListener('load', initMap); return () => existing.removeEventListener('load', initMap); }
+    const script = document.createElement('script');
+    script.id = 'gmaps-script';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places`;
+    script.async = true; script.defer = true; script.onload = initMap;
+    document.head.appendChild(script);
+  }, [initMap]);
+
+  useEffect(() => {
+    if (!mapRef.current || !riderLocation) return;
+    markerRef.current?.setMap(null);
+    markerRef.current = new google.maps.Marker({
+      position: riderLocation,
+      map: mapRef.current,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#E87722', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+    });
+    mapRef.current.panTo(riderLocation);
+  }, [riderLocation]);
+
+  return (
+    <div className={cn('relative', className)}>
+      {!ready && (
+        <div className="absolute inset-0 bg-[#1a1a1a] flex items-center justify-center z-10">
+          <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+        </div>
+      )}
+      <div ref={mapDivRef} className="w-full h-full" />
+    </div>
+  );
+}
+
+// ─── Bottom sheet content ─────────────────────────────────────────────────────
+function TrackContent({ order, riderLocation }: { order: any; riderLocation: { lat: number; lng: number } | null }) {
+  const rider      = typeof order.riderId === 'object' ? order.riderId : null;
+  const currentIdx = STATUS_ORDER.indexOf(order.status);
+
+  return (
+    <div className="space-y-4">
+      {/* 4-step progress */}
+      <div className="flex items-start justify-between">
+        {STEPS.map((step, i) => {
+          const stepIdx = STATUS_ORDER.indexOf(step.key);
+          const done    = currentIdx >= stepIdx;
+          const isLast  = i === STEPS.length - 1;
+          const { Icon } = step;
+          return (
+            <div key={step.key} className="flex items-center flex-1">
+              <div className="flex flex-col items-center gap-1.5 flex-1">
+                <div className={cn(
+                  'w-10 h-10 rounded-full flex items-center justify-center',
+                  done ? 'bg-brand-500' : 'bg-[var(--bg-card2)]'
+                )}>
+                  <Icon className={cn('w-4 h-4', done ? 'text-white' : 'text-[var(--text-muted)]')} />
+                </div>
+                <span className={cn(
+                  'text-[10px] font-medium text-center leading-tight',
+                  done ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'
+                )}>
+                  {step.label}
+                </span>
+              </div>
+              {!isLast && (
+                <div className={cn(
+                  'h-0.5 flex-1 mb-5 mx-0.5',
+                  done && currentIdx > stepIdx ? 'bg-brand-500' : 'bg-[var(--border)]'
+                )} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Rider card */}
+      {rider && (
+        <div className="flex items-center gap-3 bg-[var(--bg-card2)] rounded-2xl p-3">
+          <div className="w-12 h-12 rounded-full bg-brand-500/20 flex items-center justify-center shrink-0 overflow-hidden">
+            {rider.profilePhoto
+              ? <img src={rider.profilePhoto} alt="Rider" className="w-full h-full object-cover" />
+              : <span className="text-brand-500 font-black text-lg">{rider.name?.charAt(0)}</span>
+            }
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-[var(--text-primary)] truncate">{rider.name}</p>
+            <p className="text-xs text-[var(--text-muted)] capitalize">{rider.vehicleType} Motor Bike</p>
+            <p className="text-xs font-bold text-brand-500">{rider.vehiclePlate}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button className="w-10 h-10 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-[var(--text-muted)]" />
+            </button>
+            <a href={`tel:${rider.phone}`}
+              className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center">
+              <Phone className="w-5 h-5 text-white" />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Order details */}
+      <div className="bg-[var(--bg-card2)] rounded-2xl p-3">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-bold text-[var(--text-primary)]">Order Details</p>
+          <span className="text-xs font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
+            {PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}
+          </span>
+        </div>
+        {order.cylinders?.map((c: any, i: number) => (
+          <div key={i} className="flex items-center justify-between py-1">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-brand-500/10 rounded-lg flex items-center justify-center shrink-0">
+                <Flame className="w-3.5 h-3.5 text-brand-500" />
+              </div>
+              <span className="text-xs text-[var(--text-muted)]">{c.size}kg Cylinder Refill (x{c.quantity})</span>
+            </div>
+            <span className="text-xs font-bold text-brand-500">{formatCurrency(c.subtotal)}</span>
+          </div>
+        ))}
+        {/* Delivery fee row */}
+        <div className="flex items-center justify-between py-1 border-t border-[var(--border)] mt-1">
+          <span className="text-xs text-[var(--text-muted)]">Delivery Fee</span>
+          <span className="text-xs font-bold text-brand-500">{formatCurrency(order.deliveryFee ?? 0)}</span>
+        </div>
+        <div className="flex items-center justify-between py-1">
+          <span className="text-xs font-bold text-[var(--text-primary)]">Total</span>
+          <span className="text-xs font-black text-brand-500">{formatCurrency(order.totalAmount ?? 0)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function TrackOrderPage() {
-  const params = useParams();
-  const orderId = params.id as string;
+  const { id }   = useParams<{ id: string }>();
+  const router   = useRouter();
   const queryClient = useQueryClient();
-  const [riderLocation, setRiderLocation] = useState<{lat: number; lng: number} | null>(null);
+  const { isLoading: authLoading } = useAuth();
+  const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  const { data: orderData, isLoading } = useQuery({
-    queryKey: ['order', orderId],
-    queryFn: () => ordersApi.getById(orderId).then((r) => r.data.order),
+  const { data: order, isLoading } = useQuery({
+    queryKey: ['order', id],
+    queryFn:  () => ordersApi.getById(id).then((r) => r.data.order),
+    enabled:  !authLoading && !!id,
+    retry:    false,
     refetchInterval: 30000,
   });
 
-  // Listen for real-time rider location updates
   useEffect(() => {
-    if (!orderData || !['accepted', 'at_station', 'en_route'].includes(orderData.status)) {
-      return;
+    if (!order || !['accepted', 'at_station', 'en_route'].includes(order.status)) return;
+
+    // Seed initial rider location from order data if available
+    const riderObj = typeof order.riderId === 'object' ? order.riderId : null;
+    if (riderObj?.location?.lat && riderObj?.location?.lng && !riderLocation) {
+      setRiderLocation({ lat: riderObj.location.lat, lng: riderObj.location.lng });
     }
 
     const socket = getSocket();
-    
-    // Join order room for updates
-    socket.emit('join:order', orderId);
-    
-    // Listen for rider location updates
-    socket.on('rider:location:update', (location: {lat: number; lng: number}) => {
-      setRiderLocation(location);
-    });
-
-    // Listen for order status updates
-    socket.on('order:status:update', (status: string) => {
-      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
-    });
-
+    socket.emit('join:order', id);
+    socket.on('rider:location:update', (loc: { lat: number; lng: number }) => setRiderLocation(loc));
+    socket.on('order:status:update', () => queryClient.invalidateQueries({ queryKey: ['order', id] }));
     return () => {
       socket.off('rider:location:update');
       socket.off('order:status:update');
-      socket.emit('leave:order', orderId);
+      socket.emit('leave:order', id);
     };
-  }, [orderId, orderData?.status, queryClient]);
+  }, [id, order?.status, queryClient]);
 
-  if (isLoading) {
+  if (isLoading || authLoading || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto mb-2"></div>
-          <p className="text-gray-500">Loading order details...</p>
-        </div>
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
       </div>
     );
   }
-
-  if (!orderData) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="text-center py-8">
-          <p className="text-gray-500">Order not found</p>
-        </Card>
-      </div>
-    );
-  }
-
-  const order = orderData;
-  const rider = typeof order.riderId === 'object' ? order.riderId : null;
-  const station = typeof order.stationId === 'object' ? order.stationId : null;
-
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return { 
-          label: 'Order Placed', 
-          description: 'Looking for available rider',
-          color: 'bg-yellow-100 text-yellow-700',
-          icon: Clock 
-        };
-      case 'accepted':
-        return { 
-          label: 'Rider Assigned', 
-          description: 'Rider is heading to station',
-          color: 'bg-blue-100 text-blue-700',
-          icon: User 
-        };
-      case 'at_station':
-        return { 
-          label: 'At Station', 
-          description: 'Collecting your cylinders',
-          color: 'bg-purple-100 text-purple-700',
-          icon: Package 
-        };
-      case 'en_route':
-        return { 
-          label: 'On the Way', 
-          description: 'Rider is coming to you',
-          color: 'bg-orange-100 text-orange-700',
-          icon: Navigation 
-        };
-      case 'delivered':
-        return { 
-          label: 'Delivered', 
-          description: 'Order completed successfully',
-          color: 'bg-green-100 text-green-700',
-          icon: CheckCircle 
-        };
-      default:
-        return { 
-          label: status, 
-          description: '',
-          color: 'bg-gray-100 text-gray-700',
-          icon: Clock 
-        };
-    }
-  };
-
-  const statusInfo = getStatusInfo(order.status);
-  const StatusIcon = statusInfo.icon;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 pt-12 pb-4 sticky top-0 z-10">
-        <h1 className="text-xl font-bold text-gray-900">Track Order</h1>
-        <p className="text-sm text-gray-500 font-mono">
-          #{order._id.slice(-8).toUpperCase()}
-        </p>
-      </div>
-
-      <div className="px-4 py-4 space-y-4">
-        {/* Current Status */}
-        <Card>
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${statusInfo.color}`}>
-              <StatusIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-gray-900">{statusInfo.label}</h2>
-              <p className="text-sm text-gray-600">{statusInfo.description}</p>
-            </div>
-          </div>
-          
-          <Badge className={statusInfo.color}>
-            {order.status.replace('_', ' ')}
-          </Badge>
-        </Card>
-
-        {/* Rider Info */}
-        {rider && (
-          <Card>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900">Your Rider</h3>
-              <Button size="sm" variant="secondary">
-                <Phone className="w-4 h-4 mr-1" />
-                Call
-              </Button>
-            </div>
-            
+    <>
+      {/* ── MOBILE: fixed full-screen layout ── */}
+      <div className="lg:hidden fixed inset-0 bottom-[64px] flex flex-col bg-[var(--bg)]">
+        {/* Map fills top half */}
+        <div className="flex-1 relative min-h-0">
+          <TrackMap
+            riderLocation={riderLocation}
+            deliveryLat={order.deliveryAddress?.lat}
+            deliveryLng={order.deliveryAddress?.lng}
+            className="w-full h-full"
+          />
+          {/* Header overlay */}
+          <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 pt-12 pb-4 bg-gradient-to-b from-black/40 to-transparent">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="font-bold text-purple-600 text-lg">
-                  {rider.name?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">{rider.name}</p>
-                <p className="text-sm text-gray-500">{rider.vehicleType} • {rider.phone}</p>
-                {rider.ratingAvg && (
-                  <p className="text-sm text-gray-500">⭐ {rider.ratingAvg.toFixed(1)} rating</p>
-                )}
-              </div>
+              <button onClick={() => router.back()}
+                className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                <ArrowLeft className="w-5 h-5 text-white" />
+              </button>
+              <h1 className="text-lg font-bold text-white">Live Tracking</h1>
             </div>
+            <button className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+              <Headphones className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        </div>
 
-            {riderLocation && order.status === 'en_route' && (
-              <div className="mt-3 p-2 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  📍 Rider location updated {new Date().toLocaleTimeString()}
-                </p>
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* OTP for Delivery Confirmation */}
-        {order.status === 'en_route' && order.otpCode && (
-          <Card className="bg-green-50 border-green-200">
-            <h3 className="font-semibold text-green-900 mb-2">Delivery Code</h3>
-            <div className="text-center">
-              <p className="text-3xl font-black text-green-700 tracking-wider mb-2">
-                {order.otpCode}
-              </p>
-              <p className="text-sm text-green-600">
-                Share this code with the rider to confirm delivery
-              </p>
-            </div>
-          </Card>
-        )}
+        {/* Bottom sheet */}
+        <div className="bg-[var(--bg-card)] rounded-t-3xl border-t border-[var(--border)] px-4 pt-3 pb-4 overflow-y-auto"
+          style={{ maxHeight: '50vh' }}>
+          <div className="w-10 h-1 bg-[var(--border)] rounded-full mx-auto mb-5" />
+          <TrackContent order={order} riderLocation={riderLocation} />
+        </div>
       </div>
-    </div>
+
+      {/* ── DESKTOP: side-by-side layout ── */}
+      <div className="hidden lg:flex min-h-full bg-[var(--bg)]">
+        {/* Left: map */}
+        <div className="flex-1 relative">
+          <TrackMap
+            riderLocation={riderLocation}
+            deliveryLat={order.deliveryAddress?.lat}
+            deliveryLng={order.deliveryAddress?.lng}
+            className="absolute inset-0"
+          />
+          {/* Header overlay */}
+          <div className="absolute top-0 inset-x-0 flex items-center justify-between px-6 pt-6 pb-4 bg-gradient-to-b from-black/50 to-transparent">
+            <div className="flex items-center gap-3">
+              <button onClick={() => router.back()}
+                className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                <ArrowLeft className="w-5 h-5 text-white" />
+              </button>
+              <h1 className="text-lg font-bold text-white">Live Tracking</h1>
+            </div>
+            <button className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+              <Headphones className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        </div>
+
+        {/* Right: info panel */}
+        <div className="w-96 bg-[var(--bg-card)] border-l border-[var(--border)] flex flex-col overflow-y-auto">
+          <div className="p-6 border-b border-[var(--border)]">
+            <p className="text-xs text-[var(--text-muted)] mb-0.5">
+              Order #{id.slice(-8).toUpperCase()}
+            </p>
+            <p className="text-xl font-black text-[var(--text-primary)]">
+              {order.status === 'en_route' ? 'On Route' :
+               order.status === 'accepted' ? 'Vendor Accepted' :
+               order.status === 'at_station' ? 'Being Prepared' :
+               order.status === 'delivered' ? 'Delivered' : 'Order Placed'}
+            </p>
+          </div>
+          <div className="p-6 flex-1">
+            <TrackContent order={order} riderLocation={riderLocation} />
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

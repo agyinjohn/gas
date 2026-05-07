@@ -59,10 +59,10 @@ export default function RiderLoginPage() {
         </div>
         <div className="relative z-10 space-y-4">
           <h1 className="text-5xl font-black text-white leading-[1.1] tracking-tight">
-            Rider<br /><span className="text-brand-500">Portal</span>
+            Earn by Delivering Gas<br /><span className="text-brand-500">in minutes</span>
           </h1>
           <p className="text-gray-400 text-base leading-relaxed max-w-sm">
-            Sign in to manage your deliveries, track earnings, and stay online.
+            Join the fastest LPG delivery network. Accept requests, deliver with ease, and earn — all in one place.
           </p>
         </div>
         <p className="text-gray-700 text-xs relative z-10">© 2025 GasGo · All rights reserved</p>

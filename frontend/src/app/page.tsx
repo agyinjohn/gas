@@ -1,12 +1,13 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flame, ArrowRight, ChevronLeft } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, ChevronLeft, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/lib/auth';
 import { authApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { useOtpTimer, OtpResend } from '@/hooks/useOtpTimer';
+import { useOtpTimer } from '@/hooks/useOtpTimer';
 
 const ROLE_HOME: Record<string, string> = {
   user:    '/user',
@@ -15,111 +16,29 @@ const ROLE_HOME: Record<string, string> = {
   admin:   '/admin',
 };
 
-// ─── Shared components ────────────────────────────────────────────────────────
+// ─── Phone step ───────────────────────────────────────────────────────────────
 
-function FormField({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <label className="block text-[11px] font-semibold uppercase tracking-widest text-gray-400">{label}</label>
-      {children}
-      {error && <p className="text-xs text-red-500">{error}</p>}
-    </div>
-  );
-}
-
-function TextInput({ hasError, className, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { hasError?: boolean }) {
-  return (
-    <input
-      className={cn(
-        'w-full h-12 rounded-xl border text-sm text-gray-900 bg-gray-50 px-4 transition-all duration-150',
-        'focus:outline-none focus:bg-white focus:border-gray-400 focus:ring-4 focus:ring-gray-100',
-        'placeholder:text-gray-300',
-        hasError ? 'border-red-300 bg-red-50 focus:ring-red-100 focus:border-red-400' : 'border-gray-200',
-        className
-      )}
-      {...props}
-    />
-  );
-}
-
-function PhoneInput({ value, onChange, hasError }: { value: string; onChange: (v: string) => void; hasError?: boolean }) {
-  return (
-    <div className="flex">
-      <div className="flex items-center gap-1.5 px-3 h-12 bg-gray-50 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-600 font-medium shrink-0 select-none">
-        <span className="text-base">🇬🇭</span>
-        <span>+233</span>
-      </div>
-      <input
-        type="tel"
-        inputMode="numeric"
-        placeholder="XXXXXXXXX"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
-        className={cn(
-          'flex-1 h-12 rounded-r-xl border text-sm text-gray-900 bg-gray-50 px-4 transition-all duration-150',
-          'focus:outline-none focus:bg-white focus:border-gray-400 focus:ring-4 focus:ring-gray-100',
-          'placeholder:text-gray-300',
-          hasError ? 'border-red-300 bg-red-50 focus:ring-red-100 focus:border-red-400' : 'border-gray-200'
-        )}
-      />
-    </div>
-  );
-}
-
-function SubmitButton({ loading, children }: { loading: boolean; children: React.ReactNode }) {
-  return (
-    <button
-      type="submit"
-      disabled={loading}
-      className={cn(
-        'w-full h-12 rounded-xl bg-gray-900 text-white text-sm font-semibold',
-        'flex items-center justify-center gap-2',
-        'hover:bg-gray-800 active:scale-[0.99] transition-all duration-150',
-        'disabled:opacity-60 disabled:cursor-not-allowed'
-      )}
-    >
-      {loading
-        ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        : <>{children}<ArrowRight className="w-4 h-4" /></>}
-    </button>
-  );
-}
-
-// ─── Login form ───────────────────────────────────────────────────────────────
-
-function LoginForm() {
-  const { login } = useAuth();
-  const router = useRouter();
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [localPhone, setLocalPhone] = useState('');
-  const [phoneError, setPhoneError] = useState('');
-  const [code, setCode] = useState('');
-  const [codeError, setCodeError] = useState('');
+function PhoneStep({
+  onSent,
+}: {
+  onSent: (e164: string, display: string) => void;
+}) {
+  const [local, setLocal]     = useState('');
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-  const e164Ref = useRef('');
-  const { seconds, canResend, reset: resetTimer } = useOtpTimer();
 
-  function toE164(local: string) {
-    const digits = local.replace(/\D/g, '');
-    const stripped = digits.startsWith('0') ? digits.slice(1) : digits;
-    return '+233' + stripped;
-  }
-
-  async function sendOtp(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const digits = localPhone.replace(/\D/g, '');
+    const digits   = local.replace(/\D/g, '');
     const stripped = digits.startsWith('0') ? digits.slice(1) : digits;
-    if (stripped.length !== 9) { setPhoneError('Enter a valid 9-digit Ghana number'); return; }
-    setPhoneError('');
-    const computed = toE164(localPhone);
-    e164Ref.current = computed;
+    if (stripped.length !== 9) { setError('Enter a valid 9-digit Ghana number'); return; }
+    setError('');
+    const e164 = '+233' + stripped;
     setLoading(true);
     try {
-      await authApi.sendOTP(computed, 'login');
-      setStep('otp');
-      resetTimer();
+      await authApi.sendOTP(e164, 'login');
       toast.success('OTP sent');
+      onSent(e164, stripped);
     } catch {
       toast.error('Could not send OTP. Try again.');
     } finally {
@@ -127,85 +46,254 @@ function LoginForm() {
     }
   }
 
-  async function verifyOtp(e: React.FormEvent) {
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-1.5">
+        <label className="block text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+          Phone number
+        </label>
+        <div className="flex">
+          <div className="flex items-center gap-1.5 px-3 h-12 bg-gray-50 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-600 font-medium shrink-0 select-none">
+            <span className="text-base">🇬🇭</span>
+            <span>+233</span>
+          </div>
+          <input
+            type="tel"
+            inputMode="numeric"
+            placeholder="XXXXXXXXX"
+            value={local}
+            onChange={(e) => { setLocal(e.target.value.replace(/\D/g, '').slice(0, 10)); setError(''); }}
+            className={cn(
+              'flex-1 h-12 rounded-r-xl border text-sm text-gray-900 bg-gray-50 px-4 transition-all',
+              'focus:outline-none focus:bg-white focus:border-gray-400 focus:ring-4 focus:ring-gray-100',
+              'placeholder:text-gray-300',
+              error ? 'border-red-300 bg-red-50' : 'border-gray-200'
+            )}
+          />
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full h-12 rounded-xl bg-gray-900 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-gray-800 active:scale-[0.99] transition-all disabled:opacity-60"
+      >
+        {loading
+          ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          : <><span>Continue</span><ArrowRight className="w-4 h-4" /></>}
+      </button>
+
+      <p className="text-center text-sm text-gray-400">
+        Want to deliver?{' '}
+        <a href="/rider/login" className="text-gray-900 font-semibold hover:underline">Sign in as a rider</a>
+        {' · '}
+        <a href="/rider/register" className="text-gray-900 font-semibold hover:underline">Apply as a rider</a>
+      </p>
+    </form>
+  );
+}
+
+// ─── OTP digit boxes ──────────────────────────────────────────────────────────
+
+function OtpBoxes({
+  value,
+  onChange,
+  hasError,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  hasError: boolean;
+}) {
+  const refs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+  ];
+
+  function handleKey(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace') {
+      if (value[i]) {
+        onChange(value.slice(0, i) + value.slice(i + 1));
+      } else if (i > 0) {
+        refs[i - 1].current?.focus();
+        onChange(value.slice(0, i - 1) + value.slice(i));
+      }
+    }
+  }
+
+  function handleChange(i: number, e: React.ChangeEvent<HTMLInputElement>) {
+    const digit = e.target.value.replace(/\D/g, '').slice(-1);
+    if (!digit) return;
+    const next = value.slice(0, i) + digit + value.slice(i + 1);
+    onChange(next.slice(0, 4));
+    if (i < 3) refs[i + 1].current?.focus();
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    if (pasted) { onChange(pasted); refs[Math.min(pasted.length, 3)].current?.focus(); }
     e.preventDefault();
-    if (code.length < 4) { setCodeError('Enter the verification code'); return; }
-    setCodeError('');
+  }
+
+  return (
+    <div className="flex gap-3 justify-center">
+      {[0, 1, 2, 3].map((i) => (
+        <input
+          key={i}
+          ref={refs[i]}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={value[i] ?? ''}
+          onChange={(e) => handleChange(i, e)}
+          onKeyDown={(e) => handleKey(i, e)}
+          onPaste={handlePaste}
+          className={cn(
+            'w-16 h-16 rounded-2xl text-center text-2xl font-black transition-all',
+            'focus:outline-none focus:ring-2',
+            hasError
+              ? 'border-2 border-red-500 bg-red-500/10 text-red-500 focus:ring-red-500/30'
+              : value[i]
+              ? 'border-2 border-brand-500 bg-brand-500/10 text-[var(--text-primary)] focus:ring-brand-500/30'
+              : 'border-2 border-[var(--border)] bg-[var(--bg-card2)] text-[var(--text-primary)] focus:ring-brand-500/30'
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── OTP step ─────────────────────────────────────────────────────────────────
+
+function OtpStep({
+  e164,
+  displayPhone,
+  onBack,
+  onVerified,
+}: {
+  e164: string;
+  displayPhone: string;
+  onBack: () => void;
+  onVerified: (token: string, user: any) => void;
+}) {
+  const [code, setCode]       = useState('');
+  const [error, setError]     = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [seconds, setSeconds] = useState(90);
+  const [canResend, setCanResend] = useState(false);
+
+  useEffect(() => {
+    if (seconds <= 0) { setCanResend(true); return; }
+    const t = setTimeout(() => setSeconds((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [seconds]);
+
+  function resetTimer() { setSeconds(90); setCanResend(false); }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    if (code.length < 4) { setError('Enter the 4-digit code'); return; }
+    setError('');
     setLoading(true);
     try {
-      const res = await authApi.verifyOTP(e164Ref.current, code, 'login');
+      const res = await authApi.verifyOTP(e164, code, 'login');
       const { token, user } = res.data;
-      login(token, user);
-      router.push(ROLE_HOME[user.role] ?? '/user');
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => {
+            localStorage.setItem('user_lat', String(coords.latitude));
+            localStorage.setItem('user_lng', String(coords.longitude));
+          },
+          () => {}
+        );
+      }
+      onVerified(token, user);
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Incorrect OTP. Please try again.';
-      setCodeError(msg);
-      toast.error(msg);
+      setError(msg);
+      setCode('');
     } finally {
       setLoading(false);
     }
   }
 
-  if (step === 'phone') {
-    return (
-      <form onSubmit={sendOtp} className="space-y-5">
-        <FormField label="Phone number" error={phoneError}>
-          <PhoneInput value={localPhone} onChange={setLocalPhone} hasError={!!phoneError} />
-        </FormField>
-        <SubmitButton loading={loading}>Continue</SubmitButton>
-        <p className="text-center text-sm text-gray-400">
-          Want to deliver?{' '}
-          <a href="/rider/login" className="text-gray-900 font-semibold hover:underline">Sign in as a rider</a>
-          {' · '}
-          <a href="/rider/register" className="text-gray-900 font-semibold hover:underline">Apply as a rider</a>
-        </p>
-      </form>
-    );
+  async function handleResend() {
+    setResending(true);
+    try {
+      await authApi.sendOTP(e164, 'login');
+      resetTimer();
+      setCode('');
+      setError('');
+      toast.success('New code sent');
+    } catch {
+      toast.error('Could not resend. Try again.');
+    } finally {
+      setResending(false);
+    }
   }
 
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const timeStr = `${mins}:${String(secs).padStart(2, '0')}s`;
+
   return (
-    <form onSubmit={verifyOtp} className="space-y-5">
-      <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3.5 text-sm text-gray-500 text-center">
-        Code sent to{' '}
-        <span className="font-semibold text-gray-800">
-          +233{localPhone.replace(/\D/g, '').replace(/^0/, '')}
-        </span>
+    <form onSubmit={handleVerify} className="space-y-6">
+      {/* Icon */}
+      <div className="flex justify-center">
+        <div className="w-20 h-20 bg-brand-500/15 rounded-3xl flex items-center justify-center">
+          <Image src="/logo.png" alt="GasGo" width={44} height={44} className="rounded-xl" />
+        </div>
       </div>
-      <FormField label="Verification code" error={codeError}>
-        <TextInput
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          placeholder="0  0  0  0"
-          className="text-center text-xl font-bold tracking-[0.5em]"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-          hasError={!!codeError}
-        />
-      </FormField>
-      <SubmitButton loading={loading}>Verify & continue</SubmitButton>
-      <OtpResend
-        seconds={seconds}
-        canResend={canResend}
-        resending={resending}
-        onResend={async () => {
-          setResending(true);
-          try {
-            await authApi.sendOTP(e164Ref.current, 'login');
-            resetTimer();
-            setCode('');
-            toast.success('New code sent');
-          } catch {
-            toast.error('Could not resend. Try again.');
-          } finally {
-            setResending(false);
-          }
-        }}
-      />
+
+      {/* Heading */}
+      <div className="text-center space-y-1">
+        <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">Verify OTP</h2>
+        <p className="text-sm text-[var(--text-muted)]">
+          Enter 4 digit OTP sent to your mobile<br />
+          <span className="font-semibold text-[var(--text-primary)]">+233 {displayPhone}</span>
+        </p>
+      </div>
+
+      {/* Digit boxes */}
+      <OtpBoxes value={code} onChange={setCode} hasError={!!error} />
+      {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+
+      {/* Resend */}
+      <p className="text-center text-sm text-[var(--text-muted)]">
+        Didn&apos;t receive OTP?{' '}
+        {canResend ? (
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resending}
+            className="text-brand-500 font-semibold hover:underline disabled:opacity-50"
+          >
+            {resending ? 'Sending…' : 'Resend'}
+          </button>
+        ) : (
+          <span className="text-brand-500 font-semibold">{timeStr}</span>
+        )}
+      </p>
+
+      {/* Verify button */}
+      <button
+        type="submit"
+        disabled={loading || code.length < 4}
+        className="w-full h-14 rounded-2xl bg-brand-500 hover:bg-brand-600 text-white text-base font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50 shadow-lg shadow-brand-500/25"
+      >
+        {loading
+          ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          : <><span>Verify</span><Check className="w-5 h-5" /></>}
+      </button>
+
+      {/* Back */}
       <button
         type="button"
-        onClick={() => { setStep('phone'); setCode(''); setCodeError(''); }}
-        className="flex items-center justify-center gap-1.5 w-full text-sm text-gray-400 hover:text-gray-700 transition-colors"
+        onClick={onBack}
+        className="flex items-center justify-center gap-1.5 w-full text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
       >
         <ChevronLeft className="w-3.5 h-3.5" /> Use a different number
       </button>
@@ -216,6 +304,23 @@ function LoginForm() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
+  const { login } = useAuth();
+  const router    = useRouter();
+  const [step, setStep]               = useState<'phone' | 'otp'>('phone');
+  const [e164, setE164]               = useState('');
+  const [displayPhone, setDisplayPhone] = useState('');
+
+  function handleSent(e164: string, display: string) {
+    setE164(e164);
+    setDisplayPhone(display);
+    setStep('otp');
+  }
+
+  function handleVerified(token: string, user: any) {
+    login(token, user);
+    router.push(ROLE_HOME[user.role] ?? '/user');
+  }
+
   return (
     <div className="min-h-screen flex">
 
@@ -225,9 +330,7 @@ export default function LoginPage() {
         <div className="absolute bottom-0 right-0 w-[300px] h-[300px] bg-brand-600/10 rounded-full blur-[80px] pointer-events-none" />
 
         <div className="flex items-center gap-3 relative z-10">
-          <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30">
-            <Flame className="w-5 h-5 text-white" />
-          </div>
+          <Image src="/logo.png" alt="GasGo" width={40} height={40} className="rounded-xl" />
           <span className="text-white font-bold text-lg tracking-tight">GasGo</span>
         </div>
 
@@ -263,24 +366,32 @@ export default function LoginPage() {
       </div>
 
       {/* ── Right panel ── */}
-      <div className="flex-1 flex flex-col justify-center items-center px-6 py-12 bg-white">
+      <div className="flex-1 flex flex-col justify-center items-center px-6 py-12 bg-[var(--bg)]">
         <div className="w-full max-w-[400px] space-y-8">
 
-          {/* Mobile logo — centred */}
-          <div className="flex lg:hidden flex-col items-center gap-2 text-center">
-            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
-              <Flame className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-black text-gray-900 text-lg">GasGo</span>
-          </div>
+          {step === 'phone' && (
+            <>
+              {/* Mobile logo */}
+              <div className="flex lg:hidden flex-col items-center gap-2 text-center">
+                <Image src="/logo.png" alt="GasGo" width={40} height={40} className="rounded-xl" />
+                <span className="font-black text-[var(--text-primary)] text-lg">GasGo</span>
+              </div>
+              <div className="space-y-1 text-center lg:text-left">
+                <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">Welcome back</h2>
+                <p className="text-sm text-[var(--text-muted)]">Enter your phone number to continue</p>
+              </div>
+              <PhoneStep onSent={handleSent} />
+            </>
+          )}
 
-          {/* Heading */}
-          <div className="space-y-1 text-center lg:text-left">
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Welcome back</h2>
-            <p className="text-sm text-gray-400">Enter your phone number to continue</p>
-          </div>
-
-          <LoginForm />
+          {step === 'otp' && (
+            <OtpStep
+              e164={e164}
+              displayPhone={displayPhone}
+              onBack={() => setStep('phone')}
+              onVerified={handleVerified}
+            />
+          )}
 
         </div>
       </div>

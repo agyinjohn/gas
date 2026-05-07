@@ -228,9 +228,9 @@ export function BottomSheet({ open, onClose, title, children }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-t-3xl px-4 pt-4 pb-8 max-h-[90vh] overflow-y-auto">
-        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
-        {title && <h2 className="text-base font-semibold text-gray-900 mb-4">{title}</h2>}
+      <div className="relative bg-[var(--bg-card)] rounded-t-3xl px-4 pt-4 pb-8 max-h-[90vh] overflow-y-auto">
+        <div className="w-10 h-1 bg-[var(--border)] rounded-full mx-auto mb-4" />
+        {title && <h2 className="text-base font-semibold text-[var(--text-primary)] mb-4">{title}</h2>}
         {children}
       </div>
     </div>

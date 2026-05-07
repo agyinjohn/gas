@@ -1,19 +1,27 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         brand: {
-          50: '#FFF7ED',
-          100: '#FFEDD5',
-          200: '#FED7AA',
-          400: '#FB923C',
-          500: '#F97316',
-          600: '#EA580C',
-          700: '#C2410C',
-          800: '#9A3412',
-          900: '#7C2D12',
+          50:  '#FFF3E0',
+          100: '#FFE0B2',
+          200: '#FFCC80',
+          400: '#FFA040',
+          500: '#E87722',
+          600: '#D06010',
+          700: '#B04D08',
+          800: '#8A3A04',
+          900: '#6B2C02',
+        },
+        dark: {
+          bg:      '#1A1A1A',
+          card:    '#2A2A2A',
+          card2:   '#333333',
+          border:  '#3A3A3A',
+          muted:   '#9A9A9A',
         },
       },
       fontFamily: {
