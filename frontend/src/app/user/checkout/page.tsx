@@ -1,8 +1,9 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
-  ArrowLeft, Zap, Calendar, Camera, Flame, ArrowRightLeft,
+  ArrowLeft, Zap, Calendar, Camera, ArrowRightLeft,
   Plus, Minus, CheckSquare, Square, Loader2, MapPin, Star,
   CheckCircle2,
 } from 'lucide-react';

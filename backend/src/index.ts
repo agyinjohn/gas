@@ -66,8 +66,34 @@ app.use(`${API}/admin`,         adminRoutes);
 app.use(`${API}/notifications`, notificationRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (_req, res) => {
+  const start = Date.now();
+  let dbStatus = 'ok';
+  let dbLatencyMs = 0;
+
+  try {
+    const mongoose = await import('mongoose');
+    const t0 = Date.now();
+    await mongoose.default.connection.db?.admin().ping();
+    dbLatencyMs = Date.now() - t0;
+  } catch {
+    dbStatus = 'error';
+  }
+
+  const uptimeSeconds = Math.floor(process.uptime());
+  const memMB = Math.round(process.memoryUsage().rss / 1024 / 1024);
+
+  res.status(dbStatus === 'ok' ? 200 : 503).json({
+    status:    dbStatus === 'ok' ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    uptime:    `${uptimeSeconds}s`,
+    memory:    `${memMB}MB`,
+    db: {
+      status:    dbStatus,
+      latencyMs: dbLatencyMs,
+    },
+    version: process.env.npm_package_version ?? '1.0.0',
+  });
 });
 
 // ─── Swagger docs (dev only) ──────────────────────────────────────────────────
