@@ -10,7 +10,7 @@ import { formatCurrency, formatRelativeTime, ORDER_TYPE_LABELS, formatCylinders 
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
-const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('gasgo_station_id') || '' : '';
+const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('GetGas_station_id') || '' : '';
 
 const KANBAN_COLUMNS = [
   { key: 'pending', label: 'Incoming', icon: Inbox, color: 'text-yellow-600 bg-yellow-50' },

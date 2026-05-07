@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import Link from 'next/link';
 
-const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('gasgo_station_id') || '' : '';
+const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('GetGas_station_id') || '' : '';
 
 export default function StationAnalyticsPage() {
   const { data, isLoading } = useQuery({

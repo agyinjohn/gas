@@ -1,12 +1,13 @@
 'use client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Star, Truck, Phone, LogOut, Package, TrendingUp } from 'lucide-react';
+import { Star, Truck, Phone, LogOut, Package, TrendingUp, DollarSign } from 'lucide-react';
 import { ridersApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Card, Button, Skeleton } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
+import RiderNav from '@/components/RiderNav';
 import toast from 'react-hot-toast';
 
 export default function RiderProfilePage() {
@@ -137,20 +138,7 @@ export default function RiderProfilePage() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 flex">
-        <Link href="/rider" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <TrendingUp className="w-5 h-5" />
-          <span className="text-xs">Dashboard</span>
-        </Link>
-        <Link href="/rider/orders" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <Package className="w-5 h-5" />
-          <span className="text-xs">Orders</span>
-        </Link>
-        <Link href="/rider/profile" className="flex-1 py-3 flex flex-col items-center gap-1 text-brand-500">
-          <div className="w-5 h-5 border-2 border-current rounded-full" />
-          <span className="text-xs font-medium">Profile</span>
-        </Link>
-      </div>
+      <RiderNav />
     </div>
   );
 }

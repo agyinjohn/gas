@@ -75,10 +75,16 @@ export default function LocationPicker({ onConfirm, onClose, initial, pickupLoca
 
   const initMap = useCallback(() => {
     if (!mapDivRef.current) return;
-    const center = initial ?? ACCRA;
+    // Use passed initial, or fall back to saved GPS, or Accra
+    const savedLat = localStorage.getItem('gasgo_lat');
+    const savedLng = localStorage.getItem('gasgo_lng');
+    const defaultCenter = initial
+      ?? (savedLat && savedLng ? { lat: parseFloat(savedLat), lng: parseFloat(savedLng) } : null)
+      ?? ACCRA;
+    const defaultZoom = (initial || (savedLat && savedLng)) ? 16 : 12;
     mapRef.current = new google.maps.Map(mapDivRef.current, {
-      center,
-      zoom: initial ? 16 : 12,
+      center: defaultCenter,
+      zoom: defaultZoom,
       disableDefaultUI: true,
       zoomControl: true,
       clickableIcons: false,
@@ -100,7 +106,12 @@ export default function LocationPicker({ onConfirm, onClose, initial, pickupLoca
         placeMarker(lat, lng);
       });
     }
-    if (initial) placeMarker(initial.lat, initial.lng);
+    // Auto-pin: use passed initial, or saved GPS location
+    if (initial) {
+      placeMarker(initial.lat, initial.lng);
+    } else if (savedLat && savedLng) {
+      placeMarker(parseFloat(savedLat), parseFloat(savedLng));
+    }
     setReady(true);
   }, [initial, placeMarker]);
 

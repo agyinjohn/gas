@@ -65,7 +65,7 @@ async function sendMNotifySMS(phone: string, message: string): Promise<void> {
 
   const payload = {
     recipient: [localPhone],
-    sender: senderId || 'GasGo',
+    sender: senderId || 'GetGas',
     message,
     is_schedule: false,
     schedule_date: '',
@@ -89,19 +89,19 @@ async function sendMNotifySMS(phone: string, message: string): Promise<void> {
 
 export const SMS_TEMPLATES = {
   otpVerification: (code: string) =>
-    `Your GasGo verification code is: ${code}. Valid for 10 minutes. Do not share this code.`,
+    `Your GetGas verification code is: ${code}. Valid for 10 minutes. Do not share this code.`,
 
   orderPlaced: (orderId: string) =>
-    `Your GasGo order #${orderId.slice(-6).toUpperCase()} has been placed. We're finding you a rider.`,
+    `Your GetGas order #${orderId.slice(-6).toUpperCase()} has been placed. We're finding you a rider.`,
 
   riderAssigned: (riderName: string, eta: string) =>
     `Your rider ${riderName} has accepted your order. ETA: ${eta}.`,
 
   orderDelivered: (orderId: string) =>
-    `Order #${orderId.slice(-6).toUpperCase()} delivered! Thank you for using GasGo.`,
+    `Order #${orderId.slice(-6).toUpperCase()} delivered! Thank you for using GetGas.`,
 
   orderCancelled: () =>
-    `Your GasGo order has been cancelled. A refund will be processed within 24 hours if applicable.`,
+    `Your GetGas order has been cancelled. A refund will be processed within 24 hours if applicable.`,
 };
 
 export const ORDER_STATUS_MESSAGES: Record<string, { title: string; body: string }> = {

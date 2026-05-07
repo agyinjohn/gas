@@ -338,7 +338,7 @@ router.get('/referral', async (req: AuthRequest, res: Response) => {
     referralCode: user.referralCode,
     referralCount: user.referralCount,
     pointsBalance: user.loyaltyPoints,
-    shareUrl: `${process.env.FRONTEND_URL || 'https://gasgo.app'}/?ref=${user.referralCode}`,
+    shareUrl: `${process.env.FRONTEND_URL || 'https://GetGas.app'}/?ref=${user.referralCode}`,
   });
 });
 

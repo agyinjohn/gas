@@ -9,7 +9,7 @@ export const api = axios.create({
 // Attach JWT from localStorage
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('gasgo_token');
+    const token = localStorage.getItem('GetGas_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -20,8 +20,8 @@ api.interceptors.response.use(
   (res) => res,
   (error: AxiosError) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('gasgo_token');
-      localStorage.removeItem('gasgo_user');
+      localStorage.removeItem('GetGas_token');
+      localStorage.removeItem('GetGas_user');
       window.location.href = '/';
     }
     return Promise.reject(error);

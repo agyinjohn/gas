@@ -39,7 +39,7 @@ const FAQS = [
 const CONTACT = [
   { icon: Phone,         label: 'Call Us',   value: '+233 24 123 4567',     href: 'tel:+233241234567'              },
   { icon: MessageCircle, label: 'WhatsApp',  value: '+233 24 123 4567',     href: 'https://wa.me/233241234567'     },
-  { icon: Mail,          label: 'Email',     value: 'support@gasgo.com.gh', href: 'mailto:support@gasgo.com.gh'   },
+  { icon: Mail,          label: 'Email',     value: 'support@GetGas.com.gh', href: 'mailto:support@GetGas.com.gh'   },
 ];
 
 export default function HelpPage() {

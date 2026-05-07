@@ -49,11 +49,11 @@ function PhoneStep({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-1.5">
-        <label className="block text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+        <label className="block text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">
           Phone number
         </label>
         <div className="flex">
-          <div className="flex items-center gap-1.5 px-3 h-12 bg-gray-50 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-600 font-medium shrink-0 select-none">
+          <div className="flex items-center gap-1.5 px-3 h-12 bg-[var(--bg-card2)] border border-r-0 border-[var(--border)] rounded-l-xl text-sm text-[var(--text-muted)] font-medium shrink-0 select-none">
             <span className="text-base">🇬🇭</span>
             <span>+233</span>
           </div>
@@ -64,10 +64,10 @@ function PhoneStep({
             value={local}
             onChange={(e) => { setLocal(e.target.value.replace(/\D/g, '').slice(0, 10)); setError(''); }}
             className={cn(
-              'flex-1 h-12 rounded-r-xl border text-sm text-gray-900 bg-gray-50 px-4 transition-all',
-              'focus:outline-none focus:bg-white focus:border-gray-400 focus:ring-4 focus:ring-gray-100',
-              'placeholder:text-gray-300',
-              error ? 'border-red-300 bg-red-50' : 'border-gray-200'
+              'flex-1 h-12 rounded-r-xl border text-sm text-[var(--text-primary)] bg-[var(--bg-card2)] px-4 transition-all',
+              'focus:outline-none focus:bg-[var(--bg-card)] focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20',
+              'placeholder:text-[var(--text-muted)]',
+              error ? 'border-red-400 bg-red-500/10' : 'border-[var(--border)]'
             )}
           />
         </div>
@@ -77,18 +77,18 @@ function PhoneStep({
       <button
         type="submit"
         disabled={loading}
-        className="w-full h-12 rounded-xl bg-gray-900 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-gray-800 active:scale-[0.99] transition-all disabled:opacity-60"
+        className="w-full h-12 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.99] transition-all disabled:opacity-60 shadow-lg shadow-brand-500/25"
       >
         {loading
           ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           : <><span>Continue</span><ArrowRight className="w-4 h-4" /></>}
       </button>
 
-      <p className="text-center text-sm text-gray-400">
+      <p className="text-center text-sm text-[var(--text-muted)]">
         Want to deliver?{' '}
-        <a href="/rider/login" className="text-gray-900 font-semibold hover:underline">Sign in as a rider</a>
+        <a href="/rider/login" className="text-brand-500 font-semibold hover:underline">Sign in as a rider</a>
         {' · '}
-        <a href="/rider/register" className="text-gray-900 font-semibold hover:underline">Apply as a rider</a>
+        <a href="/rider/register" className="text-brand-500 font-semibold hover:underline">Apply as a rider</a>
       </p>
     </form>
   );
@@ -244,7 +244,7 @@ function OtpStep({
       {/* Icon */}
       <div className="flex justify-center">
         <div className="w-20 h-20 bg-brand-500/15 rounded-3xl flex items-center justify-center">
-          <Image src="/logo.png" alt="GasGo" width={44} height={44} className="rounded-xl" />
+          <Image src="/logo.png" alt="GetGas" width={44} height={44} className="rounded-xl" />
         </div>
       </div>
 
@@ -330,8 +330,8 @@ export default function LoginPage() {
         <div className="absolute bottom-0 right-0 w-[300px] h-[300px] bg-brand-600/10 rounded-full blur-[80px] pointer-events-none" />
 
         <div className="flex items-center gap-3 relative z-10">
-          <Image src="/logo.png" alt="GasGo" width={40} height={40} className="rounded-xl" />
-          <span className="text-white font-bold text-lg tracking-tight">GasGo</span>
+          <Image src="/logo.png" alt="GetGas" width={40} height={40} className="rounded-xl" />
+          <span className="text-white font-bold text-lg tracking-tight">GetGas</span>
         </div>
 
         <div className="relative z-10 space-y-8">
@@ -362,7 +362,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-gray-700 text-xs relative z-10">© 2025 GasGo · All rights reserved</p>
+        <p className="text-gray-700 text-xs relative z-10">© 2025 GetGas · All rights reserved</p>
       </div>
 
       {/* ── Right panel ── */}
@@ -373,8 +373,8 @@ export default function LoginPage() {
             <>
               {/* Mobile logo */}
               <div className="flex lg:hidden flex-col items-center gap-2 text-center">
-                <Image src="/logo.png" alt="GasGo" width={40} height={40} className="rounded-xl" />
-                <span className="font-black text-[var(--text-primary)] text-lg">GasGo</span>
+                <Image src="/logo.png" alt="GetGas" width={64} height={64} />
+                <span className="font-black text-[var(--text-primary)] text-lg">GetGas</span>
               </div>
               <div className="space-y-1 text-center lg:text-left">
                 <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">Welcome back</h2>

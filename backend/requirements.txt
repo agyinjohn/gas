@@ -1,5 +1,5 @@
 ================================================================================
-GASGO — GAS DELIVERY PLATFORM
+GetGas — GAS DELIVERY PLATFORM
 SYSTEM DESIGN REQUIREMENTS
 Version 1.0 · Confidential
 On-demand LPG cylinder delivery & exchange web application
@@ -10,7 +10,7 @@ On-demand LPG cylinder delivery & exchange web application
 1. PRODUCT OVERVIEW
 --------------------------------------------------------------------------------
 
-GasGo is an on-demand LPG (liquefied petroleum gas) delivery and exchange web
+GetGas is an on-demand LPG (liquefied petroleum gas) delivery and exchange web
 application. Users request a gas cylinder fill or exchange from their location;
 the platform matches them with the nearest available station, assigns a rider,
 and provides real-time delivery tracking. Station owners set their own prices
@@ -514,5 +514,5 @@ GEOHASH INDEXING
 
 ================================================================================
 END OF DOCUMENT
-GasGo Gas Delivery Platform · System Design Requirements · Version 1.0
+GetGas Gas Delivery Platform · System Design Requirements · Version 1.0
 ================================================================================

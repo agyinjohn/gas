@@ -60,9 +60,9 @@ export default function StationRegisterPage() {
     setLoading(true);
     try {
       const response = await stationAuthApi.verifyOTP(formData.phone, otp, 'registration');
-      localStorage.setItem('gasgo_token', response.data.token);
-      localStorage.setItem('gasgo_user', JSON.stringify(response.data.user));
-      localStorage.setItem('gasgo_station_id', response.data.station.id);
+      localStorage.setItem('GetGas_token', response.data.token);
+      localStorage.setItem('GetGas_user', JSON.stringify(response.data.user));
+      localStorage.setItem('GetGas_station_id', response.data.station.id);
       toast.success('Registration complete! Awaiting admin approval.');
       router.push('/station');
     } catch (error: any) {
@@ -109,7 +109,7 @@ export default function StationRegisterPage() {
           <Store className="w-12 h-12 text-brand-500 mx-auto mb-3" />
           <h1 className="text-xl font-bold text-gray-900">Register Station</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Join GasGo as a station partner
+            Join GetGas as a station partner
           </p>
         </div>
         

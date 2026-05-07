@@ -22,6 +22,13 @@ export default function RiderDashboardPage() {
     refetchInterval: 30000,
   });
 
+  // Sync local status from DB on load
+  useEffect(() => {
+    if (dashboardData?.status && dashboardData.status !== riderStatus) {
+      setRiderStatus(dashboardData.status);
+    }
+  }, [dashboardData?.status]);
+
   const statusMutation = useMutation({
     mutationFn: (status: string) => ridersApi.setStatus(status),
     onSuccess: (_, status) => {
@@ -31,45 +38,18 @@ export default function RiderDashboardPage() {
     },
   });
 
-  const updateLocationMutation = useMutation({
-    mutationFn: ({ lat, lng }: { lat: number; lng: number }) =>
-      ridersApi.updateLocation(lat, lng),
-  });
-
-  // Update location every 30 seconds when available
-  useEffect(() => {
-    if (riderStatus !== 'available') return;
-
-    const updateLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            updateLocationMutation.mutate({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            });
-          },
-          (error) => console.error('Location error:', error)
-        );
-      }
-    };
-
-    updateLocation(); // Initial update
-    const interval = setInterval(updateLocation, 30000);
-    return () => clearInterval(interval);
-  }, [riderStatus, updateLocationMutation]);
-
-  // Listen for new order dispatches
+  // Join personal rider room + listen for dispatched orders
   useEffect(() => {
     const socket = getSocket();
-    socket.on('order:dispatch', (order: any) => {
+
+    socket.on('order:new', (order: any) => {
       toast(`New order available: ${formatCylinders(order.cylinders)}`, {
         icon: '🔔',
         duration: 10000,
       });
       queryClient.invalidateQueries({ queryKey: ['rider', 'dashboard'] });
     });
-    return () => { socket.off('order:dispatch'); };
+    return () => { socket.off('order:new'); };
   }, [queryClient]);
 
   const dashboard = dashboardData || {};

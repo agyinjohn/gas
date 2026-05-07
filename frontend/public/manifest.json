@@ -1,6 +1,6 @@
 {
-  "name": "GasGo — On-Demand Gas Delivery",
-  "short_name": "GasGo",
+  "name": "GetGas — On-Demand Gas Delivery",
+  "short_name": "GetGas",
   "description": "Get LPG cylinders delivered to your door in minutes",
   "start_url": "/user",
   "display": "standalone",

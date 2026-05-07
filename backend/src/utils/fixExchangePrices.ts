@@ -8,7 +8,7 @@ dotenv.config();
 import mongoose from 'mongoose';
 
 async function fix() {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/gasgo';
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/GetGas';
   await mongoose.connect(uri);
   console.log('✅ Connected to MongoDB');
 

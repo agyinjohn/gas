@@ -1,9 +1,10 @@
 {
-  "name": "gasgo-frontend",
+  "name": "GetGas-frontend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:network": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

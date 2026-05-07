@@ -1,7 +1,8 @@
 'use client';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Flame, MapPin, Tag } from 'lucide-react';
+import { ArrowLeft, MapPin, Tag } from 'lucide-react';
+import Image from 'next/image';
 
 const DELIVERY_FEE = 15;
 
@@ -78,7 +79,7 @@ export default function ReviewOrderPage() {
             <img src={photo} alt="Cylinder" className="w-full h-48 object-cover" />
           ) : (
             <div className="w-full h-32 bg-[var(--bg-card2)] flex items-center justify-center">
-              <Flame className="w-12 h-12 text-brand-500/40" />
+              <Image src="/LPG.png" alt="LPG" width={64} height={64} className="opacity-40" />
             </div>
           )}
 
@@ -86,7 +87,7 @@ export default function ReviewOrderPage() {
           {cartItems.map((item) => (
             <div key={item.size} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--border)]">
               <div className="w-10 h-10 bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Flame className="w-5 h-5 text-brand-500" />
+                <Image src="/LPG.png" alt="LPG" width={24} height={24} />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-bold text-[var(--text-primary)]">LPG Refill</p>

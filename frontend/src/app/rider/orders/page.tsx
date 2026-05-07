@@ -1,11 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Package, TrendingUp, ChevronRight } from 'lucide-react';
+import RiderNav from '@/components/RiderNav';
+import { Package, ChevronRight } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import { Order, OrderStatus } from '@/types';
 import { StatusBadge, EmptyState, Skeleton } from '@/components/ui';
-import { formatCurrency, formatRelativeTime, ORDER_TYPE_LABELS } from '@/lib/utils';
+import { formatCurrency, formatRelativeTime, ORDER_TYPE_LABELS, formatCylinders } from '@/lib/utils';
 import Link from 'next/link';
 
 const FILTERS: Array<{ key: string; label: string }> = [
@@ -64,7 +65,7 @@ export default function RiderOrdersPage() {
             <Link key={order._id} href={`/rider/orders/${order._id}`}>
               <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 hover:shadow-md transition-shadow">
                 <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center shrink-0">
-                  <span className="text-sm font-black text-orange-600">{order.cylinderSize}kg</span>
+                  <span className="text-sm font-black text-orange-600">{formatCylinders(order.cylinders)}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm">
@@ -89,20 +90,7 @@ export default function RiderOrdersPage() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 flex">
-        <Link href="/rider" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <TrendingUp className="w-5 h-5" />
-          <span className="text-xs">Dashboard</span>
-        </Link>
-        <Link href="/rider/orders" className="flex-1 py-3 flex flex-col items-center gap-1 text-brand-500">
-          <Package className="w-5 h-5" />
-          <span className="text-xs font-medium">Orders</span>
-        </Link>
-        <Link href="/rider/profile" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <div className="w-5 h-5 border-2 border-current rounded-full" />
-          <span className="text-xs">Profile</span>
-        </Link>
-      </div>
+      <RiderNav />
     </div>
   );
 }

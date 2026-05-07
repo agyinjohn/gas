@@ -10,12 +10,13 @@ import { formatCurrency, formatRelativeTime, ORDER_STATUS_LABELS, formatCylinder
 import { Order } from '@/types';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import RiderNav from '@/components/RiderNav';
 
 export default function RiderHomePage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [pendingOrder, setPendingOrder] = useState<any>(null);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(120);
 
   const { data: dashData } = useQuery({
     queryKey: ['rider', 'dashboard'],
@@ -43,27 +44,52 @@ export default function RiderHomePage() {
 
   const isOnline = riderData?.status === 'available' || riderData?.status === 'busy';
 
-  // GPS broadcasting while online
+  // GPS broadcasting while online — fire immediately then every 12s
   useEffect(() => {
     if (!isOnline) return;
-    const interval = setInterval(() => {
-      navigator.geolocation?.getCurrentPosition(({ coords }) => {
-        ridersApi.updateLocation(coords.latitude, coords.longitude).catch(() => {});
-      });
-    }, 12000);
+    function sendLocation() {
+      navigator.geolocation?.getCurrentPosition(
+        ({ coords }) => {
+          console.log('[Rider] Sending GPS:', coords.latitude, coords.longitude);
+          ridersApi.updateLocation(coords.latitude, coords.longitude).catch(console.error);
+        },
+        (err) => console.warn('[Rider] GPS error:', err.message)
+      );
+    }
+    sendLocation(); // immediate
+    const interval = setInterval(sendLocation, 12000);
     return () => clearInterval(interval);
   }, [isOnline]);
 
-  // Listen for new orders
+  // Join personal rider socket room — wait for connection if needed
   useEffect(() => {
+    if (!riderData?._id) return;
     const socket = getSocket();
+    const riderId = riderData._id;
+
+    function joinRoom() {
+      console.log('[Rider] Emitting join:rider for', riderId);
+      socket.emit('join:rider', riderId);
+    }
+
+    if (socket.connected) {
+      joinRoom();
+    } else {
+      socket.once('connect', joinRoom);
+    }
+
     socket.on('order:new', (order: any) => {
+      console.log('[Rider] Received order:new', order);
       setPendingOrder(order);
-      setCountdown(60);
-      toast('New order incoming!', { icon: '🛵', duration: 60000 });
+      setCountdown(120);
+      toast('New order incoming!', { icon: '🛵', duration: 120000 });
     });
-    return () => { socket.off('order:new'); };
-  }, []);
+
+    return () => {
+      socket.off('connect', joinRoom);
+      socket.off('order:new');
+    };
+  }, [riderData?._id]);
 
   // Countdown timer for pending order
   useEffect(() => {
@@ -239,20 +265,7 @@ export default function RiderHomePage() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 flex">
-        <Link href="/rider" className="flex-1 py-3 flex flex-col items-center gap-1 text-brand-500">
-          <TrendingUp className="w-5 h-5" />
-          <span className="text-xs font-medium">Dashboard</span>
-        </Link>
-        <Link href="/rider/orders" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <Package className="w-5 h-5" />
-          <span className="text-xs">Orders</span>
-        </Link>
-        <Link href="/rider/profile" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <div className="w-5 h-5 border-2 border-current rounded-full" />
-          <span className="text-xs">Profile</span>
-        </Link>
-      </div>
+      <RiderNav />
     </div>
   );
 }

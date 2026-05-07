@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30">
             <Flame className="w-5 h-5 text-white" />
           </div>
-          <span className="text-white font-bold text-lg tracking-tight">GasGo</span>
+          <span className="text-white font-bold text-lg tracking-tight">GetGas</span>
         </div>
         <div className="relative z-10 space-y-4">
           <h1 className="text-5xl font-black text-white leading-[1.1] tracking-tight">
@@ -62,7 +62,7 @@ export default function AdminLoginPage() {
             Manage riders, stations, orders and platform settings.
           </p>
         </div>
-        <p className="text-gray-700 text-xs relative z-10">© 2025 GasGo · All rights reserved</p>
+        <p className="text-gray-700 text-xs relative z-10">© 2025 GetGas · All rights reserved</p>
       </div>
 
       {/* Right panel */}
@@ -73,7 +73,7 @@ export default function AdminLoginPage() {
             <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
               <Flame className="w-5 h-5 text-white" />
             </div>
-            <span className="font-black text-gray-900 text-lg">GasGo Admin</span>
+            <span className="font-black text-gray-900 text-lg">GetGas Admin</span>
           </div>
 
           <div className="space-y-1 text-center lg:text-left">
@@ -89,7 +89,7 @@ export default function AdminLoginPage() {
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input
                   type="email"
-                  placeholder="admin@gasgo.app"
+                  placeholder="admin@GetGas.app"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={cn(

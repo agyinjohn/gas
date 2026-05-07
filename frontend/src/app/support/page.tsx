@@ -106,7 +106,7 @@ export default function SupportPage() {
     },
     {
       title: 'Email Support',
-      description: 'support@gasgo.app',
+      description: 'support@GetGas.app',
       icon: Mail,
       action: 'Send Email',
       available: true

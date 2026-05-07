@@ -4,13 +4,13 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'GasGo API',
+      title: 'GetGas API',
       version: '1.0.0',
       description: 'On-demand LPG delivery platform API — Ghana',
     },
     servers: [
       { url: 'http://localhost:4000', description: 'Development' },
-      { url: 'https://api.gasgo.app', description: 'Production' },
+      { url: 'https://api.GetGas.app', description: 'Production' },
     ],
     components: {
       securitySchemes: {
