@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  MapPin, ChevronDown, Bell, User, Flame,
+import Image from 'next/image';
+import { MapPin, ChevronDown, Bell, User,
   Plus, Navigation, AlertCircle, Loader2, Star, Gift, Map,
   Sun, Moon, SlidersHorizontal,
 } from 'lucide-react';
@@ -56,7 +56,7 @@ function StationCard({ station }: { station: Station }) {
           'w-10 h-10 rounded-xl flex items-center justify-center mb-3',
           allOutOfStock ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
         )}>
-          <Flame className={cn('w-5 h-5', allOutOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
+          <Image src="/LPG.png" alt="LPG" width={20} height={20} className={cn(allOutOfStock ? 'opacity-30' : '')} />
         </div>
 
         <h3 className="font-semibold text-[var(--text-primary)] text-sm leading-snug mb-0.5 truncate">
@@ -323,7 +323,7 @@ export default function UserHomePage() {
                 className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 flex flex-col items-center gap-3"
               >
                 <div className="w-12 h-12 rounded-xl bg-[var(--bg-card2)] flex items-center justify-center">
-                  <Flame className="w-6 h-6 text-[var(--text-muted)]" />
+                  <Image src="/LPG.png" alt="LPG" width={28} height={28} />
                 </div>
                 <p className="text-sm font-semibold text-[var(--text-primary)]">{size}kg Refill</p>
                 <button
@@ -397,7 +397,7 @@ export default function UserHomePage() {
           {/* Empty */}
           {!stationsLoading && stations.length === 0 && coords && (
             <div className="text-center py-10">
-              <Flame className="w-8 h-8 text-[var(--text-muted)] mx-auto mb-2" />
+              <Image src="/LPG.png" alt="LPG" width={32} height={32} className="mx-auto mb-2 opacity-40" />
               <p className="text-sm text-[var(--text-muted)]">No stations found nearby</p>
             </div>
           )}

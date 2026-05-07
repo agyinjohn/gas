@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Package, Flame, X } from 'lucide-react';
+import Image from 'next/image';
+import { Search, Package, X } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import { Order } from '@/types';
 import { formatCurrency } from '@/lib/utils';
@@ -33,7 +34,7 @@ function OrderCard({ order, active }: { order: Order; active: boolean }) {
           {order.cylinders?.map((c, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className="w-7 h-7 bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Flame className="w-3.5 h-3.5 text-brand-500" />
+                <Image src="/LPG.png" alt="LPG" width={16} height={16} />
               </div>
               <div>
                 <p className="text-xs font-medium text-[var(--text-primary)]">

@@ -237,6 +237,19 @@ export function BottomSheet({ open, onClose, title, children }: ModalProps) {
   );
 }
 
+// ─── Modal (alias for BottomSheet with isOpen prop) ─────────────────────────
+
+interface ModalProps2 {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  children: ReactNode;
+}
+
+export function Modal({ isOpen, onClose, title, children }: ModalProps2) {
+  return <BottomSheet open={isOpen} onClose={onClose} title={title}>{children}</BottomSheet>;
+}
+
 // ─── Step Indicator ──────────────────────────────────────────────────────────
 
 interface StepIndicatorProps {

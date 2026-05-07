@@ -2,7 +2,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Home, ClipboardList, MapPin, User, LogOut, Sun, Moon, Flame } from 'lucide-react';
+import { Home, ClipboardList, MapPin, User, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
 import { cn } from '@/lib/utils';
@@ -36,9 +36,13 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
         {/* Logo */}
         <div className="px-6 py-6 border-b border-[var(--border)]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center shadow-md shadow-brand-500/30">
-              <Flame className="w-5 h-5 text-white" />
-            </div>
+            <Image
+              src={theme === 'dark' ? '/logo.png' : '/LPG.png'}
+              alt="GasGo"
+              width={36}
+              height={36}
+              className="rounded-xl"
+            />
             <span className="font-black text-[var(--text-primary)] text-lg tracking-tight">GasGo</span>
           </div>
         </div>

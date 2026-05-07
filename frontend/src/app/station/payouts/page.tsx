@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, Calendar, CheckCircle, Clock, 
-  AlertCircle, Bank, CreditCard 
+  AlertCircle, Landmark, CreditCard 
 } from 'lucide-react';
 import { stationsApi } from '@/lib/api';
 import { Card, Button, Input, Badge } from '@/components/ui';
@@ -72,7 +72,7 @@ export default function StationPayoutsPage() {
           {[
             { key: 'overview', label: 'Overview', icon: DollarSign },
             { key: 'history', label: 'History', icon: Calendar },
-            { key: 'bank', label: 'Bank Account', icon: Bank },
+            { key: 'bank', label: 'Bank Account', icon: Landmark },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}

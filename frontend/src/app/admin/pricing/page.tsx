@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, AlertTriangle, Pause, Play, 
@@ -33,7 +33,7 @@ export default function AdminPricingPage() {
     },
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (pricingData) {
       setPricingForm({
         deliveryFeeFlat: pricingData.deliveryFeeFlat || 5,
