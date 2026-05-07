@@ -7,7 +7,7 @@ import { Card, Button, Badge } from '@/components/ui';
 import { formatCurrency, formatRelativeTime, formatCylinders } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('gasgo_station_id') || '' : '';
+const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('GetGas_station_id') || '' : '';
 
 export default function StationOrdersPage() {
   const queryClient = useQueryClient();

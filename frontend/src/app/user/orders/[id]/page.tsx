@@ -378,28 +378,38 @@ export default function OrderDetailsPage() {
       {/* Bottom buttons */}
       {order.status !== 'cancelled' && (
         <div className="fixed bottom-0 inset-x-0 bg-[var(--bg-card)] border-t border-[var(--border)] px-4 py-4 z-20">
-          <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
+          <div className="max-w-lg mx-auto space-y-3">
+            {/* Primary CTA — always visible */}
             <button
-              onClick={() => setShowIssueSheet(true)}
-              disabled={!!(order as any).issue?.reportedAt}
-              className="h-12 bg-brand-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              onClick={() => router.push('/user/orders')}
+              className="w-full h-12 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-brand-500/25"
             >
-              <AlertTriangle className="w-4 h-4" />
-              {(order as any).issue?.reportedAt ? 'Issue Reported' : 'Report Issue'}
+              Follow Up on Order
             </button>
-            <button
-              onClick={() => order.status === 'delivered' && setShowRatingSheet(true)}
-              disabled={order.status !== 'delivered' || !!order.riderRating}
-              className={cn(
-                'h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-colors',
-                order.status === 'delivered' && !order.riderRating
-                  ? 'bg-[var(--bg-card2)] border-[var(--border)] text-[var(--text-primary)] hover:border-brand-500/50'
-                  : 'bg-[var(--bg-card2)] border-[var(--border)] text-[var(--text-muted)] opacity-50 cursor-not-allowed'
-              )}
-            >
-              <Star className="w-4 h-4" />
-              {order.riderRating ? 'Rated' : order.status !== 'delivered' ? 'Rate (after delivery)' : 'Rate Delivery'}
-            </button>
+            {/* Secondary actions */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setShowIssueSheet(true)}
+                disabled={!!(order as any).issue?.reportedAt}
+                className="h-11 bg-[var(--bg-card2)] border border-[var(--border)] text-[var(--text-primary)] rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                {(order as any).issue?.reportedAt ? 'Reported' : 'Report Issue'}
+              </button>
+              <button
+                onClick={() => order.status === 'delivered' && setShowRatingSheet(true)}
+                disabled={order.status !== 'delivered' || !!order.riderRating}
+                className={cn(
+                  'h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-colors',
+                  order.status === 'delivered' && !order.riderRating
+                    ? 'bg-[var(--bg-card2)] border-[var(--border)] text-[var(--text-primary)] hover:border-brand-500/50'
+                    : 'bg-[var(--bg-card2)] border-[var(--border)] text-[var(--text-muted)] opacity-50 cursor-not-allowed'
+                )}
+              >
+                <Star className="w-4 h-4" />
+                {order.riderRating ? 'Rated' : 'Rate Delivery'}
+              </button>
+            </div>
           </div>
         </div>
       )}

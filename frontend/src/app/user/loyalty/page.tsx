@@ -31,8 +31,8 @@ export default function UserLoyaltyPage() {
     if (referralData?.shareUrl) {
       if (navigator.share) {
         navigator.share({
-          title: 'Join GasGo with my referral code',
-          text: `Get GH₵2 bonus when you join GasGo with my code: ${referralData.referralCode}`,
+          title: 'Join GetGas with my referral code',
+          text: `Get GH₵2 bonus when you join GetGas with my code: ${referralData.referralCode}`,
           url: referralData.shareUrl,
         });
       } else {

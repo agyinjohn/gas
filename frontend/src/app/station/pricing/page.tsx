@@ -10,7 +10,7 @@ import { Card, Button, Input } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('gasgo_station_id') || '' : '';
+const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('GetGas_station_id') || '' : '';
 
 export default function StationPricingPage() {
   const queryClient = useQueryClient();

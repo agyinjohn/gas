@@ -7,7 +7,7 @@ import { Toaster } from 'react-hot-toast';
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  title: 'GasGo — On-Demand Gas Delivery',
+  title: 'GetGas — On-Demand Gas Delivery',
   description: 'Get LPG cylinders delivered to your door within minutes',
   manifest: '/manifest.json',
   themeColor: '#F97316',

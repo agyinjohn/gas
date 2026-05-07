@@ -34,7 +34,7 @@ const API = '/api/v1';
 // Socket.IO setup
 const io = new SocketServer(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: '*', // Allow all origins in dev — tighten in production
     methods: ['GET', 'POST'],
   },
 });
@@ -48,7 +48,19 @@ app.use(`${API}/payments`, paymentRoutes);
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow localhost, local network IPs, and the configured FRONTEND_URL
+    const allowed = [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'http://localhost:3000',
+    ];
+    // Allow any local network request (192.168.x.x, 10.x.x.x, 172.x.x.x)
+    if (!origin || allowed.includes(origin) || /^http:\/\/(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all in dev — tighten in production
+    }
+  },
   credentials: true,
 }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
@@ -99,7 +111,7 @@ app.get('/health', async (_req, res) => {
 // ─── Swagger docs (dev only) ──────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customSiteTitle: 'GasGo API Docs',
+    customSiteTitle: 'GetGas API Docs',
     customCss: '.swagger-ui .topbar { background-color: #f97316; }',
   }));
   app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
@@ -113,8 +125,9 @@ app.use(errorHandler);
 const PORT = parseInt(process.env.PORT || '4000', 10);
 
 connectDB().then(() => {
-  httpServer.listen(PORT, () => {
-    console.log(`🔥 GasGo API running on http://localhost:${PORT}`);
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🔥 GasGo API running on http://0.0.0.0:${PORT}`);
+    console.log(`🌐 Network access: http://192.168.43.206:${PORT}`);
     console.log(`🔌 Socket.IO ready`);
   });
   startAllJobs();

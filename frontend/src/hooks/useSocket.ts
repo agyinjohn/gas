@@ -5,14 +5,40 @@ import { io, Socket } from 'socket.io-client';
 let socketInstance: Socket | null = null;
 
 export function getSocket(): Socket {
-  if (!socketInstance) {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('gasgo_token') : null;
-    socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000', {
-      auth: { token },
-      transports: ['websocket'],
-      autoConnect: true,
-    });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('gasgo_token') : null;
+
+  // If socket exists but was created without a token (unauthenticated), destroy and recreate
+  if (socketInstance) {
+    const currentAuth = (socketInstance as any).auth?.token;
+    if (!currentAuth && token) {
+      console.log('[Socket] Recreating socket with auth token');
+      socketInstance.disconnect();
+      socketInstance = null;
+    } else {
+      return socketInstance;
+    }
   }
+
+  console.log('[Socket] Creating new socket connection, token present:', !!token);
+  socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000', {
+    auth: { token },
+    transports: ['websocket'],
+    autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+  });
+
+  socketInstance.on('connect', () => {
+    console.log('[Socket] Connected:', socketInstance?.id);
+  });
+  socketInstance.on('disconnect', (reason) => {
+    console.log('[Socket] Disconnected:', reason);
+  });
+  socketInstance.on('connect_error', (err) => {
+    console.error('[Socket] Connection error:', err.message);
+  });
+
   return socketInstance;
 }
 

@@ -513,7 +513,7 @@ export default function RiderRegisterPage() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30">
             <Flame className="w-5 h-5 text-white" />
           </div>
-          <span className="text-white font-bold text-lg tracking-tight">GasGo</span>
+          <span className="text-white font-bold text-lg tracking-tight">GetGas</span>
         </div>
 
         <div className="relative z-10 space-y-8">
@@ -545,7 +545,7 @@ export default function RiderRegisterPage() {
           </div>
         </div>
 
-        <p className="text-gray-700 text-xs relative z-10">© 2025 GasGo · All rights reserved</p>
+        <p className="text-gray-700 text-xs relative z-10">© 2025 GetGas · All rights reserved</p>
       </div>
 
       {/* ── Right panel ── */}
@@ -557,7 +557,7 @@ export default function RiderRegisterPage() {
             <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
               <Flame className="w-5 h-5 text-white" />
             </div>
-            <span className="font-black text-gray-900 text-lg">GasGo</span>
+            <span className="font-black text-gray-900 text-lg">GetGas</span>
           </div>
 
           {/* Header */}

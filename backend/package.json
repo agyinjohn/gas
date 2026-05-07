@@ -1,7 +1,7 @@
 {
-  "name": "gasgo-backend",
+  "name": "GetGas-backend",
   "version": "1.0.0",
-  "description": "GasGo LPG Delivery Platform — Express/Node.js API",
+  "description": "GetGas LPG Delivery Platform — Express/Node.js API",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",

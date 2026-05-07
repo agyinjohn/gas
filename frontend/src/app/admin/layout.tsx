@@ -159,7 +159,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Flame className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="text-white font-black text-base tracking-tight">GasGo</p>
+            <p className="text-white font-black text-base tracking-tight">GetGas</p>
             <p className="text-gray-500 text-[10px] font-medium uppercase tracking-widest">Admin</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="ml-auto lg:hidden p-1 rounded-lg hover:bg-white/10">

@@ -497,8 +497,8 @@ router.patch(
 
     // Notify rider via SMS + push
     const smsText = kycStatus === 'approved'
-      ? `GasGo: Your KYC has been approved! You can now go online and start delivering.`
-      : `GasGo: Your KYC was not approved. Reason: ${reason || 'Please contact support.'}`;
+      ? `GetGas: Your KYC has been approved! You can now go online and start delivering.`
+      : `GetGas: Your KYC was not approved. Reason: ${reason || 'Please contact support.'}`;
 
     await sendSMS(rider.phone, smsText).catch(console.error);
 

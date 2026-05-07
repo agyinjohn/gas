@@ -5,7 +5,7 @@ import { ArrowLeft, Shield } from 'lucide-react';
 const SECTIONS = [
   {
     title: '1. Introduction',
-    body: `GasGo Technologies Ltd ("GasGo", "we", "us", or "our") is committed to protecting your personal information. This Privacy Policy explains how we collect, use, store, and share your data when you use the GasGo platform.\n\nThis policy complies with the Data Protection Act, 2012 (Act 843) of Ghana and applicable data protection regulations.`,
+    body: `GetGas Technologies Ltd ("GetGas", "we", "us", or "our") is committed to protecting your personal information. This Privacy Policy explains how we collect, use, store, and share your data when you use the GetGas platform.\n\nThis policy complies with the Data Protection Act, 2012 (Act 843) of Ghana and applicable data protection regulations.`,
   },
   {
     title: '2. Information We Collect',
@@ -21,7 +21,7 @@ const SECTIONS = [
   },
   {
     title: '5. Location Data',
-    body: `GasGo requires access to your device's location to:\n\n• Find nearby LPG stations\n• Set your delivery address accurately\n• Enable real-time rider tracking\n\nLocation access is requested only when you use the app. You can disable location permissions in your device settings, but this will limit the functionality of the app.\n\nRider location data is shared with you only during an active delivery and is not retained after the order is completed.`,
+    body: `GetGas requires access to your device's location to:\n\n• Find nearby LPG stations\n• Set your delivery address accurately\n• Enable real-time rider tracking\n\nLocation access is requested only when you use the app. You can disable location permissions in your device settings, but this will limit the functionality of the app.\n\nRider location data is shared with you only during an active delivery and is not retained after the order is completed.`,
   },
   {
     title: '6. Sharing Your Information',
@@ -33,7 +33,7 @@ const SECTIONS = [
   },
   {
     title: '8. Your Rights',
-    body: `Under the Data Protection Act 2012 (Act 843), you have the right to:\n\n• Access the personal data we hold about you\n• Correct inaccurate or incomplete data\n• Request deletion of your data (subject to legal retention requirements)\n• Object to processing of your data for marketing purposes\n• Withdraw consent where processing is based on consent\n\nTo exercise any of these rights, contact us at privacy@gasgo.com.gh. We will respond within 30 days.`,
+    body: `Under the Data Protection Act 2012 (Act 843), you have the right to:\n\n• Access the personal data we hold about you\n• Correct inaccurate or incomplete data\n• Request deletion of your data (subject to legal retention requirements)\n• Object to processing of your data for marketing purposes\n• Withdraw consent where processing is based on consent\n\nTo exercise any of these rights, contact us at privacy@GetGas.com.gh. We will respond within 30 days.`,
   },
   {
     title: '9. Security',
@@ -45,15 +45,15 @@ const SECTIONS = [
   },
   {
     title: '11. Children\'s Privacy',
-    body: `GasGo is not intended for use by persons under the age of 18. We do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact us immediately and we will delete it.`,
+    body: `GetGas is not intended for use by persons under the age of 18. We do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact us immediately and we will delete it.`,
   },
   {
     title: '12. Changes to This Policy',
-    body: `We may update this Privacy Policy from time to time. We will notify you of material changes via the app or by SMS. Your continued use of GasGo after changes are posted constitutes acceptance of the updated policy.\n\nLast updated: January 2025`,
+    body: `We may update this Privacy Policy from time to time. We will notify you of material changes via the app or by SMS. Your continued use of GetGas after changes are posted constitutes acceptance of the updated policy.\n\nLast updated: January 2025`,
   },
   {
     title: '13. Contact & Complaints',
-    body: `For privacy-related queries or to exercise your rights:\n\nData Protection Officer\nGasGo Technologies Ltd\nEmail: privacy@gasgo.com.gh\nPhone: +233 24 123 4567\nAccra, Ghana\n\nYou also have the right to lodge a complaint with the Data Protection Commission of Ghana.`,
+    body: `For privacy-related queries or to exercise your rights:\n\nData Protection Officer\nGetGas Technologies Ltd\nEmail: privacy@GetGas.com.gh\nPhone: +233 24 123 4567\nAccra, Ghana\n\nYou also have the right to lodge a complaint with the Data Protection Commission of Ghana.`,
   },
 ];
 

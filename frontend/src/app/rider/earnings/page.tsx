@@ -3,8 +3,10 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, CreditCard, Landmark, Calendar, 
-  TrendingUp, Clock, CheckCircle, AlertCircle 
+  TrendingUp, Clock, CheckCircle, AlertCircle, Package, Star
 } from 'lucide-react';
+import Link from 'next/link';
+import RiderNav from '@/components/RiderNav';
 import { ridersApi } from '@/lib/api';
 import { Card, Button, Input, Badge } from '@/components/ui';
 import { formatCurrency, formatRelativeTime } from '@/lib/utils';
@@ -60,7 +62,7 @@ export default function RiderEarningsPage() {
   const weeklyEarnings = dashboard.todayEarnings * 7; // Simplified calculation
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
       <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 pt-12 pb-6">
         <h1 className="text-xl font-bold mb-2">Earnings</h1>
@@ -364,6 +366,9 @@ export default function RiderEarningsPage() {
           </div>
         )}
       </div>
+
+      {/* Bottom Nav */}
+      <RiderNav />
     </div>
   );
 }

@@ -28,6 +28,12 @@ export function initSocketIO(socketServer: SocketServer): void {
       socket.leave(`order:${orderId}`);
     });
 
+    // Rider joins their personal room to receive dispatched orders
+    socket.on('join:rider', (riderId: string) => {
+      socket.join(`rider:${riderId}`);
+      console.log(`[Socket] Rider ${riderId} joined room rider:${riderId}`);
+    });
+
     // Rider broadcasts their GPS position
     socket.on('rider:location', (payload: { orderId: string; lat: number; lng: number }) => {
       const { orderId, lat, lng } = payload;

@@ -6,7 +6,7 @@ import { stationsApi } from '@/lib/api';
 import { Card, Badge, Input } from '@/components/ui';
 import { formatRelativeTime, formatCylinders } from '@/lib/utils';
 
-const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('gasgo_station_id') || '' : '';
+const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('GetGas_station_id') || '' : '';
 
 export default function StationReviewsPage() {
   const [page, setPage] = useState(1);

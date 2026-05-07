@@ -222,7 +222,7 @@ export default function UserProfilePage() {
               className="w-full h-11 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-500/20 transition-colors">
               <LogOut className="w-4 h-4" /> Sign Out
             </button>
-            <p className="text-center text-xs text-[var(--text-muted)]">GasGo v1.0.0</p>
+            <p className="text-center text-xs text-[var(--text-muted)]">GetGas v1.0.0</p>
           </div>
 
           {/* ── Right: addresses ── */}

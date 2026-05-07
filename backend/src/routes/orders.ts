@@ -284,7 +284,7 @@ router.post(
       const user = await User.findById(userId).select('phone email');
       const reference = generatePaymentReference(order._id.toString());
       const payment = await initializePayment({
-        email: user?.email || `${user?.phone}@gasgo.app`,
+        email: user?.email || `${user?.phone}@GetGas.app`,
         amountGHS: finalAmount,
         reference,
         callbackUrl: `${process.env.FRONTEND_URL}/user/orders/${order._id}?payment=callback`,
@@ -712,7 +712,7 @@ router.post(
           const result = await transferToBeneficiary({
             amountGHS: riderEarning,
             recipientCode: rider.bankAccount.recipientCode,
-            reason: `GasGo rider payout — Order ${order._id.toString().slice(-6).toUpperCase()}`,
+            reason: `GetGas rider payout — Order ${order._id.toString().slice(-6).toUpperCase()}`,
             reference: ref,
           });
           riderPayout.status = 'processing';

@@ -1,11 +1,11 @@
-# GasGo — On-Demand LPG Delivery Platform
+# GetGas — On-Demand LPG Delivery Platform
 
 Full-stack monorepo: **Next.js 14** (App Router) frontend + **Node.js/Express** backend + **MongoDB** database.
 
 ## Project Structure
 
 ```
-gasgo/
+GetGas/
 ├── backend/          # Express API server
 │   └── src/
 │       ├── config/   # DB, env, constants

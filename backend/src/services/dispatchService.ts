@@ -12,39 +12,66 @@ import { sendPushNotification } from './notificationService';
  */
 export async function dispatchOrder(orderId: string): Promise<void> {
   const order = await Order.findById(orderId).populate('stationId', 'lat lng name _id');
-  if (!order || order.status !== 'pending') return;
+  if (!order || order.status !== 'pending') {
+    console.log(`[Dispatch] Skipping ${orderId} — status: ${order?.status ?? 'not found'}`);
+    return;
+  }
 
   const station = order.stationId as unknown as { _id: mongoose.Types.ObjectId; lat: number; lng: number; name: string };
+  console.log(`[Dispatch] Order ${orderId} — station: ${station.name} (${station.lat}, ${station.lng})`);
+  console.log(`[Dispatch] Dispatch attempts so far: ${order.dispatchAttempts.length}/${CONSTANTS.MAX_DISPATCH_ATTEMPTS}`);
 
   if (order.dispatchAttempts.length >= CONSTANTS.MAX_DISPATCH_ATTEMPTS) {
+    console.log(`[Dispatch] Max attempts reached — escalating`);
     await escalateToAdmin(orderId);
     return;
   }
 
   const nearbyRiders = await getNearbyRiders(station.lat, station.lng, CONSTANTS.DISPATCH_RADIUS_KM);
+  console.log(`[Dispatch] Nearby riders (geo, ${CONSTANTS.DISPATCH_RADIUS_KM}km): ${nearbyRiders.length}`);
 
   // Filter out riders already attempted
   const attemptedIds = new Set(order.dispatchAttempts.map((a) => a.riderId.toString()));
-  const eligibleRiders = nearbyRiders.filter((r) => !attemptedIds.has(r.riderId));
+  let eligibleRiders = nearbyRiders.filter((r) => !attemptedIds.has(r.riderId));
+  console.log(`[Dispatch] Eligible after filtering attempted: ${eligibleRiders.length}`);
+
+  // Fallback: if no nearby riders found (e.g. no GPS data in dev), use any available approved rider
+  if (eligibleRiders.length === 0) {
+    const allRiders = await Rider.find({
+      status: 'available',
+      kycStatus: 'approved',
+      _id: { $nin: [...attemptedIds].map((id) => new mongoose.Types.ObjectId(id)) },
+    }).select('_id name status kycStatus location').lean();
+
+    console.log(`[Dispatch] Fallback — all available+approved riders in DB: ${allRiders.length}`);
+    allRiders.forEach((r: any) => {
+      console.log(`  Rider: ${r.name} | status: ${r.status} | kyc: ${r.kycStatus} | location: ${JSON.stringify(r.location ?? 'none')}`);
+    });
+
+    eligibleRiders = allRiders.map((r) => ({ riderId: r._id.toString(), distanceKm: 0 }));
+  }
 
   if (eligibleRiders.length === 0) {
+    console.log(`[Dispatch] No eligible riders at all — escalating`);
     await escalateToAdmin(orderId);
     return;
   }
 
-  // Find the first truly available rider (geo query may be slightly stale)
+  // Find the first truly available rider
   let rider = null;
   for (const candidate of eligibleRiders) {
     const r = await Rider.findOne({ _id: candidate.riderId, status: 'available', kycStatus: 'approved' });
+    console.log(`[Dispatch] Checking candidate ${candidate.riderId}: ${r ? `found (${r.name})` : 'not available/approved'}`);
     if (r) { rider = r; break; }
   }
 
   if (!rider) {
+    console.log(`[Dispatch] No available+approved rider found — escalating`);
     await escalateToAdmin(orderId);
     return;
   }
 
-  // Log dispatch attempt with 'timeout' as default — updated below if rider responds
+  console.log(`[Dispatch] Selected rider: ${rider.name} (${rider._id}) — emitting order:new to room rider:${rider._id}`);
   order.dispatchAttempts.push({
     riderId: rider._id,
     sentAt: new Date(),
@@ -65,6 +92,7 @@ export async function dispatchOrder(orderId: string): Promise<void> {
   };
 
   emitOrderToRider(rider._id.toString(), orderSummary);
+  console.log(`[Dispatch] Socket emitted order:new to rider:${rider._id} — room size: ${(require('./realtimeService').io as any)?.sockets?.adapter?.rooms?.get('rider:' + rider._id.toString())?.size ?? 0} connected clients`);
 
   if (rider.fcmToken) {
     const sizes = order.cylinders.map((c) => `${c.quantity}×${c.size}kg`).join(', ');

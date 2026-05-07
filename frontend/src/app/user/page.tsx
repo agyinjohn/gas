@@ -1,8 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import Image from 'next/image';
-import { MapPin, ChevronDown, Bell, User,
+import { MapPin, ChevronDown, Bell, User, Flame,
   Plus, Navigation, AlertCircle, Loader2, Star, Gift, Map,
   Sun, Moon, SlidersHorizontal,
 } from 'lucide-react';
@@ -56,7 +55,7 @@ function StationCard({ station }: { station: Station }) {
           'w-10 h-10 rounded-xl flex items-center justify-center mb-3',
           allOutOfStock ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
         )}>
-          <Image src="/LPG.png" alt="LPG" width={20} height={20} className={cn(allOutOfStock ? 'opacity-30' : '')} />
+          <Flame className={cn('w-5 h-5', allOutOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
         </div>
 
         <h3 className="font-semibold text-[var(--text-primary)] text-sm leading-snug mb-0.5 truncate">
@@ -105,55 +104,83 @@ export default function UserHomePage() {
   const [coords, setCoords]               = useState<{ lat: number; lng: number } | null>(null);
   const [locationState, setLocationState] = useState<'detecting' | 'granted' | 'denied' | 'manual'>('detecting');
   const [showPicker, setShowPicker]       = useState(false);
-  const [locationLabel, setLocationLabel] = useState('Location goes here...');
+  const [locationLabel, setLocationLabel] = useState('');
   const [radius, setRadius]               = useState(10);
 
+  // On mount: load persisted location instantly, then silently refresh GPS in background
   useEffect(() => {
-    if (!navigator.geolocation) { setLocationState('denied'); return; }
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-        if (result.state === 'denied') { setLocationState('denied'); return; }
-        requestLocation();
-        result.onchange = () => {
-          if (result.state === 'granted') requestLocation();
-          if (result.state === 'denied') setLocationState('denied');
-        };
-      });
+    const savedLat   = localStorage.getItem('gasgo_lat');
+    const savedLng   = localStorage.getItem('gasgo_lng');
+    const savedLabel = localStorage.getItem('gasgo_location_label');
+    const savedMode  = localStorage.getItem('gasgo_location_mode') as 'granted' | 'manual' | null;
+
+    if (savedLat && savedLng) {
+      setCoords({ lat: parseFloat(savedLat), lng: parseFloat(savedLng) });
+      setLocationLabel(savedLabel || 'Current location');
+      setLocationState(savedMode || 'granted');
+      // If it was GPS-based, silently refresh in background
+      if (savedMode !== 'manual') silentRefreshLocation();
     } else {
+      // No saved location — request fresh
       requestLocation();
     }
   }, []);
 
-  function requestLocation() {
+  function silentRefreshLocation() {
+    if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       ({ coords: c }) => {
         setCoords({ lat: c.latitude, lng: c.longitude });
         setLocationState('granted');
-        // Reverse geocode with Google Maps Geocoding API
-        const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
-        if (key) {
-          fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${c.latitude},${c.longitude}&key=${key}&result_type=sublocality|locality`)
-            .then((r) => r.json())
-            .then((data) => {
-              const result = data.results?.[0];
-              if (result) {
-                // Pick the shortest meaningful component (neighbourhood or city)
-                const comp = result.address_components?.find((ac: any) =>
-                  ac.types.includes('sublocality') || ac.types.includes('neighborhood')
-                ) ?? result.address_components?.find((ac: any) => ac.types.includes('locality'));
-                setLocationLabel(comp?.long_name ?? result.formatted_address.split(',')[0]);
-              } else {
-                setLocationLabel('Current location');
-              }
-            })
-            .catch(() => setLocationLabel('Current location'));
-        } else {
-          setLocationLabel('Current location');
-        }
+        reverseGeocode(c.latitude, c.longitude, (label) => {
+          setLocationLabel(label);
+          localStorage.setItem('gasgo_lat', String(c.latitude));
+          localStorage.setItem('gasgo_lng', String(c.longitude));
+          localStorage.setItem('gasgo_location_label', label);
+          localStorage.setItem('gasgo_location_mode', 'granted');
+        });
+      },
+      () => {}, // silent fail — keep existing saved location
+      { timeout: 10000, enableHighAccuracy: true, maximumAge: 0 }
+    );
+  }
+
+  function requestLocation() {
+    if (!navigator.geolocation) { setLocationState('denied'); return; }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords: c }) => {
+        setCoords({ lat: c.latitude, lng: c.longitude });
+        setLocationState('granted');
+        reverseGeocode(c.latitude, c.longitude, (label) => {
+          setLocationLabel(label);
+          localStorage.setItem('gasgo_lat', String(c.latitude));
+          localStorage.setItem('gasgo_lng', String(c.longitude));
+          localStorage.setItem('gasgo_location_label', label);
+          localStorage.setItem('gasgo_location_mode', 'granted');
+        });
       },
       () => setLocationState('denied'),
-      { timeout: 15000, enableHighAccuracy: true, maximumAge: 60000 }
+      { timeout: 15000, enableHighAccuracy: true, maximumAge: 0 }
     );
+  }
+
+  function reverseGeocode(lat: number, lng: number, cb: (label: string) => void) {
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
+    if (!key) { cb('Current location'); return; }
+    fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}&result_type=sublocality|locality`)
+      .then((r) => r.json())
+      .then((data) => {
+        const result = data.results?.[0];
+        if (result) {
+          const comp = result.address_components?.find((ac: any) =>
+            ac.types.includes('sublocality') || ac.types.includes('neighborhood')
+          ) ?? result.address_components?.find((ac: any) => ac.types.includes('locality'));
+          cb(comp?.long_name ?? result.formatted_address.split(',')[0]);
+        } else {
+          cb('Current location');
+        }
+      })
+      .catch(() => cb('Current location'));
   }
 
   function handleLocationConfirm(loc: PickedLocation) {
@@ -161,6 +188,11 @@ export default function UserHomePage() {
     setLocationLabel(loc.formatted.split(',')[0]);
     setLocationState('manual');
     setShowPicker(false);
+    // Persist manual pick — won't be overwritten by GPS refresh
+    localStorage.setItem('gasgo_lat', String(loc.lat));
+    localStorage.setItem('gasgo_lng', String(loc.lng));
+    localStorage.setItem('gasgo_location_label', loc.formatted.split(',')[0]);
+    localStorage.setItem('gasgo_location_mode', 'manual');
   }
 
   // Nearby stations
@@ -226,9 +258,9 @@ export default function UserHomePage() {
                 <MapPin className="w-3.5 h-3.5 text-brand-500" />
               )}
               <span className="text-sm text-[var(--text-primary)] font-medium max-w-[160px] truncate">
-                {locationState === 'detecting' ? 'Detecting…' :
-                 locationState === 'denied'    ? 'Set location' :
-                 locationLabel}
+                {locationState === 'detecting' && !coords ? 'Detecting…' :
+                 locationState === 'denied'              ? 'Set location' :
+                 locationLabel || 'Detecting…'}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
             </button>
@@ -323,7 +355,7 @@ export default function UserHomePage() {
                 className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 flex flex-col items-center gap-3"
               >
                 <div className="w-12 h-12 rounded-xl bg-[var(--bg-card2)] flex items-center justify-center">
-                  <Image src="/LPG.png" alt="LPG" width={28} height={28} />
+                  <Flame className="w-6 h-6 text-[var(--text-muted)]" />
                 </div>
                 <p className="text-sm font-semibold text-[var(--text-primary)]">{size}kg Refill</p>
                 <button
@@ -397,7 +429,7 @@ export default function UserHomePage() {
           {/* Empty */}
           {!stationsLoading && stations.length === 0 && coords && (
             <div className="text-center py-10">
-              <Image src="/LPG.png" alt="LPG" width={32} height={32} className="mx-auto mb-2 opacity-40" />
+              <Flame className="w-8 h-8 text-[var(--text-muted)] mx-auto mb-2" />
               <p className="text-sm text-[var(--text-muted)]">No stations found nearby</p>
             </div>
           )}
@@ -417,7 +449,7 @@ export default function UserHomePage() {
           <div className="flex-1">
             <p className="font-bold text-[var(--text-primary)] text-sm">Refer &amp; Earn GHS 20</p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              Invite friends to GasGo and get discount on your next refill
+              Invite friends to GetGas and get discount on your next refill
             </p>
           </div>
           <Link href="/user/loyalty">

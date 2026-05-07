@@ -7,7 +7,7 @@ import { ordersApi } from '@/lib/api';
 import { useRiderLocationBroadcast } from '@/hooks/useSocket';
 import { Order } from '@/types';
 import { Button, Card, StepIndicator } from '@/components/ui';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatCylinders } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 const DELIVERY_STEPS = ['Go to Station', 'Pick Up Cylinder', 'Deliver to Customer'];
@@ -198,7 +198,7 @@ export default function RiderOrderPage() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Cylinder</span>
-              <span className="font-medium">{order.cylinderSize}kg · {order.orderType}</span>
+              <span className="font-medium">{formatCylinders(order.cylinders)} · {order.orderType}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Station</span>

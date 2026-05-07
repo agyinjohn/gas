@@ -110,6 +110,7 @@ router.patch(
       'location.lng': lng,
       'location.updatedAt': new Date(),
     });
+    console.log(`[Location] Rider ${riderId} updated location: (${lat}, ${lng})`);
 
     // Broadcast to the active order's socket room
     const activeOrder = await Order.findOne(

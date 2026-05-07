@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 async function seed() {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/gasgo';
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/GetGas';
   await mongoose.connect(uri);
   console.log('✅ Connected to MongoDB');
 
@@ -18,17 +18,17 @@ async function seed() {
   const { Station } = await import('../models/Station');
 
   // Create admin
-  const existing = await Admin.findOne({ email: 'admin@gasgo.app' });
+  const existing = await Admin.findOne({ email: 'admin@GetGas.app' });
   if (!existing) {
-    const passwordHash = await bcrypt.hash('Admin@GasGo2025!', 12);
+    const passwordHash = await bcrypt.hash('Admin@GetGas2025!', 12);
     await Admin.create({
       name: 'Super Admin',
       phone: '+233000000000',
-      email: 'admin@gasgo.app',
+      email: 'admin@GetGas.app',
       passwordHash,
       role: 'super_admin',
     });
-    console.log('✅ Admin created: admin@gasgo.app / Admin@GasGo2025!');
+    console.log('✅ Admin created: admin@GetGas.app / Admin@GetGas2025!');
   } else {
     console.log('ℹ️  Admin already exists');
   }
