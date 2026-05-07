@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Settings, DollarSign, Truck, Clock, Save } from 'lucide-react';
 import { adminApi } from '@/lib/api';
@@ -36,7 +36,7 @@ export default function AdminSettingsPage() {
   });
 
   // Update form when data loads
-  React.useEffect(() => {
+  useEffect(() => {
     if (pricingData?.pricing) {
       setPricingForm(pricingData.pricing);
     }
