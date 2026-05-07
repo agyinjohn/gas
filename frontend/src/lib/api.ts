@@ -90,6 +90,8 @@ export const ordersApi = {
     api.post(`/api/v1/orders/${id}/rate`, { rating, comment }),
   rateStation: (id: string, rating: number, comment?: string) =>
     api.post(`/api/v1/orders/${id}/rate-station`, { rating, comment }),
+  reportIssue: (id: string, category: string, description: string) =>
+    api.post(`/api/v1/orders/${id}/report-issue`, { category, description }),
 };
 
 export const ridersApi = {
@@ -118,6 +120,12 @@ export const usersApi = {
 
   getLoyalty: (page = 1) => api.get('/api/v1/users/loyalty', { params: { page } }),
   getReferral: () => api.get('/api/v1/users/referral'),
+};
+
+export const notificationsApi = {
+  list: () => api.get('/api/v1/notifications'),
+  readAll: () => api.patch('/api/v1/notifications/read-all'),
+  readOne: (id: string) => api.patch(`/api/v1/notifications/${id}/read`),
 };
 
 export const stationAuthApi = {

@@ -6,7 +6,7 @@ import {
   Plus, Navigation, AlertCircle, Loader2, Star, Gift, Map,
   Sun, Moon, SlidersHorizontal,
 } from 'lucide-react';
-import { stationsApi, ordersApi } from '@/lib/api';
+import { stationsApi, ordersApi, notificationsApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
 import { cn } from '@/lib/utils';
@@ -129,7 +129,27 @@ export default function UserHomePage() {
       ({ coords: c }) => {
         setCoords({ lat: c.latitude, lng: c.longitude });
         setLocationState('granted');
-        setLocationLabel('Current location');
+        // Reverse geocode with Google Maps Geocoding API
+        const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
+        if (key) {
+          fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${c.latitude},${c.longitude}&key=${key}&result_type=sublocality|locality`)
+            .then((r) => r.json())
+            .then((data) => {
+              const result = data.results?.[0];
+              if (result) {
+                // Pick the shortest meaningful component (neighbourhood or city)
+                const comp = result.address_components?.find((ac: any) =>
+                  ac.types.includes('sublocality') || ac.types.includes('neighborhood')
+                ) ?? result.address_components?.find((ac: any) => ac.types.includes('locality'));
+                setLocationLabel(comp?.long_name ?? result.formatted_address.split(',')[0]);
+              } else {
+                setLocationLabel('Current location');
+              }
+            })
+            .catch(() => setLocationLabel('Current location'));
+        } else {
+          setLocationLabel('Current location');
+        }
       },
       () => setLocationState('denied'),
       { timeout: 15000, enableHighAccuracy: true, maximumAge: 60000 }
@@ -156,6 +176,14 @@ export default function UserHomePage() {
     queryFn:  () => ordersApi.list().then((r) => r.data),
     refetchInterval: 30000,
   });
+
+  // Unread notification count for badge
+  const { data: notifData } = useQuery({
+    queryKey: ['notifications', 'unread'],
+    queryFn:  () => notificationsApi.list().then((r) => r.data),
+    refetchInterval: 60000,
+  });
+  const unreadCount: number = notifData?.unreadCount ?? 0;
 
   const stations: Station[] = stationsData?.stations ?? [];
   const activeOrder = ordersData?.orders?.find(
@@ -220,10 +248,16 @@ export default function UserHomePage() {
               }
             </button>
             <button
-              className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center"
+              onClick={() => router.push('/notifications')}
+              className="relative w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center"
               aria-label="Notifications"
             >
               <Bell className="w-4 h-4 text-[var(--text-muted)]" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-brand-500 rounded-full text-[9px] font-black text-white flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             <Link
               href="/user/profile"

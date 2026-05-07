@@ -69,6 +69,15 @@ export interface IOrder extends Document {
   paystackReference?: string;
   paymentStatus: 'pending' | 'captured' | 'released' | 'refunded';
 
+  // Issue report
+  issue?: {
+    category: string;
+    description: string;
+    reportedAt: Date;
+    resolvedAt?: Date;
+    resolution?: string;
+  };
+
   // Rating — rider
   riderRating?: number;
   riderRatingComment?: string;
@@ -176,6 +185,14 @@ const OrderSchema = new Schema<IOrder>(
       type: String,
       enum: ['pending', 'captured', 'released', 'refunded'],
       default: 'pending',
+    },
+
+    issue: {
+      category:    { type: String },
+      description: { type: String },
+      reportedAt:  { type: Date },
+      resolvedAt:  { type: Date },
+      resolution:  { type: String },
     },
 
     riderRating: { type: Number, min: 1, max: 5 },

@@ -1,227 +1,147 @@
 'use client';
-import { useState } from 'react';
-import { 
-  Bell, Package, DollarSign, Star, 
-  AlertCircle, CheckCircle, Clock, Settings 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import {
+  Bell, Package, Bike, Flame, CheckCircle2,
+  XCircle, CreditCard, ArrowLeft, Loader2,
 } from 'lucide-react';
-import { Card, Button, Badge } from '@/components/ui';
+import { notificationsApi } from '@/lib/api';
 import { formatRelativeTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+
+const TYPE_META: Record<string, { icon: any; iconBg: string; iconColor: string }> = {
+  order_placed:   { icon: Package,      iconBg: 'bg-brand-500/15',  iconColor: 'text-brand-500'  },
+  rider_assigned: { icon: Bike,         iconBg: 'bg-blue-500/15',   iconColor: 'text-blue-500'   },
+  at_station:     { icon: Flame,        iconBg: 'bg-amber-500/15',  iconColor: 'text-amber-500'  },
+  en_route:       { icon: Bike,         iconBg: 'bg-brand-500/15',  iconColor: 'text-brand-500'  },
+  delivered:      { icon: CheckCircle2, iconBg: 'bg-green-500/15',  iconColor: 'text-green-500'  },
+  cancelled:      { icon: XCircle,      iconBg: 'bg-red-500/15',    iconColor: 'text-red-500'    },
+  payment:        { icon: CreditCard,   iconBg: 'bg-purple-500/15', iconColor: 'text-purple-500' },
+  system:         { icon: Bell,         iconBg: 'bg-[var(--bg-card2)]', iconColor: 'text-[var(--text-muted)]' },
+};
 
 export default function NotificationsPage() {
-  const [activeTab, setActiveTab] = useState<'all' | 'orders' | 'payments' | 'system'>('all');
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
-  // Mock notifications data
-  const mockNotifications = [
-    {
-      id: '1',
-      type: 'order',
-      title: 'New Order Received',
-      message: 'Order #AB123456 - 2×6kg cylinders for delivery',
-      timestamp: new Date(Date.now() - 300000), // 5 minutes ago
-      read: false,
-      icon: Package,
-      color: 'text-blue-600 bg-blue-100'
-    },
-    {
-      id: '2',
-      type: 'payment',
-      title: 'Payment Received',
-      message: 'GH₵85.00 payment confirmed for order #AB123455',
-      timestamp: new Date(Date.now() - 900000), // 15 minutes ago
-      read: false,
-      icon: DollarSign,
-      color: 'text-green-600 bg-green-100'
-    },
-    {
-      id: '3',
-      type: 'system',
-      title: 'Rider KYC Approved',
-      message: 'Kwame Asante\'s KYC verification has been approved',
-      timestamp: new Date(Date.now() - 1800000), // 30 minutes ago
-      read: true,
-      icon: CheckCircle,
-      color: 'text-green-600 bg-green-100'
-    },
-    {
-      id: '4',
-      type: 'order',
-      title: 'Order Delivered',
-      message: 'Order #AB123454 has been successfully delivered',
-      timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-      read: true,
-      icon: CheckCircle,
-      color: 'text-green-600 bg-green-100'
-    },
-    {
-      id: '5',
-      type: 'system',
-      title: 'Low Stock Alert',
-      message: 'Kofi Gas Station: 6kg cylinders running low (3 remaining)',
-      timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-      read: true,
-      icon: AlertCircle,
-      color: 'text-yellow-600 bg-yellow-100'
-    },
-    {
-      id: '6',
-      type: 'order',
-      title: 'New Review Received',
-      message: 'Customer left a 5-star review for your service',
-      timestamp: new Date(Date.now() - 10800000), // 3 hours ago
-      read: true,
-      icon: Star,
-      color: 'text-yellow-600 bg-yellow-100'
-    }
-  ];
+  const { data, isLoading } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => notificationsApi.list().then((r) => r.data),
+    refetchInterval: 30000,
+  });
 
-  const filteredNotifications = activeTab === 'all' 
-    ? mockNotifications 
-    : mockNotifications.filter(n => n.type === activeTab);
+  const readAllMutation = useMutation({
+    mutationFn: () => notificationsApi.readAll(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
 
-  const unreadCount = mockNotifications.filter(n => !n.read).length;
+  const readOneMutation = useMutation({
+    mutationFn: (id: string) => notificationsApi.readOne(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
 
-  const markAllAsRead = () => {
-    // In real app, this would call an API
-    console.log('Mark all as read');
-  };
+  const notifications: any[] = data?.notifications ?? [];
+  const unreadCount: number  = data?.unreadCount ?? 0;
 
-  const markAsRead = (id: string) => {
-    // In real app, this would call an API
-    console.log('Mark as read:', id);
-  };
+  function handleClick(n: any) {
+    if (!n.read) readOneMutation.mutate(n._id);
+    if (n.orderId) router.push(`/user/orders/${n.orderId}`);
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-full bg-[var(--bg)] pb-24">
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 pt-12 pb-4 sticky top-0 z-10">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-[var(--bg-card)] border-b border-[var(--border)] px-4 pt-12 pb-0 lg:pt-4 sticky top-0 z-10">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <Bell className="w-6 h-6 text-gray-600" />
+            <button onClick={() => router.back()}
+              className="w-9 h-9 rounded-full bg-[var(--bg-card2)] flex items-center justify-center lg:hidden">
+              <ArrowLeft className="w-5 h-5 text-[var(--text-primary)]" />
+            </button>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Notifications</h1>
+              <h1 className="text-xl font-bold text-[var(--text-primary)]">Notifications</h1>
               {unreadCount > 0 && (
-                <p className="text-sm text-gray-500">{unreadCount} unread notifications</p>
+                <p className="text-xs text-[var(--text-muted)]">{unreadCount} unread</p>
               )}
             </div>
           </div>
-          
-          <div className="flex gap-2">
-            <Button size="sm" variant="secondary">
-              <Settings className="w-4 h-4 mr-1" />
-              Settings
-            </Button>
-            {unreadCount > 0 && (
-              <Button size="sm" onClick={markAllAsRead}>
-                Mark All Read
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {[
-            { key: 'all', label: 'All', count: mockNotifications.length },
-            { key: 'orders', label: 'Orders', count: mockNotifications.filter(n => n.type === 'order').length },
-            { key: 'payments', label: 'Payments', count: mockNotifications.filter(n => n.type === 'payment').length },
-            { key: 'system', label: 'System', count: mockNotifications.filter(n => n.type === 'system').length },
-          ].map(({ key, label, count }) => (
+          {unreadCount > 0 && (
             <button
-              key={key}
-              onClick={() => setActiveTab(key as any)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                activeTab === key
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              onClick={() => readAllMutation.mutate()}
+              disabled={readAllMutation.isPending}
+              className="text-xs font-semibold text-brand-500 hover:underline disabled:opacity-50"
             >
-              {label} ({count})
+              Mark all read
             </button>
-          ))}
+          )}
         </div>
       </div>
 
-      <div className="px-4 py-4">
-        {filteredNotifications.length === 0 ? (
-          <Card className="text-center py-12">
-            <Bell className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No notifications</h3>
-            <p className="text-gray-500">
-              {activeTab === 'all' 
-                ? 'You\'re all caught up! No new notifications.'
-                : `No ${activeTab} notifications at the moment.`
-              }
-            </p>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {filteredNotifications.map((notification) => {
-              const IconComponent = notification.icon;
-              
-              return (
-                <Card 
-                  key={notification.id}
-                  className={`cursor-pointer transition-colors ${
-                    !notification.read ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => markAsRead(notification.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${notification.color}`}>
-                      <IconComponent className="w-5 h-5" />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-1">
-                        <p className={`font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>
-                          {notification.title}
-                        </p>
-                        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                          {!notification.read && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          )}
-                          <span className="text-xs text-gray-500">
-                            {formatRelativeTime(notification.timestamp)}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <p className={`text-sm ${!notification.read ? 'text-gray-700' : 'text-gray-600'}`}>
-                        {notification.message}
-                      </p>
-                      
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge className={`${
-                          notification.type === 'order' ? 'bg-blue-100 text-blue-700' :
-                          notification.type === 'payment' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {notification.type}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
+      <div className="px-4 py-4 max-w-lg mx-auto lg:max-w-2xl space-y-2">
+
+        {isLoading && (
+          <div className="flex justify-center py-16">
+            <Loader2 className="w-7 h-7 text-brand-500 animate-spin" />
           </div>
         )}
 
-        {/* Notification Settings */}
-        <Card className="mt-6 bg-blue-50 border-blue-200">
-          <div className="flex items-start gap-3">
-            <Settings className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-blue-900 mb-1">Notification Preferences</h3>
-              <p className="text-sm text-blue-700 mb-3">
-                Customize which notifications you receive and how you're notified.
-              </p>
-              <Button size="sm" variant="secondary">
-                Manage Preferences
-              </Button>
+        {!isLoading && notifications.length === 0 && (
+          <div className="text-center py-16">
+            <div className="w-14 h-14 bg-brand-500/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Bell className="w-7 h-7 text-brand-500" />
             </div>
+            <p className="text-sm font-bold text-[var(--text-primary)]">No notifications yet</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              You'll be notified about your orders here.
+            </p>
           </div>
-        </Card>
+        )}
+
+        {notifications.map((n) => {
+          const meta = TYPE_META[n.type] ?? TYPE_META.system;
+          const Icon = meta.icon;
+          return (
+            <button
+              key={n._id}
+              onClick={() => handleClick(n)}
+              className={cn(
+                'w-full flex items-start gap-3 p-4 rounded-2xl border text-left transition-all active:scale-[0.99]',
+                n.read
+                  ? 'bg-[var(--bg-card)] border-[var(--border)]'
+                  : 'bg-brand-500/5 border-brand-500/20'
+              )}
+            >
+              {/* Icon */}
+              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', meta.iconBg)}>
+                <Icon className={cn('w-5 h-5', meta.iconColor)} />
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <p className={cn('text-sm font-bold leading-snug', n.read ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]')}>
+                    {n.title}
+                  </p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!n.read && (
+                      <span className="w-2 h-2 bg-brand-500 rounded-full" />
+                    )}
+                    <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">
+                      {formatRelativeTime(n.createdAt)}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-relaxed">{n.body}</p>
+                {n.orderId && (
+                  <p className="text-[10px] font-semibold text-brand-500 mt-1">
+                    Order #{typeof n.orderId === 'string' ? n.orderId.slice(-8).toUpperCase() : n.orderId?.toString().slice(-8).toUpperCase()}
+                  </p>
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

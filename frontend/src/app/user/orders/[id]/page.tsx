@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Bike, ClipboardList, Store, MapPin, Star, AlertTriangle, Map } from 'lucide-react';
+import { ArrowLeft, Bike, ClipboardList, Store, MapPin, Star, AlertTriangle, Map, ChevronRight, CheckCircle2, Phone } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import { useOrderTracking } from '@/hooks/useSocket';
 import { useAuth } from '@/lib/auth';
@@ -46,13 +46,17 @@ export default function OrderDetailsPage() {
 
   const isPaymentCallback = searchParams.get('payment') === 'callback';
 
-  const [showOTPSheet,    setShowOTPSheet]    = useState(false);
-  const [showRatingSheet, setShowRatingSheet] = useState(false);
-  const [otp,             setOtp]             = useState('');
-  const [rating,          setRating]          = useState(5);
-  const [ratingComment,   setRatingComment]   = useState('');
-  const [otpLoading,      setOtpLoading]      = useState(false);
-  const [ratingLoading,   setRatingLoading]   = useState(false);
+  const [showOTPSheet,      setShowOTPSheet]      = useState(false);
+  const [showRatingSheet,   setShowRatingSheet]   = useState(false);
+  const [showIssueSheet,    setShowIssueSheet]    = useState(false);
+  const [otp,               setOtp]               = useState('');
+  const [rating,            setRating]            = useState(5);
+  const [ratingComment,     setRatingComment]     = useState('');
+  const [issueCategory,     setIssueCategory]     = useState('not_delivered');
+  const [issueDescription,  setIssueDescription]  = useState('');
+  const [otpLoading,        setOtpLoading]        = useState(false);
+  const [ratingLoading,     setRatingLoading]     = useState(false);
+  const [issueLoading,      setIssueLoading]      = useState(false);
 
   const { data: order, refetch, error } = useQuery({
     queryKey: ['order', id],
@@ -90,6 +94,19 @@ export default function OrderDetailsPage() {
     } finally { setOtpLoading(false); }
   }
 
+  async function handleSubmitIssue() {
+    if (issueDescription.trim().length < 10) { toast.error('Please describe the issue (min 10 characters)'); return; }
+    setIssueLoading(true);
+    try {
+      await ordersApi.reportIssue(id, issueCategory, issueDescription.trim());
+      setShowIssueSheet(false);
+      toast.success('Issue reported. Our team will contact you shortly.');
+      refetch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to report issue');
+    } finally { setIssueLoading(false); }
+  }
+
   async function handleSubmitRating() {
     setRatingLoading(true);
     try {
@@ -113,12 +130,13 @@ export default function OrderDetailsPage() {
   // ── Error / 403 state ──────────────────────────────────────────────────────
   if (error) {
     const is403 = (error as any)?.response?.status === 403;
-    // If 403, redirect to orders list — user doesn't own this order
     if (is403) {
-      router.replace('/user/orders');
+      // Use useEffect-style redirect to avoid setState-during-render warning
       return (
         <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"
+            ref={(el) => { if (el) router.replace('/user/orders'); }}
+          />
         </div>
       );
     }
@@ -138,6 +156,25 @@ export default function OrderDetailsPage() {
   }
 
   if (!order) return null;
+
+  const isDelivered = order.status === 'delivered';
+  const isActive    = ['pending', 'accepted', 'at_station', 'en_route'].includes(order.status);
+
+  const ISSUE_CATEGORIES = isDelivered
+    ? [
+        { value: 'wrong_item',    label: 'Wrong item received' },
+        { value: 'damaged',       label: 'Item was damaged' },
+        { value: 'late_delivery', label: 'Very late delivery' },
+        { value: 'payment_issue', label: 'Payment problem' },
+        { value: 'other',         label: 'Other' },
+      ]
+    : [
+        { value: 'late_delivery',       label: 'Delivery time exceeded' },
+        { value: 'rider_not_reachable', label: 'Rider not picking calls' },
+        { value: 'wrong_location',      label: 'Rider going to wrong location' },
+        { value: 'not_delivered',       label: 'Order not moving / stuck' },
+        { value: 'other',               label: 'Other' },
+      ];
 
   const rider          = typeof order.riderId   === 'object' ? order.riderId   : null;
   const station        = typeof order.stationId === 'object' ? order.stationId : null;
@@ -199,6 +236,27 @@ export default function OrderDetailsPage() {
             </Link>
           )}
         </div>
+
+        {/* Rider card — shown when rider is assigned */}
+        {rider && ['accepted', 'at_station', 'en_route', 'delivered'].includes(order.status) && (
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-brand-500/20 flex items-center justify-center shrink-0 overflow-hidden">
+              {(rider as any).profilePhoto
+                ? <img src={(rider as any).profilePhoto} alt="Rider" className="w-full h-full object-cover" />
+                : <span className="text-brand-500 font-black text-lg">{(rider as any).name?.charAt(0)}</span>
+              }
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-[var(--text-primary)] truncate">{(rider as any).name}</p>
+              <p className="text-xs text-[var(--text-muted)] capitalize">{(rider as any).vehicleType} Motor Bike</p>
+              <p className="text-xs font-bold text-brand-500">{(rider as any).vehiclePlate}</p>
+            </div>
+            <a href={`tel:${(rider as any).phone}`}
+              className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center shrink-0">
+              <Phone className="w-5 h-5 text-white" />
+            </a>
+          </div>
+        )}
 
         {/* Order Status timeline */}
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4">
@@ -321,16 +379,66 @@ export default function OrderDetailsPage() {
       {order.status !== 'cancelled' && (
         <div className="fixed bottom-0 inset-x-0 bg-[var(--bg-card)] border-t border-[var(--border)] px-4 py-4 z-20">
           <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
-            <button className="h-12 bg-brand-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2">
-              <AlertTriangle className="w-4 h-4" /> Report Issue
+            <button
+              onClick={() => setShowIssueSheet(true)}
+              disabled={!!(order as any).issue?.reportedAt}
+              className="h-12 bg-brand-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <AlertTriangle className="w-4 h-4" />
+              {(order as any).issue?.reportedAt ? 'Issue Reported' : 'Report Issue'}
             </button>
-            <button onClick={() => setShowRatingSheet(true)}
-              className="h-12 bg-[var(--bg-card2)] border border-[var(--border)] text-[var(--text-primary)] rounded-xl font-bold text-sm flex items-center justify-center gap-2">
-              <Star className="w-4 h-4" /> Rate Delivery
+            <button
+              onClick={() => order.status === 'delivered' && setShowRatingSheet(true)}
+              disabled={order.status !== 'delivered' || !!order.riderRating}
+              className={cn(
+                'h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-colors',
+                order.status === 'delivered' && !order.riderRating
+                  ? 'bg-[var(--bg-card2)] border-[var(--border)] text-[var(--text-primary)] hover:border-brand-500/50'
+                  : 'bg-[var(--bg-card2)] border-[var(--border)] text-[var(--text-muted)] opacity-50 cursor-not-allowed'
+              )}
+            >
+              <Star className="w-4 h-4" />
+              {order.riderRating ? 'Rated' : order.status !== 'delivered' ? 'Rate (after delivery)' : 'Rate Delivery'}
             </button>
           </div>
         </div>
       )}
+
+      {/* Issue Sheet */}
+      <BottomSheet open={showIssueSheet} onClose={() => setShowIssueSheet(false)} title="Report an Issue">
+        <p className="text-sm text-[var(--text-muted)] mb-4">
+          {isDelivered ? 'Tell us what went wrong with your delivery.' : 'Tell us what\'s happening with your active order.'}
+        </p>
+        <div className="space-y-2 mb-4">
+          {ISSUE_CATEGORIES.map(({ value, label }) => (
+            <button key={value} type="button"
+              onClick={() => setIssueCategory(value)}
+              className={cn(
+                'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-all',
+                issueCategory === value
+                  ? 'border-brand-500 bg-brand-500/10 text-brand-500'
+                  : 'border-[var(--border)] text-[var(--text-primary)] hover:border-brand-500/40'
+              )}
+            >
+              {label}
+              {issueCategory === value && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={issueDescription}
+          onChange={(e) => setIssueDescription(e.target.value)}
+          placeholder="Describe the issue in detail… (min 10 characters)"
+          rows={3}
+          className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card2)] px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4 resize-none"
+        />
+        <button onClick={handleSubmitIssue} disabled={issueLoading}
+          className="w-full h-12 bg-brand-500 text-white rounded-xl font-bold text-sm disabled:opacity-60">
+          {issueLoading
+            ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
+            : 'Submit Report'}
+        </button>
+      </BottomSheet>
 
       {/* OTP Sheet */}
       <BottomSheet open={showOTPSheet} onClose={() => setShowOTPSheet(false)} title="Confirm Delivery">

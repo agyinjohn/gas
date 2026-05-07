@@ -4,12 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   LogOut, MapPin, Plus, ChevronRight, Package,
-  HelpCircle, FileText, Shield, Star, Trash2,
-  Home, Building, Edit2, Check, X,
+  HelpCircle, FileText, Shield, Trash2,
+  Home, Building, Edit2, Check, X, Sun, Moon,
 } from 'lucide-react';
 import { api, usersApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { Card, Button, Skeleton } from '@/components/ui';
+import { useTheme } from '@/components/shared/ThemeProvider';
+import { Skeleton } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -19,10 +20,10 @@ import type { PickedLocation } from '@/components/LocationPicker';
 const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
 
 const ACCOUNT_LINKS = [
-  { label: 'Order History',    href: '/user/orders', icon: Package    },
-  { label: 'Help & Support',   href: '#',            icon: HelpCircle },
-  { label: 'Terms of Service', href: '#',            icon: FileText   },
-  { label: 'Privacy Policy',   href: '#',            icon: Shield     },
+  { label: 'Order History',    href: '/user/orders',       icon: Package    },
+  { label: 'Help & Support',   href: '/user/help',         icon: HelpCircle },
+  { label: 'Terms of Service', href: '/user/terms',        icon: FileText   },
+  { label: 'Privacy Policy',   href: '/user/privacy',      icon: Shield     },
 ];
 
 const ADDRESS_LABELS = ['Home', 'Work', 'Other'];
@@ -46,6 +47,7 @@ function getAddressIcon(label: string) {
 
 export default function UserProfilePage() {
   const { logout, user } = useAuth();
+  const { theme, toggle } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -195,6 +197,26 @@ export default function UserProfilePage() {
                 </Link>
               ))}
             </div>
+
+            {/* Theme switcher */}
+            <button
+              onClick={toggle}
+              className="w-full h-11 bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl font-bold text-sm flex items-center justify-between px-4 hover:bg-[var(--bg-card2)] transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[var(--text-muted)]" />}
+                <span className="text-[var(--text-primary)]">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+              </div>
+              <div className={cn(
+                'w-10 h-5 rounded-full transition-colors relative',
+                theme === 'dark' ? 'bg-brand-500' : 'bg-[var(--border)]'
+              )}>
+                <div className={cn(
+                  'absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all',
+                  theme === 'dark' ? 'left-5' : 'left-0.5'
+                )} />
+              </div>
+            </button>
 
             <button onClick={handleLogout}
               className="w-full h-11 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-500/20 transition-colors">

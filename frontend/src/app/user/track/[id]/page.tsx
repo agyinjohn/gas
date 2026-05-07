@@ -146,23 +146,21 @@ function TrackContent({ order, riderLocation }: { order: any; riderLocation: { l
       {rider && (
         <div className="flex items-center gap-3 bg-[var(--bg-card2)] rounded-2xl p-3">
           <div className="w-12 h-12 rounded-full bg-brand-500/20 flex items-center justify-center shrink-0 overflow-hidden">
-            {(rider as any).profilePhoto
-              ? <img src={(rider as any).profilePhoto} alt="Rider" className="w-full h-full object-cover" />
-              : <span className="text-brand-500 font-black text-lg">{(rider as any).name?.charAt(0)}</span>
+            {rider.profilePhoto
+              ? <img src={rider.profilePhoto} alt="Rider" className="w-full h-full object-cover" />
+              : <span className="text-brand-500 font-black text-lg">{rider.name?.charAt(0)}</span>
             }
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[var(--text-primary)] truncate">{(rider as any).name}</p>
-            <p className="text-xs text-[var(--text-muted)] capitalize">{(rider as any).vehicleType}</p>
-            <p className="text-xs font-bold text-brand-500">{(rider as any).vehiclePlate}</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] truncate">{rider.name}</p>
+            <p className="text-xs text-[var(--text-muted)] capitalize">{rider.vehicleType} Motor Bike</p>
+            <p className="text-xs font-bold text-brand-500">{rider.vehiclePlate}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {/* Chat — placeholder */}
             <button className="w-10 h-10 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center">
               <MessageCircle className="w-5 h-5 text-[var(--text-muted)]" />
             </button>
-            {/* Call — functional */}
-            <a href={`tel:${(rider as any).phone}`}
+            <a href={`tel:${rider.phone}`}
               className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center">
               <Phone className="w-5 h-5 text-white" />
             </a>
@@ -189,6 +187,15 @@ function TrackContent({ order, riderLocation }: { order: any; riderLocation: { l
             <span className="text-xs font-bold text-brand-500">{formatCurrency(c.subtotal)}</span>
           </div>
         ))}
+        {/* Delivery fee row */}
+        <div className="flex items-center justify-between py-1 border-t border-[var(--border)] mt-1">
+          <span className="text-xs text-[var(--text-muted)]">Delivery Fee</span>
+          <span className="text-xs font-bold text-brand-500">{formatCurrency(order.deliveryFee ?? 0)}</span>
+        </div>
+        <div className="flex items-center justify-between py-1">
+          <span className="text-xs font-bold text-[var(--text-primary)]">Total</span>
+          <span className="text-xs font-black text-brand-500">{formatCurrency(order.totalAmount ?? 0)}</span>
+        </div>
       </div>
     </div>
   );
@@ -212,6 +219,13 @@ export default function TrackOrderPage() {
 
   useEffect(() => {
     if (!order || !['accepted', 'at_station', 'en_route'].includes(order.status)) return;
+
+    // Seed initial rider location from order data if available
+    const riderObj = typeof order.riderId === 'object' ? order.riderId : null;
+    if (riderObj?.location?.lat && riderObj?.location?.lng && !riderLocation) {
+      setRiderLocation({ lat: riderObj.location.lat, lng: riderObj.location.lng });
+    }
+
     const socket = getSocket();
     socket.emit('join:order', id);
     socket.on('rider:location:update', (loc: { lat: number; lng: number }) => setRiderLocation(loc));
@@ -234,7 +248,7 @@ export default function TrackOrderPage() {
   return (
     <>
       {/* ── MOBILE: fixed full-screen layout ── */}
-      <div className="lg:hidden fixed inset-0 flex flex-col bg-[var(--bg)]">
+      <div className="lg:hidden fixed inset-0 bottom-[64px] flex flex-col bg-[var(--bg)]">
         {/* Map fills top half */}
         <div className="flex-1 relative min-h-0">
           <TrackMap
@@ -245,7 +259,13 @@ export default function TrackOrderPage() {
           />
           {/* Header overlay */}
           <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 pt-12 pb-4 bg-gradient-to-b from-black/40 to-transparent">
-            <h1 className="text-lg font-bold text-white">Live Tracking</h1>
+            <div className="flex items-center gap-3">
+              <button onClick={() => router.back()}
+                className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                <ArrowLeft className="w-5 h-5 text-white" />
+              </button>
+              <h1 className="text-lg font-bold text-white">Live Tracking</h1>
+            </div>
             <button className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
               <Headphones className="w-5 h-5 text-white" />
             </button>
@@ -253,8 +273,8 @@ export default function TrackOrderPage() {
         </div>
 
         {/* Bottom sheet */}
-        <div className="bg-[var(--bg-card)] rounded-t-3xl border-t border-[var(--border)] px-4 pt-3 pb-24 overflow-y-auto"
-          style={{ maxHeight: '60vh' }}>
+        <div className="bg-[var(--bg-card)] rounded-t-3xl border-t border-[var(--border)] px-4 pt-3 pb-4 overflow-y-auto"
+          style={{ maxHeight: '50vh' }}>
           <div className="w-10 h-1 bg-[var(--border)] rounded-full mx-auto mb-5" />
           <TrackContent order={order} riderLocation={riderLocation} />
         </div>
