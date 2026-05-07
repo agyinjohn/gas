@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  DollarSign, CreditCard, Bank, Calendar, 
+  DollarSign, CreditCard, Landmark, Calendar, 
   TrendingUp, Clock, CheckCircle, AlertCircle 
 } from 'lucide-react';
 import { ridersApi } from '@/lib/api';
@@ -71,7 +71,7 @@ export default function RiderEarningsPage() {
           {[
             { key: 'overview', label: 'Overview', icon: TrendingUp },
             { key: 'payouts', label: 'Payouts', icon: DollarSign },
-            { key: 'bank', label: 'Bank Account', icon: Bank },
+            { key: 'bank', label: 'Bank Account', icon: Landmark },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -345,7 +345,7 @@ export default function RiderEarningsPage() {
                   className="w-full"
                   loading={bankAccountMutation.isPending}
                 >
-                  <Bank className="w-4 h-4 mr-2" />
+                  <Landmark className="w-4 h-4 mr-2" />
                   {rider.bankAccount ? 'Update' : 'Save'} Account
                 </Button>
               </form>
