@@ -301,7 +301,7 @@ function RecentOrders() {
               <p className="text-sm font-bold text-green-600">
                 +{formatCurrency(order.stationPayout * 0.15)}
               </p>
-              <p className="text-xs text-gray-400">{ORDER_STATUS_LABELS[order.status]}</p>
+              <p className="text-xs text-gray-400">{(ORDER_STATUS_LABELS as Record<string, string>)[order.status]}</p>
             </div>
           </div>
         </Link>
