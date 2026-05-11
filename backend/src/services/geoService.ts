@@ -87,16 +87,7 @@ export async function getNearbyStations(
 
   if (cylinderSize) {
     query['cylinderListings'] = {
-      $elemMatch: {
-        size: cylinderSize,
-        isAvailable: true,
-        stockCount: { $gt: 0 },
-      },
-    };
-  } else {
-    // At least one available size
-    query['cylinderListings'] = {
-      $elemMatch: { isAvailable: true, stockCount: { $gt: 0 } },
+      $elemMatch: { size: cylinderSize },
     };
   }
 

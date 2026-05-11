@@ -19,10 +19,10 @@ import { Notification } from '../models/Notification';
 // Notification templates per status
 const NOTIF: Record<string, { title: string; body: (o: any) => string; type: string }> = {
   pending:    { type: 'order_placed',   title: 'Order Placed 📦',          body: (o) => `Your order #${o._id.toString().slice(-8).toUpperCase()} has been placed and is being processed.` },
-  accepted:   { type: 'rider_assigned', title: 'Rider Assigned 🏍️',       body: (o) => `A rider has accepted your order and is heading to the station.` },
-  at_station: { type: 'at_station',     title: 'Being Prepared 🔥',        body: (o) => `Your gas cylinders are being prepared at the station.` },
-  en_route:   { type: 'en_route',       title: 'On the Way! 🙌',           body: (o) => `Your rider is on the way. Get ready to receive your gas!` },
-  delivered:  { type: 'delivered',      title: 'Delivered ✅',               body: (o) => `Order #${o._id.toString().slice(-8).toUpperCase()} delivered. Enjoy your gas!` },
+  accepted:   { type: 'rider_assigned', title: 'Rider On the Way 🏍️',      body: (o) => `Your rider has accepted the order and is heading to the station to pick up your gas.` },
+  at_station: { type: 'at_station',     title: 'Preparing Your Order 🔥',  body: (o) => `Your rider is at the station picking up your gas cylinders.` },
+  en_route:   { type: 'en_route',       title: 'On the Way! 🙌',           body: (o) => `Your rider has picked up your gas and is heading to you now!` },
+  delivered:  { type: 'delivered',      title: 'Delivered ✅',              body: (o) => `Order #${o._id.toString().slice(-8).toUpperCase()} delivered. Enjoy your gas!` },
   cancelled:  { type: 'cancelled',      title: 'Order Cancelled',          body: (o) => `Your order #${o._id.toString().slice(-8).toUpperCase()} has been cancelled.` },
 };
 
@@ -144,10 +144,10 @@ router.post(
 
     for (const [size, quantity] of sizeMap) {
       const listing = station.cylinderListings.find((l) => l.size === size);
-      if (!listing || !listing.isAvailable || listing.stockCount < quantity) {
+      if (!listing || !listing.isAvailable) {
         return res.status(400).json({
           success: false,
-          message: `Insufficient stock for ${size}kg cylinder (requested ${quantity}, available ${listing?.stockCount ?? 0})`,
+          message: `${size}kg cylinder is not available at this station`,
         });
       }
     }
@@ -251,12 +251,6 @@ router.post(
       }],
     });
 
-    // Decrement stock for each line item
-    for (const [size, quantity] of sizeMap) {
-      const listing = station.cylinderListings.find((l) => l.size === size)!;
-      listing.stockCount -= quantity;
-      listing.isAvailable = listing.stockCount > 0 && !listing.isPaused;
-    }
     await station.save();
 
     // Deduct redeemed points from user balance
@@ -386,7 +380,7 @@ router.get('/:id', [param('id').isMongoId()], async (req: AuthRequest, res: Resp
 
   const order = await Order.findById(req.params.id)
     .populate('stationId', 'name address lat lng')
-    .populate('riderId', 'name phone profilePhoto ratingAvg vehicleType location')
+    .populate('riderId', 'name phone profilePhoto ratingAvg vehicleType vehiclePlate location')
     .populate('userId', 'name phone');
 
   if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
@@ -440,7 +434,7 @@ router.get('/:id', [param('id').isMongoId()], async (req: AuthRequest, res: Resp
  */
 router.patch(
   '/:id/status',
-  [param('id').isMongoId(), body('status').isIn(['accepted', 'at_station', 'en_route', 'cancelled'])],
+  [param('id').isMongoId(), body('status').isIn(['accepted', 'at_station', 'en_route', 'delivered', 'cancelled'])],
   async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
 
@@ -509,22 +503,80 @@ router.patch(
       await markDispatchAccepted(order._id.toString(), id);
     }
 
+    if (status === 'delivered' && role === 'rider') {
+      order.paymentStatus = 'released';
+
+      // Free up rider
+      const { Rider } = await import('../models/Rider');
+      const rider = await Rider.findByIdAndUpdate(
+        order.riderId,
+        { status: 'available', currentOrderId: null, $inc: { totalTrips: 1, totalEarnings: order.deliveryFee } },
+        { new: true }
+      );
+
+      // Rider payout record
+      const riderEarning = +order.deliveryFee.toFixed(2);
+      const riderPayout = await Payout.create({
+        recipientType: 'rider',
+        recipientId: order.riderId,
+        orderId: order._id,
+        amountGHS: riderEarning,
+        status: 'pending',
+      });
+
+      if (rider?.bankAccount?.recipientCode) {
+        try {
+          const ref = generatePaymentReference(riderPayout._id.toString());
+          const result = await transferToBeneficiary({
+            amountGHS: riderEarning,
+            recipientCode: rider.bankAccount.recipientCode,
+            reason: `GetGas rider payout — Order ${order._id.toString().slice(-6).toUpperCase()}`,
+            reference: ref,
+          });
+          riderPayout.status = 'processing';
+          riderPayout.paystackTransferCode = result.transferCode;
+          riderPayout.paystackReference = ref;
+          await riderPayout.save();
+        } catch (err) {
+          console.error('[Payout] Rider transfer failed:', err);
+        }
+      }
+
+      // Station payout record
+      await Payout.create({
+        recipientType: 'station',
+        recipientId: order.stationId,
+        orderId: order._id,
+        amountGHS: order.stationPayout,
+        status: 'pending',
+      });
+
+      await Station.findByIdAndUpdate(order.stationId, { $inc: { totalOrders: 1 } });
+
+      // Loyalty points
+      const amountPaid = +(order.totalAmount - (order.loyaltyDiscount ?? 0)).toFixed(2);
+      const pointsEarned = Math.floor(amountPaid * LOYALTY_EARN_RATE);
+      if (pointsEarned > 0) {
+        const user = await User.findById(order.userId);
+        if (user) {
+          user.loyaltyPoints = (user.loyaltyPoints ?? 0) + pointsEarned;
+          await user.save();
+          await LoyaltyTransaction.create({
+            userId: order.userId,
+            orderId: order._id,
+            type: 'earn',
+            points: pointsEarned,
+            balanceAfter: user.loyaltyPoints,
+            description: `Earned ${pointsEarned} points for order #${order._id.toString().slice(-6).toUpperCase()}`,
+          });
+          await Order.findByIdAndUpdate(order._id, { loyaltyPointsEarned: pointsEarned });
+        }
+      }
+    }
+
     if (status === 'cancelled') {
       order.cancellationReason = note;
       order.cancelledBy = role as 'user' | 'station' | 'admin';
-
-      // Restore stock for each line item — respect isPaused state
-      const station = await Station.findById(order.stationId);
-      if (station) {
-        for (const item of order.cylinders) {
-          const listing = station.cylinderListings.find((l) => l.size === item.size);
-          if (listing) {
-            listing.stockCount += item.quantity;
-            listing.isAvailable = listing.stockCount > 0 && !listing.isPaused;
-          }
-        }
-        await station.save();
-      }
 
       // Free rider
       if (order.riderId) {
@@ -691,12 +743,12 @@ router.post(
       const { Rider } = await import('../models/Rider');
       const rider = await Rider.findByIdAndUpdate(
         order.riderId,
-        { status: 'available', currentOrderId: null, $inc: { totalTrips: 1, totalEarnings: order.stationPayout * 0.15 } },
+        { status: 'available', currentOrderId: null, $inc: { totalTrips: 1, totalEarnings: order.deliveryFee } },
         { new: true }
       );
 
       // Create rider payout record
-      const riderEarning = +(order.stationPayout * 0.15).toFixed(2);
+      const riderEarning = +order.deliveryFee.toFixed(2);
       const riderPayout = await Payout.create({
         recipientType: 'rider',
         recipientId: order.riderId,

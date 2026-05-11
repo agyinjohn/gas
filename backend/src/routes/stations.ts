@@ -93,7 +93,7 @@ router.get(
         lng: station.lng,
         distanceKm: Math.round(distanceKm * 10) / 10,
         ratingAvg: station.ratingAvg,
-        cylinderListings: station.cylinderListings.filter((l) => l.isAvailable && l.stockCount > 0),
+        cylinderListings: station.cylinderListings,
       })),
     });
   }
@@ -335,10 +335,8 @@ router.patch(
 router.patch(
   '/:id/inventory',
   [
-    body('size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]),
-    body('stockCount').optional().isInt({ min: 0 }),
-    body('isPaused').optional().isBoolean(),
-    body('lowStockThreshold').optional().isInt({ min: 0 }),
+    body('size').isInt({ min: 1 }),
+    body('isAvailable').isBoolean(),
   ],
   async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
@@ -346,16 +344,12 @@ router.patch(
     const station = await Station.findById(req.params.id);
     if (!station) return res.status(404).json({ success: false, message: 'Station not found' });
 
-    const { size, stockCount, isPaused, lowStockThreshold } = req.body;
+    const { size, isAvailable } = req.body;
     const listing = station.cylinderListings.find((l) => l.size === size);
     if (!listing) return res.status(404).json({ success: false, message: 'Listing not found' });
 
-    if (stockCount !== undefined) listing.stockCount = stockCount;
-    if (isPaused  !== undefined) listing.isPaused   = isPaused;
-    if (lowStockThreshold !== undefined) listing.lowStockThreshold = lowStockThreshold;
-
-    // isAvailable = has stock AND not manually paused
-    listing.isAvailable = listing.stockCount > 0 && !listing.isPaused;
+    listing.isAvailable = isAvailable;
+    listing.isPaused    = !isAvailable;
 
     await station.save();
     res.json({ success: true, listing });

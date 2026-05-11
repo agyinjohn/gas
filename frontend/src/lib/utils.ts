@@ -31,22 +31,22 @@ export function formatRelativeTime(date: string | Date): string {
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   scheduled:  'Scheduled',
-  pending:    'Pending',
-  accepted:   'Rider Assigned',
-  at_station: 'At Station',
+  pending:    'Order Placed',
+  accepted:   'Rider En Route to Station',
+  at_station: 'Preparing Your Order',
   en_route:   'On the Way',
   delivered:  'Delivered',
   cancelled:  'Cancelled',
 };
 
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
-  scheduled:  'bg-indigo-100 text-indigo-800',
-  pending:    'bg-yellow-100 text-yellow-800',
-  accepted:   'bg-blue-100 text-blue-800',
-  at_station: 'bg-purple-100 text-purple-800',
-  en_route:   'bg-orange-100 text-orange-800',
-  delivered:  'bg-green-100 text-green-800',
-  cancelled:  'bg-red-100 text-red-800',
+  scheduled:  'bg-indigo-100 text-indigo-700',
+  pending:    'bg-yellow-100 text-yellow-700',
+  accepted:   'bg-blue-100 text-blue-700',
+  at_station: 'bg-purple-100 text-purple-700',
+  en_route:   'bg-brand-100 text-brand-700',
+  delivered:  'bg-green-100 text-green-700',
+  cancelled:  'bg-red-100 text-red-700',
 };
 
 export const ORDER_TYPE_LABELS: Record<string, string> = {
