@@ -67,14 +67,6 @@ export default function OrderDetailsPage() {
 
   const isPaymentCallback = searchParams.get('payment') === 'callback';
 
-  // When Paystack redirects back, verify the payment and update order status
-  useEffect(() => {
-    if (!isPaymentCallback || !order?.paystackReference) return;
-    paymentsApi.verify(order.paystackReference)
-      .then(() => refetch())
-      .catch(console.error);
-  }, [isPaymentCallback, order?.paystackReference]);
-
   const [showOTPSheet,     setShowOTPSheet]     = useState(false);
   const [showRatingSheet,  setShowRatingSheet]  = useState(false);
   const [showIssueSheet,   setShowIssueSheet]   = useState(false);
@@ -96,6 +88,14 @@ export default function OrderDetailsPage() {
     staleTime: 0,
     refetchInterval: 30000,
   });
+
+  // When Paystack redirects back, verify the payment and update order status
+  useEffect(() => {
+    if (!isPaymentCallback || !order?.paystackReference) return;
+    paymentsApi.verify(order.paystackReference)
+      .then(() => refetch())
+      .catch(console.error);
+  }, [isPaymentCallback, order?.paystackReference]);
 
   const handleStatusChange = useCallback((status: string) => {
     queryClient.invalidateQueries({ queryKey: ['order', id] });
