@@ -164,31 +164,44 @@ router.patch('/fcm-token', [body('token').notEmpty()], async (req: AuthRequest, 
  */
 router.get('/dashboard', async (req: AuthRequest, res: Response) => {
   const riderId = new mongoose.Types.ObjectId(req.user!.id);
-  const rider = await Rider.findById(riderId).select('totalTrips ratingAvg totalEarnings status');
+  const rider = await Rider.findById(riderId).select('totalTrips ratingAvg totalEarnings status location');
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
-  const [todayOrders, todayEarningsResult, activeOrder] = await Promise.all([
-    Order.countDocuments({ riderId, status: 'delivered', createdAt: { $gte: today } }),
+  const [todayOrders, todayEarningsResult, activeOrder, recentOrders] = await Promise.all([
+    Order.countDocuments({ riderId, status: 'delivered', updatedAt: { $gte: today } }),
     Order.aggregate([
-      { $match: { riderId, status: 'delivered', createdAt: { $gte: today } } },
-      { $group: { _id: null, total: { $sum: { $multiply: ['$stationPayout', 0.15] } } } },
+      { $match: { riderId, status: 'delivered', updatedAt: { $gte: today } } },
+      { $group: { _id: null, total: { $sum: '$deliveryFee' } } },
     ]),
     Order.findOne(
       { riderId, status: { $in: ['accepted', 'at_station', 'en_route'] } },
-      '_id status cylinders orderType deliveryAddress stationId'
+      '_id status cylinders orderType deliveryAddress stationId deliveryFee'
     ).populate('stationId', 'name address lat lng'),
+    Order.find({ riderId, status: 'delivered' })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('_id cylinders orderType deliveryAddress deliveryFee status createdAt')
+      .lean(),
+  ]);
+
+  // Recalculate totalEarnings from all delivered orders if rider record seems stale
+  const allTimeEarnings = await Order.aggregate([
+    { $match: { riderId, status: 'delivered' } },
+    { $group: { _id: null, total: { $sum: '$deliveryFee' } } },
   ]);
 
   res.json({
     success: true,
     dashboard: {
       todayTrips: todayOrders,
-      todayEarnings: todayEarningsResult[0]?.total || 0,
-      totalTrips: rider?.totalTrips,
-      ratingAvg: rider?.ratingAvg,
-      totalEarnings: rider?.totalEarnings,
+      todayEarnings: todayEarningsResult[0]?.total ?? 0,
+      totalTrips: rider?.totalTrips ?? 0,
+      ratingAvg: rider?.ratingAvg ?? 0,
+      totalEarnings: allTimeEarnings[0]?.total ?? 0,
       status: rider?.status,
+      location: rider?.location ?? null,
       activeOrder: activeOrder || null,
+      recentOrders,
     },
   });
 });
@@ -212,18 +225,24 @@ router.get('/dashboard', async (req: AuthRequest, res: Response) => {
  */
 router.get('/orders', async (req: AuthRequest, res: Response) => {
   const riderId = req.user!.id;
-  const page  = parseInt(req.query.page  as string || '1');
-  const limit = parseInt(req.query.limit as string || '20');
-  const skip  = (page - 1) * limit;
+  const page   = parseInt(req.query.page   as string || '1');
+  const limit  = parseInt(req.query.limit  as string || '20');
+  const status = req.query.status as string | undefined;
+  const skip   = (page - 1) * limit;
+
+  const filter: Record<string, unknown> = { riderId };
+  if (status) {
+    filter.status = { $in: status.split(',').map((s) => s.trim()) };
+  }
 
   const [orders, total] = await Promise.all([
-    Order.find({ riderId, status: { $in: ['delivered', 'cancelled'] } })
+    Order.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate('stationId', 'name address')
       .populate('userId', 'name phone'),
-    Order.countDocuments({ riderId }),
+    Order.countDocuments(filter),
   ]);
 
   res.json({ success: true, orders, pagination: { page, limit, total } });

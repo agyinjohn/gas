@@ -16,7 +16,7 @@ import type { PickedLocation } from '@/components/LocationPicker';
 
 const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
 
-const QUICK_SIZES = [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48];
+const QUICK_SIZES = [3, 6, 12];
 
 interface Listing {
   size: number;
@@ -118,10 +118,11 @@ export default function UserHomePage() {
       setCoords({ lat: parseFloat(savedLat), lng: parseFloat(savedLng) });
       setLocationLabel(savedLabel || 'Current location');
       setLocationState(savedMode || 'granted');
-      // If it was GPS-based, silently refresh in background
       if (savedMode !== 'manual') silentRefreshLocation();
+    } else if (!navigator.geolocation) {
+      // No geolocation support and no saved location — go to picker
+      router.replace('/user/location');
     } else {
-      // No saved location — request fresh
       requestLocation();
     }
   }, []);
@@ -146,7 +147,7 @@ export default function UserHomePage() {
   }
 
   function requestLocation() {
-    if (!navigator.geolocation) { setLocationState('denied'); return; }
+    if (!navigator.geolocation) { router.replace('/user/location'); return; }
     navigator.geolocation.getCurrentPosition(
       ({ coords: c }) => {
         setCoords({ lat: c.latitude, lng: c.longitude });
@@ -159,7 +160,7 @@ export default function UserHomePage() {
           localStorage.setItem('gasgo_location_mode', 'granted');
         });
       },
-      () => setLocationState('denied'),
+      () => router.replace('/user/location'),
       { timeout: 15000, enableHighAccuracy: true, maximumAge: 0 }
     );
   }

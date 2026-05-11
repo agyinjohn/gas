@@ -120,9 +120,11 @@ export default function CheckoutPage() {
     staleTime: 60000,
   });
 
+  // Show all listings with a price set — stock/availability is enforced at order time
   const availableSizes: number[] = stationData?.cylinderListings
-    ?.filter((l: any) => l.isAvailable && l.stockCount > 0)
-    ?.map((l: any) => l.size) ?? [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48];
+    ?.filter((l: any) => l.fillPrice > 0)
+    ?.map((l: any) => l.size)
+    ?.sort((a: number, b: number) => a - b) ?? [];
 
   // Cart
   const [cart, setCart] = useState<Record<number, number>>(
@@ -133,8 +135,6 @@ export default function CheckoutPage() {
     setCart((prev) => {
       const next = (prev[size] ?? 0) + delta;
       if (next <= 0) { const { [size]: _, ...rest } = prev; return rest; }
-      const listing = stationData?.cylinderListings?.find((l: any) => l.size === size);
-      if (listing && next > listing.stockCount) return prev;
       return { ...prev, [size]: next };
     });
   }
@@ -282,20 +282,31 @@ export default function CheckoutPage() {
           </p>
           <p className="text-xs text-[var(--text-muted)] mb-3">Tick to select, use +/− to adjust quantity</p>
           <div className="space-y-2.5">
+            {!effectiveStationId && (
+              <p className="text-sm text-[var(--text-muted)] py-4 text-center">Select a station above to see available cylinders.</p>
+            )}
+            {effectiveStationId && !stationData && (
+              <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] py-4">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading cylinders…
+              </div>
+            )}
+            {effectiveStationId && stationData && availableSizes.length === 0 && (
+              <p className="text-sm text-[var(--text-muted)] py-4 text-center">No cylinders currently available at this station.</p>
+            )}
             {availableSizes.map((size) => {
-              const qty      = cart[size] ?? 0;
-              const checked  = qty > 0;
-              const l        = stationData?.cylinderListings?.find((li: any) => li.size === size);
-              const price    = l?.fillPrice ?? null;
-              const stock    = l?.stockCount ?? 99;
-              const lowStock = stock <= 5;
+              const qty       = cart[size] ?? 0;
+              const checked   = qty > 0;
+              const l         = stationData?.cylinderListings?.find((li: any) => li.size === size);
+              const price     = l?.fillPrice ?? null;
+              const unavailable = !l?.isAvailable;
               return (
                 <div key={size} className={cn(
                   'bg-[var(--bg-card)] rounded-2xl border-2 p-4 transition-all',
+                  unavailable ? 'opacity-50 cursor-not-allowed border-[var(--border)]' :
                   checked ? 'border-brand-500 bg-brand-500/10' : 'border-[var(--border)] hover:border-brand-500/50'
                 )}>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => checked ? setQty(size, -qty) : setQty(size, 1)} className="shrink-0">
+                    <button onClick={() => !unavailable && (checked ? setQty(size, -qty) : setQty(size, 1))} className="shrink-0" disabled={unavailable}>
                       <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
                         checked ? 'bg-brand-500 border-brand-500' : 'border-[var(--text-muted)] bg-[var(--bg-card2)]'
                       )}>
@@ -316,11 +327,9 @@ export default function CheckoutPage() {
                       <p className="font-bold text-[var(--text-primary)] text-sm">
                         {size}kg{price ? ` · GHS ${price}` : ''}
                       </p>
-                      {l && (
-                        <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full',
-                          lowStock ? 'text-amber-500 bg-amber-500/10' : 'text-green-500 bg-green-500/10'
-                        )}>
-                          {lowStock ? `Only ${stock} left` : `${stock} in stock`}
+                      {unavailable && (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full text-red-500 bg-red-500/10">
+                          Unavailable
                         </span>
                       )}
                     </div>
@@ -331,8 +340,8 @@ export default function CheckoutPage() {
                           −
                         </button>
                         <span className="w-5 text-center font-black text-sm text-brand-500">{qty}</span>
-                        <button onClick={() => setQty(size, 1)} disabled={qty >= stock}
-                          className="w-7 h-7 rounded-full border-2 border-brand-500/30 bg-[var(--bg-card)] flex items-center justify-center text-brand-500 font-bold disabled:opacity-30">
+                        <button onClick={() => setQty(size, 1)}
+                          className="w-7 h-7 rounded-full border-2 border-brand-500/30 bg-[var(--bg-card)] flex items-center justify-center text-brand-500 font-bold">
                           +
                         </button>
                       </div>

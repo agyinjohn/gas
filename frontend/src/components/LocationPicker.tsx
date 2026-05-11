@@ -45,6 +45,8 @@ export default function LocationPicker({ onConfirm, onClose, initial, pickupLoca
   const [locating,      setLocating]      = useState(false);
   const [picked,        setPicked]        = useState<PickedLocation | null>(null);
   const [sameAsPickup,  setSameAsPickup]  = useState(false);
+  const [mapError,      setMapError]      = useState(false);
+  const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reverseGeocode = useCallback((lat: number, lng: number) => {
     const geocoder = new google.maps.Geocoder();
@@ -116,25 +118,36 @@ export default function LocationPicker({ onConfirm, onClose, initial, pickupLoca
   }, [initial, placeMarker]);
 
   useEffect(() => {
-    // If already loaded, init immediately
+    // Start a 10 s timeout — if map hasn't loaded by then, show error
+    loadTimerRef.current = setTimeout(() => {
+      if (!mapRef.current) setMapError(true);
+    }, 10000);
+
+    const clearTimer = () => {
+      if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
+    };
+
     if (window.google?.maps?.places) {
+      clearTimer();
       initMap();
       return;
     }
-    // If script already injected, wait for it
     const existing = document.getElementById('gmaps-script');
     if (existing) {
-      existing.addEventListener('load', initMap);
-      return () => existing.removeEventListener('load', initMap);
+      const onLoad = () => { clearTimer(); initMap(); };
+      existing.addEventListener('load', onLoad);
+      return () => existing.removeEventListener('load', onLoad);
     }
-    // Inject script fresh
     const script = document.createElement('script');
     script.id = 'gmaps-script';
     script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places`;
     script.async = true;
     script.defer = true;
-    script.onload = initMap;
+    script.onload = () => { clearTimer(); initMap(); };
+    script.onerror = () => { clearTimer(); setMapError(true); };
     document.head.appendChild(script);
+
+    return clearTimer;
   }, [initMap]);
 
   function useMyLocation() {
@@ -168,14 +181,15 @@ export default function LocationPicker({ onConfirm, onClose, initial, pickupLoca
             ref={inputRef}
             type="text"
             placeholder="Search for your address…"
-            className="w-full h-11 bg-[var(--bg-card2)] border border-[var(--border)] rounded-xl pl-9 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+            disabled={mapError}
+            className="w-full h-11 bg-[var(--bg-card2)] border border-[var(--border)] rounded-xl pl-9 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-40"
           />
         </div>
       </div>
 
       {/* Map */}
       <div className="relative flex-1 min-h-0">
-        {!ready && (
+        {!ready && !mapError && (
           <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-card2)] z-10">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
@@ -183,10 +197,27 @@ export default function LocationPicker({ onConfirm, onClose, initial, pickupLoca
             </div>
           </div>
         )}
+        {mapError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--bg)] z-10 px-8 text-center">
+            <div className="w-16 h-16 bg-red-500/10 rounded-3xl flex items-center justify-center mb-4">
+              <MapPin className="w-8 h-8 text-red-500" />
+            </div>
+            <p className="text-base font-bold text-[var(--text-primary)] mb-2">Map failed to load</p>
+            <p className="text-sm text-[var(--text-muted)] mb-6">
+              We couldn't load the map. Check your internet connection and try again.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full max-w-xs bg-brand-500 text-white font-bold text-sm py-3 rounded-xl"
+            >
+              Go to Home
+            </button>
+          </div>
+        )}
         <div ref={mapDivRef} className="w-full h-full" />
         <button
           onClick={useMyLocation}
-          disabled={locating || !ready}
+          disabled={locating || !ready || mapError}
           className="absolute top-3 right-3 bg-[var(--bg-card)] shadow-md rounded-xl p-2.5 hover:bg-[var(--bg-card2)] transition-colors disabled:opacity-50"
         >
           {locating

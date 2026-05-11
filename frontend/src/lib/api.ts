@@ -3,7 +3,10 @@ import axios, { AxiosError } from 'axios';
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
   timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+  },
 });
 
 // Attach JWT from localStorage
@@ -58,8 +61,8 @@ export const stationsApi = {
   updatePrices: (id: string, data: object) =>
     api.patch(`/api/v1/stations/${id}/prices`, data),
 
-  updateInventory: (id: string, data: object) =>
-    api.patch(`/api/v1/stations/${id}/inventory`, data),
+  updateInventory: (id: string, size: number, isAvailable: boolean) =>
+    api.patch(`/api/v1/stations/${id}/inventory`, { size, isAvailable }),
 
   addExchangeReturn: (id: string, size: number, quantity?: number) =>
     api.post(`/api/v1/stations/${id}/exchange-returns`, { size, quantity }),

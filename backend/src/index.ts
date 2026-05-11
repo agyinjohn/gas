@@ -127,7 +127,7 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
 connectDB().then(() => {
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🔥 GasGo API running on http://0.0.0.0:${PORT}`);
-    console.log(`🌐 Network access: http://192.168.43.206:${PORT}`);
+    console.log(`🌐 Expose via ngrok: ngrok http ${PORT}`);
     console.log(`🔌 Socket.IO ready`);
   });
   startAllJobs();

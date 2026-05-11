@@ -29,7 +29,7 @@ const ROLE_HOME: Record<string, string> = {
 };
 
 const ROLE_ALLOWED: Record<string, string[]> = {
-  user:    ['/user'],
+  user:    ['/user', '/notifications', '/user/location'],
   rider:   ['/rider'],
   station: ['/station'],
   admin:   ['/admin'],
@@ -77,13 +77,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const baseURL  = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
     axios.get(`${baseURL}${endpoint}`, {
-      headers: { Authorization: `Bearer ${storedToken}` },
+      headers: {
+        Authorization: `Bearer ${storedToken}`,
+        'ngrok-skip-browser-warning': 'true',
+      },
     }).then(() => {
       setToken(storedToken);
       setUser(parsed);
-    }).catch(() => {
-      // Token invalid or expired — clear everything and force re-login
-      clearStorage();
+    }).catch((err) => {
+      // Only clear session on explicit 401 — not on network errors (e.g. backend down)
+      if (err.response?.status === 401) {
+        clearStorage();
+      } else {
+        // Network/server error — trust stored session optimistically
+        setToken(storedToken);
+        setUser(parsed);
+      }
     }).finally(() => {
       setIsLoading(false);
     });

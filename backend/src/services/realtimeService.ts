@@ -39,9 +39,23 @@ export function initSocketIO(socketServer: SocketServer): void {
     });
 
     // Rider broadcasts their GPS position
-    socket.on('rider:location', (payload: { orderId: string; lat: number; lng: number }) => {
+    socket.on('rider:location', async (payload: { orderId: string; lat: number; lng: number }) => {
       const { orderId, lat, lng } = payload;
       console.log(`[Rider:Location] orderId=${orderId} lat=${lat} lng=${lng}`);
+
+      // Persist to DB so the user page can seed from it on load
+      try {
+        const order = await (await import('../models/Order')).Order.findById(orderId).select('riderId');
+        if (order?.riderId) {
+          const { Rider } = await import('../models/Rider');
+          await Rider.findByIdAndUpdate(order.riderId, {
+            location: { lat, lng, updatedAt: new Date() },
+          });
+        }
+      } catch (err) {
+        console.error('[Rider:Location] Failed to persist location:', err);
+      }
+
       const roomSize = io.sockets.adapter.rooms.get(`order:${orderId}`)?.size ?? 0;
       console.log(`[Rider:Location] Broadcasting to order:${orderId} — ${roomSize} client(s) in room`);
       io.to(`order:${orderId}`).emit('rider:location:update', { lat, lng, updatedAt: new Date() });

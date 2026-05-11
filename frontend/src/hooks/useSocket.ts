@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { ridersApi } from '@/lib/api';
 
 let socketInstance: Socket | null = null;
 
@@ -69,26 +70,37 @@ export function useOrderTracking(
 /**
  * For riders — broadcast GPS position every N seconds while on an active order.
  */
-export function useRiderLocationBroadcast(orderId: string | null, intervalMs = 12000) {
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+export function useRiderLocationBroadcast(orderId: string | null, onPosition?: (pos: { lat: number; lng: number }) => void) {
+  const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!orderId) return;
+    if (!navigator.geolocation) {
+      console.warn('[Rider:Broadcast] Geolocation not supported');
+      return;
+    }
+
     const socket = getSocket();
+    socket.emit('join:order', orderId);
 
-    const broadcast = () => {
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(({ coords }) => {
-        socket.emit('rider:location', {
-          orderId,
-          lat: coords.latitude,
-          lng: coords.longitude,
-        });
-      });
+    // Use watchPosition for continuous streaming — no stale cache
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      ({ coords }) => {
+        const loc = { lat: coords.latitude, lng: coords.longitude };
+        console.log('[Rider:Broadcast] GPS fix → lat:', loc.lat, 'lng:', loc.lng, '| orderId:', orderId);
+        socket.emit('rider:location', { orderId, ...loc });
+        ridersApi.updateLocation(loc.lat, loc.lng).catch(() => {});
+        onPosition?.(loc);
+      },
+      (err) => console.warn('[Rider:Broadcast] watchPosition error:', err.code, err.message),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
     };
-
-    broadcast();
-    intervalRef.current = setInterval(broadcast, intervalMs);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [orderId, intervalMs]);
+  }, [orderId]);
 }
