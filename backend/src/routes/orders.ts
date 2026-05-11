@@ -286,7 +286,7 @@ router.post(
         email: user?.email || `${user?.phone}@GetGas.app`,
         amountGHS: finalAmount,
         reference,
-        callbackUrl: `${process.env.FRONTEND_URL}/user/order-success?orderId=${order._id}&orderNumber=${order.orderNumber ?? order._id.toString().slice(-8).toUpperCase()}&method=${paymentMethod}&payment=callback`,
+        callbackUrl: `${process.env.FRONTEND_URL}/user/order-success?orderId=${order._id}&orderNumber=${order._id.toString().slice(-8).toUpperCase()}&method=${paymentMethod}&payment=callback`,
         metadata: { orderId: order._id.toString() },
         mobileNumber: paymentMethod === 'mobile_money' ? user?.phone : undefined,
         provider: paymentProvider,
