@@ -121,6 +121,7 @@ export interface Order {
   paymentMethod: PaymentMethod;
   paymentProvider?: string;
   paymentStatus: 'pending' | 'captured' | 'released' | 'refunded';
+  paystackReference?: string;
 
   riderRating?: number;
   riderRatingComment?: string;
