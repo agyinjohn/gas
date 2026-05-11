@@ -212,7 +212,7 @@ export default function RiderHomePage() {
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-brand-600 uppercase tracking-wide">Active Order</p>
                 <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">
-                  {ORDER_STATUS_LABELS[activeOrder.status as keyof typeof ORDER_STATUS_LABELS]}
+                  {(ORDER_STATUS_LABELS as Record<string, string>)[activeOrder.status]}
                 </span>
               </div>
               <p className="font-semibold text-gray-900">
