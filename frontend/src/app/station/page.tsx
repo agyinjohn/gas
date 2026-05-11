@@ -5,7 +5,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
-import { Package, DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, Inbox } from 'lucide-react';
+import { Package, DollarSign, TrendingUp, ShoppingBag, CheckCircle, AlertCircle, Inbox, Clock } from 'lucide-react';
 import { ordersApi, stationsApi } from '@/lib/api';
 import { getSocket } from '@/hooks/useSocket';
 import { Order } from '@/types';
@@ -78,10 +78,10 @@ export default function StationDashboardPage() {
 
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Today's Orders" value={analytics?.today?.count || 0} icon={Package} iconBg="bg-orange-100 dark:bg-orange-500/10" iconColor="text-orange-500" valueColor="text-orange-600 dark:text-orange-400" />
-            <KpiCard label="Today's Revenue" value={formatCurrency(analytics?.today?.revenue || 0)} icon={DollarSign} iconBg="bg-emerald-100 dark:bg-emerald-500/10" iconColor="text-emerald-500" valueColor="text-emerald-600 dark:text-emerald-400" />
-            <KpiCard label="Avg Delivery Time" value={`${Math.round(analytics?.avgDeliveryMinutes || 0)}m`} icon={Clock} iconBg="bg-blue-100 dark:bg-blue-500/10" iconColor="text-blue-500" valueColor="text-blue-600 dark:text-blue-400" />
-            <KpiCard label="This Week" value={analytics?.period?.count || 0} icon={TrendingUp} iconBg="bg-violet-100 dark:bg-violet-500/10" iconColor="text-violet-500" valueColor="text-violet-600 dark:text-violet-400" />
+            <KpiCard label="Today's Orders" value={analytics?.today?.count ?? 0} icon={Package} iconBg="bg-orange-100 dark:bg-orange-500/10" iconColor="text-orange-500" valueColor="text-orange-600 dark:text-orange-400" />
+            <KpiCard label="Today's Revenue" value={formatCurrency(analytics?.today?.revenue ?? 0)} icon={DollarSign} iconBg="bg-emerald-100 dark:bg-emerald-500/10" iconColor="text-emerald-500" valueColor="text-emerald-600 dark:text-emerald-400" />
+            <KpiCard label="Pending Orders" value={pendingOrders.length} icon={ShoppingBag} iconBg="bg-yellow-100 dark:bg-yellow-500/10" iconColor="text-yellow-500" valueColor="text-yellow-600 dark:text-yellow-400" />
+            <KpiCard label="Week Revenue" value={formatCurrency(analytics?.period?.revenue ?? 0)} icon={TrendingUp} iconBg="bg-violet-100 dark:bg-violet-500/10" iconColor="text-violet-500" valueColor="text-violet-600 dark:text-violet-400" />
           </div>
 
           {/* Revenue & Orders Trend */}

@@ -1,12 +1,12 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Bike, ClipboardList, Store, MapPin, Star,
   AlertTriangle, Map, CheckCircle2, Phone, Flame,
 } from 'lucide-react';
-import { ordersApi } from '@/lib/api';
+import { ordersApi, paymentsApi } from '@/lib/api';
 import { useOrderTracking } from '@/hooks/useSocket';
 import { useAuth } from '@/lib/auth';
 import { Order } from '@/types';
@@ -66,6 +66,14 @@ export default function OrderDetailsPage() {
   const { isLoading: authLoading } = useAuth();
 
   const isPaymentCallback = searchParams.get('payment') === 'callback';
+
+  // When Paystack redirects back, verify the payment and update order status
+  useEffect(() => {
+    if (!isPaymentCallback || !order?.paystackReference) return;
+    paymentsApi.verify(order.paystackReference)
+      .then(() => refetch())
+      .catch(console.error);
+  }, [isPaymentCallback, order?.paystackReference]);
 
   const [showOTPSheet,     setShowOTPSheet]     = useState(false);
   const [showRatingSheet,  setShowRatingSheet]  = useState(false);

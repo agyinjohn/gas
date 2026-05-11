@@ -61,6 +61,9 @@ export const stationsApi = {
   updatePrices: (id: string, data: object) =>
     api.patch(`/api/v1/stations/${id}/prices`, data),
 
+  setStockStatus: (id: string, outOfStock: boolean) =>
+    api.patch(`/api/v1/stations/${id}/stock-status`, { outOfStock }),
+
   updateInventory: (id: string, size: number, isAvailable: boolean) =>
     api.patch(`/api/v1/stations/${id}/inventory`, { size, isAvailable }),
 
@@ -132,6 +135,10 @@ export const notificationsApi = {
   list: () => api.get('/api/v1/notifications'),
   readAll: () => api.patch('/api/v1/notifications/read-all'),
   readOne: (id: string) => api.patch(`/api/v1/notifications/${id}/read`),
+};
+
+export const paymentsApi = {
+  verify: (reference: string) => api.get(`/api/v1/payments/verify/${reference}`),
 };
 
 export const stationAuthApi = {

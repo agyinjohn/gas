@@ -93,6 +93,7 @@ router.get(
         lng: station.lng,
         distanceKm: Math.round(distanceKm * 10) / 10,
         ratingAvg: station.ratingAvg,
+        outOfStock: station.outOfStock,
         cylinderListings: station.cylinderListings,
       })),
     });
@@ -123,7 +124,7 @@ router.get(
  */
 router.get('/:id', async (req: Request, res: Response) => {
   const station = await Station.findById(req.params.id).select(
-    'name address city lat lng ratingAvg totalRatings totalOrders status operatingHours cylinderListings commissionPct'
+    'name address city lat lng ratingAvg totalRatings totalOrders status operatingHours cylinderListings commissionPct outOfStock'
   );
   if (!station || station.status !== 'active') {
     return res.status(404).json({ success: false, message: 'Station not found' });
@@ -282,7 +283,7 @@ router.patch(
       station.cylinderListings.push({
         size, brand: 'LPG', fillType: 'LPG', fillPrice, exchangePrice,
         stockCount: 0, needsRefillCount: 0, lowStockThreshold: 5,
-        isPaused: false, isAvailable: false,
+        isPaused: false, isAvailable: true,
       });
       await station.save();
       return res.json({ success: true, listing: station.cylinderListings.find((l) => l.size === size) });
@@ -304,6 +305,21 @@ router.patch(
     res.json({ success: true, listing });
   }
 );
+
+/**
+ * @swagger
+ * /api/v1/stations/{id}/stock-status:
+ *   patch:
+ *     tags: [Stations]
+ *     summary: Toggle station-level out-of-stock status
+ */
+router.patch('/:id/stock-status', async (req: AuthRequest, res: Response) => {
+  const station = await Station.findById(req.params.id);
+  if (!station) return res.status(404).json({ success: false, message: 'Station not found' });
+  station.outOfStock = !!req.body.outOfStock;
+  await station.save();
+  res.json({ success: true, outOfStock: station.outOfStock });
+});
 
 /**
  * @swagger
@@ -592,7 +608,7 @@ router.get('/:id/analytics', async (req: AuthRequest, res: Response) => {
   if (period === 'month') periodStart.setDate(now.getDate() - 30);
 
   const matchDelivered = { stationId, status: 'delivered', createdAt: { $gte: periodStart } };
-  const matchToday     = { stationId, status: 'delivered', createdAt: { $gte: startOfDay } };
+  const matchToday     = { stationId, status: { $nin: ['cancelled'] }, createdAt: { $gte: startOfDay } };
 
   const [
     todaySummary,

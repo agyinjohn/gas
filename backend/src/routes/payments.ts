@@ -81,6 +81,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req: R
  */
 router.get('/verify/:reference', async (req: Request, res: Response) => {
   const result = await verifyPayment(req.params.reference);
+
+  // If payment is successful, update the order
+  if (result?.status === 'success') {
+    const order = await Order.findOne({ paystackReference: req.params.reference });
+    if (order && order.paymentStatus === 'pending') {
+      order.paymentStatus = 'captured';
+      await order.save();
+    }
+  }
+
   res.json({ success: true, payment: result });
 });
 

@@ -50,6 +50,7 @@ export interface IStation extends Document {
     accountNumber: string;
     accountName: string;
   };
+  outOfStock: boolean;
   fcmToken?: string;
   priceChangeLog: Array<{
     size: number;
@@ -123,6 +124,7 @@ const StationSchema = new Schema<IStation>(
       accountName: String,
     },
     fcmToken: String,
+    outOfStock: { type: Boolean, default: false },
     priceChangeLog: [
       {
         size: Number,

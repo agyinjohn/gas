@@ -32,9 +32,10 @@ export default function RiderHomePage() {
     queryKey: ['orders', 'rider', 'active'],
     queryFn: () =>
       ordersApi
-        .list({ status: 'accepted,at_station,en_route' })
-        .then((r) => r.data.orders[0] || null),
+        .list({ status: 'accepted,at_station,en_route', limit: 1 })
+        .then((r) => r.data.orders[0] ?? null),
     refetchInterval: 10000,
+    refetchOnWindowFocus: true,
   });
 
   const statusMutation = useMutation({
@@ -107,6 +108,7 @@ export default function RiderHomePage() {
     try {
       await ordersApi.updateStatus(pendingOrder.orderId, 'accepted');
       setPendingOrder(null);
+      queryClient.invalidateQueries({ queryKey: ['orders', 'rider', 'active'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast.success('Order accepted!');
     } catch {

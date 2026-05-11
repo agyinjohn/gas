@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  DollarSign, CreditCard, Landmark, Calendar, 
+  CreditCard, Landmark, Calendar, 
   TrendingUp, Clock, CheckCircle, AlertCircle, Package, Star
 } from 'lucide-react';
 import Link from 'next/link';
@@ -72,7 +72,7 @@ export default function RiderEarningsPage() {
         <div className="flex gap-1 mt-4 bg-white/10 rounded-xl p-1">
           {[
             { key: 'overview', label: 'Overview', icon: TrendingUp },
-            { key: 'payouts', label: 'Payouts', icon: DollarSign },
+            { key: 'payouts', label: 'Payouts', icon: CreditCard },
             { key: 'bank', label: 'Bank Account', icon: Landmark },
           ].map(({ key, label, icon: Icon }) => (
             <button
@@ -96,7 +96,7 @@ export default function RiderEarningsPage() {
           <div className="space-y-4">
             {/* Today's Earnings */}
             <Card className="text-center bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-              <DollarSign className="w-12 h-12 text-green-500 mx-auto mb-3" />
+              <p className="text-4xl font-black text-green-600 mb-1">₵</p>
               <p className="text-3xl font-black text-gray-900 mb-1">
                 {formatCurrency(dashboard.todayEarnings || 0)}
               </p>
@@ -140,39 +140,7 @@ export default function RiderEarningsPage() {
               </Card>
             </div>
 
-            {/* Earnings Breakdown */}
-            <Card>
-              <h2 className="font-semibold text-gray-900 mb-3">How Earnings Work</h2>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <span className="text-green-600 font-bold text-xs">15%</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Commission Rate</p>
-                    <p className="text-gray-500">You earn 15% of each order's station payout</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Instant Payouts</p>
-                    <p className="text-gray-500">Earnings are paid out after each completed delivery</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                    <CreditCard className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Mobile Money</p>
-                    <p className="text-gray-500">Payments sent directly to your mobile money account</p>
-                  </div>
-                </div>
-              </div>
-            </Card>
+
           </div>
         )}
 
@@ -246,7 +214,7 @@ export default function RiderEarningsPage() {
               </div>
             ) : (
               <Card className="text-center py-8">
-                <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-4xl font-black text-gray-300 mx-auto mb-3">₵</p>
                 <p className="text-gray-500 mb-2">No payouts yet</p>
                 <p className="text-sm text-gray-400">
                   Complete your first delivery to see payouts here

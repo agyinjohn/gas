@@ -1,7 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, DollarSign, Package, Clock, AlertCircle } from 'lucide-react';
+import { TrendingUp, DollarSign, Package, Banknote, AlertCircle } from 'lucide-react';
 import { stationsApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -42,10 +42,10 @@ export default function StationAnalyticsPage() {
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { label: "Today's Orders", value: today.count, icon: Package, iconBg: 'bg-orange-100', iconColor: 'text-orange-500', valueColor: 'text-orange-600' },
-              { label: "Today's Revenue", value: formatCurrency(today.revenue), icon: DollarSign, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-500', valueColor: 'text-emerald-600' },
-              { label: 'Commission', value: formatCurrency(today.commission), icon: TrendingUp, iconBg: 'bg-blue-100', iconColor: 'text-blue-500', valueColor: 'text-blue-600' },
-              { label: 'Net Payout', value: formatCurrency(today.revenue - today.commission), icon: DollarSign, iconBg: 'bg-violet-100', iconColor: 'text-violet-500', valueColor: 'text-violet-600' },
+              { label: "Today's Orders",  value: today.count,                                    icon: Package,   iconBg: 'bg-orange-100 dark:bg-orange-500/10', iconColor: 'text-orange-500', valueColor: 'text-orange-600 dark:text-orange-400' },
+              { label: "Today's Revenue", value: formatCurrency(today.revenue),                  icon: DollarSign, iconBg: 'bg-emerald-100 dark:bg-emerald-500/10', iconColor: 'text-emerald-500', valueColor: 'text-emerald-600 dark:text-emerald-400' },
+              { label: 'Week Orders',     value: analytics?.period?.count ?? 0,                  icon: TrendingUp, iconBg: 'bg-blue-100 dark:bg-blue-500/10',    iconColor: 'text-blue-500',    valueColor: 'text-blue-600 dark:text-blue-400'    },
+              { label: 'Net Payout',      value: formatCurrency(today.revenue - today.commission), icon: Banknote,  iconBg: 'bg-violet-100 dark:bg-violet-500/10', iconColor: 'text-violet-500', valueColor: 'text-violet-600 dark:text-violet-400' },
             ].map(({ label, value, icon: Icon, iconBg, iconColor, valueColor }) => (
               <div key={label} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${iconBg} mb-3`}>

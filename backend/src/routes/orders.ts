@@ -142,12 +142,17 @@ router.post(
       sizeMap.set(item.size, (sizeMap.get(item.size) ?? 0) + item.quantity);
     }
 
+    // Check station-level out of stock
+    if (station.outOfStock) {
+      return res.status(400).json({ success: false, message: 'This station is currently out of stock' });
+    }
+
     for (const [size, quantity] of sizeMap) {
       const listing = station.cylinderListings.find((l) => l.size === size);
-      if (!listing || !listing.isAvailable) {
+      if (!listing || listing.fillPrice <= 0) {
         return res.status(400).json({
           success: false,
-          message: `${size}kg cylinder is not available at this station`,
+          message: `${size}kg cylinder is not configured at this station`,
         });
       }
     }
@@ -281,7 +286,7 @@ router.post(
         email: user?.email || `${user?.phone}@GetGas.app`,
         amountGHS: finalAmount,
         reference,
-        callbackUrl: `${process.env.FRONTEND_URL}/user/orders/${order._id}?payment=callback`,
+        callbackUrl: `${process.env.FRONTEND_URL}/user/order-success?orderId=${order._id}&orderNumber=${order.orderNumber ?? order._id.toString().slice(-8).toUpperCase()}&method=${paymentMethod}&payment=callback`,
         metadata: { orderId: order._id.toString() },
         mobileNumber: paymentMethod === 'mobile_money' ? user?.phone : undefined,
         provider: paymentProvider,
@@ -338,6 +343,24 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   else if (role === 'rider') filter = { riderId: id };
   else if (role === 'station') filter = { stationId: (req.user as any).stationId ?? req.query.stationId };
   else if (role === 'admin') filter = {}; // admin sees all
+
+  // Optional status filter — supports comma-separated values e.g. ?status=accepted,en_route
+  if (req.query.status) {
+    const statuses = (req.query.status as string).split(',').map((s) => s.trim());
+    filter.status = statuses.length === 1 ? statuses[0] : { $in: statuses };
+  }
+
+  // Optional date range filter e.g. ?from=2024-01-01&to=2024-01-31
+  if (req.query.from || req.query.to) {
+    const dateFilter: Record<string, Date> = {};
+    if (req.query.from) dateFilter.$gte = new Date(req.query.from as string);
+    if (req.query.to) {
+      const to = new Date(req.query.to as string);
+      to.setHours(23, 59, 59, 999);
+      dateFilter.$lte = to;
+    }
+    filter.createdAt = dateFilter;
+  }
 
   const [orders, total] = await Promise.all([
     Order.find(filter)

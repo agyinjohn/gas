@@ -1,10 +1,11 @@
 'use client';
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Store, Clock, CreditCard, Bell, LogOut, Wifi, WifiOff, AlertCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Store, Clock, CreditCard, Bell, LogOut, Wifi, WifiOff, AlertCircle, PackageX } from 'lucide-react';
 import { stationsApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 function getStationId(): string {
@@ -25,11 +26,21 @@ export default function StationSettingsPage() {
   const stationId = useMemo(() => getStationId(), []);
   const { logout } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const { data: station, isLoading } = useQuery({
     queryKey: ['station', stationId],
     queryFn: () => stationsApi.getById(stationId).then((r) => r.data.station),
     enabled: !!stationId,
+  });
+
+  const stockMutation = useMutation({
+    mutationFn: (outOfStock: boolean) => stationsApi.setStockStatus(stationId, outOfStock),
+    onSuccess: (_data, outOfStock) => {
+      queryClient.invalidateQueries({ queryKey: ['station', stationId] });
+      toast.success(outOfStock ? 'Station marked as out of stock' : 'Station is now available');
+    },
+    onError: () => toast.error('Failed to update stock status'),
   });
 
   const handleLogout = () => {
@@ -196,6 +207,39 @@ export default function StationSettingsPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Out of Stock */}
+          <div className={cn(
+            'flex items-center justify-between p-4 rounded-2xl border-2 transition-all',
+            station.outOfStock ? 'border-red-300 bg-red-500/10' : 'border-[var(--border)] bg-[var(--bg-card)]'
+          )}>
+            <div className="flex items-center gap-3">
+              <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+                station.outOfStock ? 'bg-red-500' : 'bg-[var(--bg-card2)]'
+              )}>
+                <PackageX className={cn('w-4 h-4', station.outOfStock ? 'text-white' : 'text-[var(--text-muted)]')} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[var(--text-primary)]">Out of Stock</p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {station.outOfStock ? 'Customers cannot place orders' : 'Station is accepting orders'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => stockMutation.mutate(!station.outOfStock)}
+              disabled={stockMutation.isPending}
+              className={cn(
+                'w-12 h-6 rounded-full relative transition-colors shrink-0',
+                station.outOfStock ? 'bg-red-500' : 'bg-[var(--border)]'
+              )}
+            >
+              <div className={cn(
+                'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform',
+                station.outOfStock ? 'translate-x-6' : 'translate-x-0.5'
+              )} />
+            </button>
           </div>
 
           {/* Sign Out */}

@@ -54,15 +54,21 @@ export default function PaymentPage() {
       });
 
       if (data.payment?.authorizationUrl) {
+        // MoMo/card — redirect to Paystack
+        sessionStorage.removeItem('checkout_photo');
         window.location.href = data.payment.authorizationUrl;
       } else {
-        toast.success('Order placed!');
+        // Cash — go to success page
+        sessionStorage.removeItem('checkout_photo');
         const orderId = data.order?._id || data.order?.id;
-        if (orderId) {
-          router.push(`/user/orders/${orderId}`);
-        } else {
-          router.push('/user/orders');
-        }
+        const q = new URLSearchParams({
+          orderId:     orderId ?? '',
+          orderNumber: data.order?.orderNumber ?? orderId?.slice(-8).toUpperCase() ?? '',
+          total:       grandTotal.toFixed(2),
+          method,
+          summary:     summaryLabel,
+        });
+        router.replace(`/user/order-success?${q.toString()}`);
       }
     } catch (err: any) {
       const errors = err.response?.data?.errors;

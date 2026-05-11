@@ -34,28 +34,29 @@ interface Station {
   lng: number;
   distanceKm: number;
   ratingAvg: number;
+  outOfStock: boolean;
   cylinderListings: Listing[];
 }
 
 // ─── Nearby Station Card (Figma style) ───────────────────────────────────────
 
 function StationCard({ station }: { station: Station }) {
-  const available = station.cylinderListings.filter((l) => l.isAvailable);
-  const allOutOfStock = station.cylinderListings.length > 0 && available.length === 0;
-  const minPrice = available.length ? Math.min(...available.map((l) => l.fillPrice)) : null;
+  const minPrice = station.cylinderListings.length > 0
+    ? Math.min(...station.cylinderListings.filter((l) => l.fillPrice > 0).map((l) => l.fillPrice))
+    : null;
 
   return (
     <Link href={`/user/stations/${station.id}`}>
       <div className={cn(
         'bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 h-full transition-all',
-        allOutOfStock ? 'opacity-60' : 'active:scale-[0.98]'
+        station.outOfStock ? 'opacity-60' : 'active:scale-[0.98]'
       )}>
         {/* Icon */}
         <div className={cn(
           'w-10 h-10 rounded-xl flex items-center justify-center mb-3',
-          allOutOfStock ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
+          station.outOfStock ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
         )}>
-          <Flame className={cn('w-5 h-5', allOutOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
+          <Flame className={cn('w-5 h-5', station.outOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
         </div>
 
         <h3 className="font-semibold text-[var(--text-primary)] text-sm leading-snug mb-0.5 truncate">
@@ -72,10 +73,10 @@ function StationCard({ station }: { station: Station }) {
           </span>
         </div>
 
-        {minPrice && (
+        {!station.outOfStock && minPrice && (
           <p className="text-xs font-bold text-brand-500 mt-2">From GHS {minPrice}</p>
         )}
-        {allOutOfStock && (
+        {station.outOfStock && (
           <p className="text-xs font-bold text-red-500 mt-2">Out of stock</p>
         )}
       </div>

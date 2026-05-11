@@ -294,19 +294,17 @@ export default function CheckoutPage() {
               <p className="text-sm text-[var(--text-muted)] py-4 text-center">No cylinders currently available at this station.</p>
             )}
             {availableSizes.map((size) => {
-              const qty       = cart[size] ?? 0;
-              const checked   = qty > 0;
-              const l         = stationData?.cylinderListings?.find((li: any) => li.size === size);
-              const price     = l?.fillPrice ?? null;
-              const unavailable = !l?.isAvailable;
+              const qty     = cart[size] ?? 0;
+              const checked = qty > 0;
+              const l       = stationData?.cylinderListings?.find((li: any) => li.size === size);
+              const price   = l?.fillPrice ?? null;
               return (
                 <div key={size} className={cn(
                   'bg-[var(--bg-card)] rounded-2xl border-2 p-4 transition-all',
-                  unavailable ? 'opacity-50 cursor-not-allowed border-[var(--border)]' :
                   checked ? 'border-brand-500 bg-brand-500/10' : 'border-[var(--border)] hover:border-brand-500/50'
                 )}>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => !unavailable && (checked ? setQty(size, -qty) : setQty(size, 1))} className="shrink-0" disabled={unavailable}>
+                    <button onClick={() => checked ? setQty(size, -qty) : setQty(size, 1)} className="shrink-0">
                       <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
                         checked ? 'bg-brand-500 border-brand-500' : 'border-[var(--text-muted)] bg-[var(--bg-card2)]'
                       )}>
@@ -327,11 +325,6 @@ export default function CheckoutPage() {
                       <p className="font-bold text-[var(--text-primary)] text-sm">
                         {size}kg{price ? ` · GHS ${price}` : ''}
                       </p>
-                      {unavailable && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full text-red-500 bg-red-500/10">
-                          Unavailable
-                        </span>
-                      )}
                     </div>
                     {checked && (
                       <div className="flex items-center gap-2 shrink-0">
