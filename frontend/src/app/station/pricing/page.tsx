@@ -503,7 +503,7 @@ export default function StationPricingPage() {
                   </button>
                   <button
                     onClick={addCustomSize}
-                    disabled={addingSize || (newSize && allSizes.includes(parseInt(newSize)))}
+                    disabled={addingSize || !!(newSize && allSizes.includes(parseInt(newSize)))}
                     className="flex-1 h-10 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                   >
                     {addingSize ? (
