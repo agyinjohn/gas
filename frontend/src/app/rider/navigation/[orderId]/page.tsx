@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -9,6 +9,7 @@ import {
 import { ordersApi, ridersApi } from '@/lib/api';
 import { Card, Button, Input } from '@/components/ui';
 import { formatCylinders, formatCurrency } from '@/lib/utils';
+import { getSocket } from '@/hooks/useSocket';
 import toast from 'react-hot-toast';
 
 export default function RiderNavigationPage() {
@@ -17,6 +18,7 @@ export default function RiderNavigationPage() {
   const queryClient = useQueryClient();
   const [otpInput, setOtpInput] = useState('');
   const [currentLocation, setCurrentLocation] = useState<{lat: number; lng: number} | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: orderData, isLoading } = useQuery({
     queryKey: ['order', orderId],
@@ -44,28 +46,37 @@ export default function RiderNavigationPage() {
     },
   });
 
-  // Update rider location every 30 seconds
+  const orderStatus = orderData?.status;
+
+  // Broadcast location via socket (instant) + REST (persists to DB)
   useEffect(() => {
-    const updateLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const location = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
-            setCurrentLocation(location);
-            ridersApi.updateLocation(location.lat, location.lng);
-          },
-          (error) => console.error('Location error:', error)
-        );
-      }
+    console.log('[Rider] orderStatus:', orderStatus);
+    if (!['accepted', 'at_station', 'en_route'].includes(orderStatus ?? '')) return;
+
+    const socket = getSocket();
+    socket.emit('join:order', orderId);
+
+    const intervalMs = orderStatus === 'en_route' ? 5000 : 15000;
+
+    const broadcast = () => {
+      if (!navigator.geolocation) { console.warn('[Rider] Geolocation not available'); return; }
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          const loc = { lat: coords.latitude, lng: coords.longitude };
+          setCurrentLocation(loc);
+          console.log('[Rider] Live location: lat=%f, lng=%f', loc.lat, loc.lng);
+          socket.emit('rider:location', { orderId, lat: loc.lat, lng: loc.lng });
+          ridersApi.updateLocation(loc.lat, loc.lng);
+        },
+        (err) => console.error('[Rider] Location error:', err.message),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
     };
 
-    updateLocation(); // Initial update
-    const interval = setInterval(updateLocation, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    broadcast();
+    intervalRef.current = setInterval(broadcast, intervalMs);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [orderId, orderStatus]);
 
   if (isLoading) {
     return (

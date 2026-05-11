@@ -117,6 +117,7 @@ router.patch(
       { riderId, status: { $in: ['accepted', 'at_station', 'en_route'] } },
       '_id'
     );
+    console.log(`[Location] Active order for rider ${riderId}: ${activeOrder?._id ?? 'none'}`);
     if (activeOrder) {
       io.to(`order:${activeOrder._id}`).emit('rider:location:update', {
         lat, lng, updatedAt: new Date(),

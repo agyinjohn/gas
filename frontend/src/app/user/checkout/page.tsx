@@ -122,7 +122,7 @@ export default function CheckoutPage() {
 
   const availableSizes: number[] = stationData?.cylinderListings
     ?.filter((l: any) => l.isAvailable && l.stockCount > 0)
-    ?.map((l: any) => l.size) ?? [3, 6, 12];
+    ?.map((l: any) => l.size) ?? [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48];
 
   // Cart
   const [cart, setCart] = useState<Record<number, number>>(

@@ -221,6 +221,57 @@ router.post('/rider/login',
   }
 );
 
+// ─── Unified Staff Login (Rider + Station + Admin) ──────────────────────────
+router.post('/staff/login',
+  [body('phone').trim().notEmpty(), body('password').notEmpty()],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const phone = normalizePhone(req.body.phone);
+    const { password } = req.body;
+
+    // 1. Check Admin (by phone or email)
+    const admin = await Admin.findOne({ $or: [{ phone }, { email: req.body.phone }], isActive: true });
+    if (admin) {
+      const valid = await admin.comparePassword(password);
+      if (!valid) return res.status(401).json({ success: false, message: 'Invalid phone or password' });
+      const token = signToken({ id: admin._id, role: 'admin', phone: admin.phone }, '7d');
+      return res.json({ success: true, token, role: 'admin', user: { id: admin._id, name: admin.name, phone: admin.phone } });
+    }
+
+    // 2. Check Rider
+    const rider = await Rider.findOne({ phone });
+    if (rider) {
+      if (rider.kycStatus !== 'approved') return res.status(403).json({ success: false, message: 'Your account is pending admin approval' });
+      const valid = await rider.comparePassword(password);
+      if (!valid) return res.status(401).json({ success: false, message: 'Invalid phone or password' });
+      const token = signToken({ id: rider._id, role: 'rider', phone });
+      return res.json({ success: true, token, role: 'rider', user: { id: rider._id, name: rider.name, phone } });
+    }
+
+    // 3. Check Station owner
+    const user = await User.findOne({ phone });
+    if (user) {
+      const { Station } = await import('../models/Station');
+      const station = await Station.findOne({ ownerId: user._id, status: { $in: ['active'] } });
+      if (station) {
+        if (!user.passwordHash) return res.status(401).json({ success: false, message: 'Invalid phone or password' });
+        const bcrypt = await import('bcryptjs');
+        const valid = await bcrypt.compare(password, user.passwordHash);
+        if (!valid) return res.status(401).json({ success: false, message: 'Invalid phone or password' });
+        const token = signToken({ id: user._id, role: 'station', stationId: station._id, phone });
+        return res.json({ success: true, token, role: 'station', user: { id: user._id, name: user.name, phone } });
+      }
+      // All stations suspended/banned
+      const anyStation = await Station.findOne({ ownerId: user._id });
+      if (anyStation) {
+        return res.status(403).json({ success: false, message: `Your station is ${anyStation.status}` });
+      }
+    }
+
+    return res.status(404).json({ success: false, message: 'No staff account found with this phone number' });
+  }
+);
+
 // Admin Login
 router.post('/admin/login',
   [body('phone').trim().notEmpty(), body('password').notEmpty()],

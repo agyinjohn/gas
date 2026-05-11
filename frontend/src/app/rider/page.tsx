@@ -68,7 +68,7 @@ export default function RiderHomePage() {
     const riderId = riderData._id;
 
     function joinRoom() {
-      console.log('[Rider] Emitting join:rider for', riderId);
+      console.log('[Rider] Joining room rider:', riderId, '| socket connected:', socket.connected, '| socket id:', socket.id);
       socket.emit('join:rider', riderId);
     }
 
@@ -77,6 +77,9 @@ export default function RiderHomePage() {
     } else {
       socket.once('connect', joinRoom);
     }
+
+    // Re-join on every reconnect
+    socket.on('connect', joinRoom);
 
     socket.on('order:new', (order: any) => {
       console.log('[Rider] Received order:new', order);

@@ -139,7 +139,7 @@ export default function UserProfilePage() {
   }
 
   return (
-    <div className="bg-[var(--bg)] pb-28 lg:pb-8">
+    <div className="bg-[var(--bg)] pb-24 lg:pb-0">
 
       {showPicker && (
         <LocationPicker

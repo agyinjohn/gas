@@ -1,16 +1,19 @@
 'use client';
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Store, Clock, Bell, LogOut } from 'lucide-react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Store, Clock, CreditCard, Bell, LogOut, Wifi, WifiOff, AlertCircle } from 'lucide-react';
 import { stationsApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { Card, Button, Input } from '@/components/ui';
-import { Station } from '@/types';
-import toast from 'react-hot-toast';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
-const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('GetGas_station_id') || '' : '';
+function getStationId(): string {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('gasgo_token') : null;
+    if (!token) return '';
+    return JSON.parse(atob(token.split('.')[1])).stationId || '';
+  } catch { return ''; }
+}
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const DAY_LABELS: Record<string, string> = {
@@ -19,173 +22,192 @@ const DAY_LABELS: Record<string, string> = {
 };
 
 export default function StationSettingsPage() {
-  const queryClient = useQueryClient();
+  const stationId = useMemo(() => getStationId(), []);
   const { logout } = useAuth();
   const router = useRouter();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['station', STATION_ID],
-    queryFn: () => stationsApi.getById(STATION_ID).then((r) => r.data.station as Station),
+  const { data: station, isLoading } = useQuery({
+    queryKey: ['station', stationId],
+    queryFn: () => stationsApi.getById(stationId).then((r) => r.data.station),
+    enabled: !!stationId,
   });
-
-  const station = data;
 
   const handleLogout = () => {
     logout();
     toast.success('Logged out');
-    router.push('/station/login');
+    router.push('/staff/login');
   };
 
-  if (isLoading || !station) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 pt-12 pb-4 flex items-center gap-3 sticky top-0 z-10">
-        <Link href="/station" className="p-1.5 rounded-xl hover:bg-gray-100">
-          <ArrowLeft className="w-5 h-5 text-gray-700" />
-        </Link>
-        <h1 className="text-base font-semibold text-gray-900">Settings</h1>
+  if (!station) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <p className="text-[var(--text-muted)]">Station not found</p>
+        </div>
       </div>
+    );
+  }
 
-      <div className="px-4 py-4 space-y-4">
-        {/* Station Info */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <Store className="w-4 h-4 text-brand-500" />
-            <h2 className="text-sm font-semibold text-gray-700">Station Info</h2>
-          </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Name</span>
-              <span className="font-medium">{station.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Address</span>
-              <span className="font-medium text-right max-w-[55%]">{station.address}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">City</span>
-              <span className="font-medium">{station.city}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Status</span>
-              <span className={`font-medium capitalize ${
-                station.status === 'active' ? 'text-green-600' :
-                station.status === 'pending' ? 'text-yellow-600' : 'text-red-600'
-              }`}>{station.status}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Commission Rate</span>
-              <span className="font-medium">{station.commissionPct}%</span>
-            </div>
-          </div>
-        </Card>
+  return (
+    <div className="px-4 lg:px-6 py-6 max-w-6xl mx-auto pb-8">
+        <div className="space-y-6">
 
-        {/* Operating Hours */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <Clock className="w-4 h-4 text-brand-500" />
-            <h2 className="text-sm font-semibold text-gray-700">Operating Hours</h2>
+          {/* Station Info */}
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 bg-brand-50 rounded-xl flex items-center justify-center">
+                <Store className="w-5 h-5 text-brand-500" />
+              </div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">Station Information</h2>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                <span className="text-sm text-[var(--text-muted)]">Station Name</span>
+                <span className="text-sm font-semibold text-[var(--text-primary)]">{station.name}</span>
+              </div>
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                <span className="text-sm text-[var(--text-muted)]">Address</span>
+                <span className="text-sm font-semibold text-[var(--text-primary)] text-right max-w-xs">{station.address}</span>
+              </div>
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                <span className="text-sm text-[var(--text-muted)]">City</span>
+                <span className="text-sm font-semibold text-[var(--text-primary)]">{station.city}</span>
+              </div>
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                <span className="text-sm text-[var(--text-muted)]">Status</span>
+                <div className="flex items-center gap-2">
+                  {station.status === 'active' ? (
+                    <>
+                      <Wifi className="w-4 h-4 text-emerald-500" />
+                      <span className="text-sm font-semibold text-emerald-600">Active</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="w-4 h-4 text-red-500" />
+                      <span className="text-sm font-semibold text-red-600 capitalize">{station.status}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[var(--text-muted)]">Commission Rate</span>
+                <span className="text-sm font-semibold text-[var(--text-primary)]">{station.commissionPct}%</span>
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            {DAYS.map((day) => {
-              const hours = station.operatingHours?.[day];
-              return (
-                <div key={day} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700 w-24">{DAY_LABELS[day]}</span>
-                  <div className="flex items-center gap-2">
-                    {hours?.isOpen !== false ? (
-                      <span className="text-gray-600">
-                        {hours?.open || '08:00'} – {hours?.close || '18:00'}
-                      </span>
-                    ) : (
-                      <span className="text-red-500">Closed</span>
-                    )}
-                    <div
-                      className={`w-10 h-5 rounded-full relative transition-colors ${
-                        hours?.isOpen !== false ? 'bg-brand-500' : 'bg-gray-300'
-                      }`}
-                    >
-                      <div
-                        className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                          hours?.isOpen !== false ? 'translate-x-5' : 'translate-x-0.5'
-                        }`}
-                      />
+
+          {/* Operating Hours */}
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
+                <Clock className="w-5 h-5 text-blue-500" />
+              </div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">Operating Hours</h2>
+            </div>
+            <div className="space-y-2">
+              {DAYS.map((day) => {
+                const hours = station.operatingHours?.[day];
+                const isOpen = hours?.isOpen !== false;
+                return (
+                  <div key={day} className="flex items-center justify-between py-2.5 border-b border-[var(--border)] last:border-0">
+                    <span className="text-sm font-medium text-[var(--text-primary)] w-24">{DAY_LABELS[day]}</span>
+                    <div className="flex items-center gap-3">
+                      {isOpen ? (
+                        <span className="text-sm text-[var(--text-muted)]">
+                          {hours?.open || '08:00'} – {hours?.close || '18:00'}
+                        </span>
+                      ) : (
+                        <span className="text-sm font-medium text-red-600">Closed</span>
+                      )}
+                      <div className={`w-10 h-5 rounded-full relative transition-colors ${isOpen ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isOpen ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-gray-400 mt-3">
-            Contact support to update your operating hours.
-          </p>
-        </Card>
-
-        {/* Payout Account */}
-        <Card>
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Payout Account</h2>
-          {station.bankAccount ? (
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Provider</span>
-                <span className="font-medium">{station.bankAccount.provider}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Account No.</span>
-                <span className="font-medium font-mono">{station.bankAccount.accountNumber}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Account Name</span>
-                <span className="font-medium">{station.bankAccount.accountName}</span>
-              </div>
+                );
+              })}
             </div>
-          ) : (
-            <div className="text-center py-4">
-              <p className="text-sm text-gray-400 mb-3">No payout account configured</p>
-              <button className="text-sm text-brand-600 font-medium">Add Account</button>
-            </div>
-          )}
-        </Card>
-
-        {/* Notifications */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <Bell className="w-4 h-4 text-brand-500" />
-            <h2 className="text-sm font-semibold text-gray-700">Notifications</h2>
+            <p className="text-xs text-[var(--text-muted)] mt-4">Contact support to update your operating hours.</p>
           </div>
-          <div className="space-y-3">
-            {[
-              { label: 'New order alerts', desc: 'Sound & vibration on new incoming orders', enabled: true },
-              { label: 'Low stock alerts', desc: 'When cylinder stock falls below threshold', enabled: true },
-              { label: 'Payout notifications', desc: 'When payouts are processed', enabled: true },
-            ].map(({ label, desc, enabled }) => (
-              <div key={label} className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{label}</p>
-                  <p className="text-xs text-gray-500">{desc}</p>
+
+          {/* Payout Account */}
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 bg-purple-50 rounded-xl flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-purple-500" />
+              </div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">Payout Account</h2>
+            </div>
+            {station.bankAccount ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                  <span className="text-sm text-[var(--text-muted)]">Provider</span>
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">{station.bankAccount.provider}</span>
                 </div>
-                <div
-                  className={`w-10 h-5 rounded-full relative shrink-0 transition-colors ${enabled ? 'bg-brand-500' : 'bg-gray-300'}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
+                  <span className="text-sm text-[var(--text-muted)]">Account Number</span>
+                  <span className="text-sm font-semibold text-[var(--text-primary)] font-mono">{station.bankAccount.accountNumber}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--text-muted)]">Account Name</span>
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">{station.bankAccount.accountName}</span>
                 </div>
               </div>
-            ))}
+            ) : (
+              <div className="text-center py-6">
+                <CreditCard className="w-10 h-10 text-[var(--text-muted)] mx-auto mb-2" />
+                <p className="text-sm text-[var(--text-muted)] mb-3">No payout account configured</p>
+                <button className="text-sm text-brand-600 font-semibold hover:text-brand-700">Add Bank Account</button>
+              </div>
+            )}
           </div>
-        </Card>
 
-        <Button variant="danger" className="w-full" onClick={handleLogout}>
-          <LogOut className="w-4 h-4" /> Sign Out
-        </Button>
-      </div>
+          {/* Notifications */}
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 bg-orange-50 rounded-xl flex items-center justify-center">
+                <Bell className="w-5 h-5 text-orange-500" />
+              </div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">Notifications</h2>
+            </div>
+            <div className="space-y-4">
+              {[
+                { label: 'New Order Alerts', desc: 'Sound & vibration on incoming orders', enabled: true },
+                { label: 'Low Stock Alerts', desc: 'When cylinder stock falls below threshold', enabled: true },
+                { label: 'Payout Notifications', desc: 'When payouts are processed', enabled: true },
+              ].map(({ label, desc, enabled }) => (
+                <div key={label} className="flex items-start justify-between gap-3 pb-4 border-b border-[var(--border)] last:border-0 last:pb-0">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{label}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{desc}</p>
+                  </div>
+                  <div className={`w-10 h-5 rounded-full relative shrink-0 transition-colors ${enabled ? 'bg-brand-500' : 'bg-gray-300'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Sign Out */}
+          <button
+            onClick={handleLogout}
+            className="w-full h-12 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+
+        </div>
     </div>
   );
 }

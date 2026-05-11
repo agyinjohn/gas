@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import { ArrowRight, ChevronLeft, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/lib/auth';
@@ -86,9 +87,11 @@ function PhoneStep({
 
       <p className="text-center text-sm text-[var(--text-muted)]">
         Want to deliver?{' '}
-        <a href="/rider/login" className="text-brand-500 font-semibold hover:underline">Sign in as a rider</a>
-        {' · '}
-        <a href="/rider/register" className="text-brand-500 font-semibold hover:underline">Apply as a rider</a>
+        <Link href="/rider/register" className="text-brand-500 font-semibold hover:underline">Apply as a rider</Link>
+      </p>
+      <p className="text-center text-sm text-[var(--text-muted)]">
+        Staff?{' '}
+        <Link href="/staff/login" className="text-brand-500 font-semibold hover:underline">Sign in here</Link>
       </p>
     </form>
   );
@@ -326,57 +329,103 @@ export default function LoginPage() {
 
       {/* ── Left panel (desktop only) ── */}
       <div className="hidden lg:flex lg:w-[52%] bg-gray-950 flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-brand-500/20 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-[300px] h-[300px] bg-brand-600/10 rounded-full blur-[80px] pointer-events-none" />
 
+        {/* Background layers */}
+        <div className="absolute -top-40 -left-40 w-[700px] h-[700px] bg-brand-500/10 rounded-full blur-[160px] pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 w-[500px] h-[500px] bg-orange-600/8 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-1/3 right-0 w-[300px] h-[300px] bg-violet-600/8 rounded-full blur-[100px] pointer-events-none" />
+
+        {/* Dot grid */}
+        <div className="absolute inset-0 opacity-[0.12]" style={{
+          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)',
+          backgroundSize: '28px 28px'
+        }} />
+
+        {/* Accent lines */}
+        <div className="absolute top-0 right-24 w-px h-full bg-gradient-to-b from-transparent via-white/5 to-transparent" />
+        <div className="absolute top-0 right-48 w-px h-full bg-gradient-to-b from-transparent via-white/3 to-transparent" />
+
+        {/* Logo */}
         <div className="flex items-center gap-3 relative z-10">
-          <Image src="/logo.png" alt="GetGas" width={40} height={40} className="rounded-xl" />
-          <span className="text-white font-bold text-lg tracking-tight">GetGas</span>
+          <Image src="/logo.png" alt="GetGas" width={48} height={48} className="rounded-xl" />
+          <span className="text-white font-black text-2xl tracking-tight">GetGas</span>
         </div>
 
-        <div className="relative z-10 space-y-8">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5">
-              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-xs text-gray-400 font-medium">Live in Ghana</span>
-            </div>
-            <h1 className="text-5xl font-black text-white leading-[1.1] tracking-tight">
+        {/* Main content */}
+        <div className="relative z-10 space-y-10">
+
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-brand-500/20 border border-brand-500/40 rounded-lg px-4 py-1.5">
+            <span className="w-1.5 h-1.5 bg-brand-300 rounded-full animate-pulse" />
+            <span className="text-xs text-brand-200 font-semibold tracking-wide">Live in Ghana</span>
+          </div>
+
+          {/* Headline */}
+          <div className="space-y-5">
+            <h1 className="text-[56px] font-black text-white leading-[1.0] tracking-tight">
               Gas delivered<br />
-              <span className="text-brand-500">in minutes.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 via-orange-300 to-amber-300">
+                in minutes.
+              </span>
             </h1>
-            <p className="text-gray-400 text-base leading-relaxed max-w-sm">
+            <p className="text-gray-400 text-[15px] leading-relaxed max-w-[340px]">
               The fastest way to get LPG cylinders to your door. Order, track, and pay — all in one place.
             </p>
           </div>
+
+          {/* Divider */}
+          <div className="w-12 h-0.5 bg-gradient-to-r from-brand-500 to-transparent rounded-full" />
+
+          {/* Stats */}
           <div className="grid grid-cols-3 gap-4">
             {[
-              { value: '2,400+', label: 'Orders delivered' },
-              { value: '98%',    label: 'On-time rate'     },
-              { value: '4.9★',   label: 'Avg. rating'      },
+              { value: '2,400+', label: 'Orders delivered', color: 'text-brand-400'  },
+              { value: '98%',    label: 'On-time rate',     color: 'text-emerald-400' },
+              { value: '4.9★',   label: 'Avg. rating',      color: 'text-amber-400'   },
             ].map((s) => (
-              <div key={s.label} className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                <p className="text-xl font-black text-white">{s.value}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+              <div key={s.label} className="space-y-1">
+                <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                <p className="text-[11px] text-gray-600 font-medium">{s.label}</p>
               </div>
             ))}
           </div>
+
+          {/* Testimonial */}
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl px-5 py-4">
+            <p className="text-sm text-gray-400 leading-relaxed italic">
+              &ldquo;I ordered gas at 8am and it was at my door by 8:25. GasGo is a lifesaver!”
+            </p>
+            <div className="flex items-center gap-2.5 mt-3">
+              <div className="w-7 h-7 rounded-full bg-brand-500/20 border border-brand-500/30 flex items-center justify-center">
+                <span className="text-[11px] font-bold text-brand-400">AB</span>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-white">Abena Boateng</p>
+                <p className="text-[10px] text-gray-600">Customer, Kumasi</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <p className="text-gray-700 text-xs relative z-10">© 2025 GetGas · All rights reserved</p>
+        <p className="text-gray-700 text-xs relative z-10">© 2025 GasGo · All rights reserved</p>
       </div>
 
       {/* ── Right panel ── */}
-      <div className="flex-1 flex flex-col justify-center items-center px-6 py-12 bg-[var(--bg)]">
+      <div className="flex-1 flex flex-col justify-center items-center min-h-screen px-6 py-12 bg-[var(--bg)]">
         <div className="w-full max-w-[400px] space-y-8">
 
           {step === 'phone' && (
             <>
               {/* Mobile logo */}
-              <div className="flex lg:hidden flex-col items-center gap-2 text-center">
+              <div className="flex lg:hidden flex-col items-center gap-3 text-center">
                 <Image src="/logo.png" alt="GetGas" width={64} height={64} />
                 <span className="font-black text-[var(--text-primary)] text-lg">GetGas</span>
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">Welcome back</h2>
+                  <p className="text-sm text-[var(--text-muted)]">Enter your phone number to continue</p>
+                </div>
               </div>
-              <div className="space-y-1 text-center lg:text-left">
+              <div className="hidden lg:block space-y-1 text-center lg:text-left">
                 <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">Welcome back</h2>
                 <p className="text-sm text-[var(--text-muted)]">Enter your phone number to continue</p>
               </div>

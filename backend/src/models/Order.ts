@@ -128,7 +128,7 @@ const DispatchAttemptSchema = new Schema<IDispatchAttempt>({
 }, { _id: false });
 
 const CylinderLineItemSchema = new Schema<ICylinderLineItem>({
-  size:      { type: Number, enum: [3, 6, 12], required: true },
+  size:      { type: Number, enum: [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48], required: true },
   quantity:  { type: Number, required: true, min: 1 },
   unitPrice: { type: Number, required: true, min: 0 },
   subtotal:  { type: Number, required: true, min: 0 },
@@ -205,7 +205,7 @@ const OrderSchema = new Schema<IOrder>(
 
     dispatchAttempts: [DispatchAttemptSchema],
     deliveryPhotoUrl: String,
-    exchangeOldSize: { type: Number, enum: [3, 6, 12] },
+    exchangeOldSize: { type: Number, enum: [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48] },
     cancellationReason: String,
     cancelledBy: { type: String, enum: ['user', 'station', 'admin', 'system'] },
     isScheduled: { type: Boolean, default: false },

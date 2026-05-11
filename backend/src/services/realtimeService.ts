@@ -19,9 +19,12 @@ export function initSocketIO(socketServer: SocketServer): void {
   });
 
   io.on('connection', (socket: Socket) => {
+    console.log(`[Socket] New connection: ${socket.id}`);
+
     // Join order-specific room for scoped broadcasts
     socket.on('join:order', (orderId: string) => {
       socket.join(`order:${orderId}`);
+      console.log(`[Socket] join:order — socket=${socket.id} room=order:${orderId}`);
     });
 
     socket.on('leave:order', (orderId: string) => {
@@ -31,12 +34,16 @@ export function initSocketIO(socketServer: SocketServer): void {
     // Rider joins their personal room to receive dispatched orders
     socket.on('join:rider', (riderId: string) => {
       socket.join(`rider:${riderId}`);
-      console.log(`[Socket] Rider ${riderId} joined room rider:${riderId}`);
+      const roomSize = io.sockets.adapter.rooms.get(`rider:${riderId}`)?.size ?? 0;
+      console.log(`[Socket] Rider ${riderId} joined room rider:${riderId} — room size now: ${roomSize}`);
     });
 
     // Rider broadcasts their GPS position
     socket.on('rider:location', (payload: { orderId: string; lat: number; lng: number }) => {
       const { orderId, lat, lng } = payload;
+      console.log(`[Rider:Location] orderId=${orderId} lat=${lat} lng=${lng}`);
+      const roomSize = io.sockets.adapter.rooms.get(`order:${orderId}`)?.size ?? 0;
+      console.log(`[Rider:Location] Broadcasting to order:${orderId} — ${roomSize} client(s) in room`);
       io.to(`order:${orderId}`).emit('rider:location:update', { lat, lng, updatedAt: new Date() });
     });
 

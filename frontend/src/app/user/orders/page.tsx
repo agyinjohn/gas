@@ -146,7 +146,7 @@ export default function UserOrdersPage() {
         </div>
       </div>
 
-      <div className="px-4 py-5 flex flex-col gap-5 max-w-lg mx-auto lg:max-w-2xl">
+      <div className="px-4 py-5 pb-24 lg:pb-5 flex flex-col gap-5 max-w-lg mx-auto lg:max-w-2xl">
 
         {/* Loading skeletons */}
         {isLoading && (

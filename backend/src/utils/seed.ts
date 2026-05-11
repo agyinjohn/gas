@@ -1,6 +1,6 @@
 /**
  * Run: npx ts-node src/utils/seed.ts
- * Creates the first admin account and sample station data.
+ * Creates the first admin account, sample station data, riders, and orders.
  */
 import dotenv from 'dotenv';
 dotenv.config();
@@ -16,10 +16,12 @@ async function seed() {
   const { Admin } = await import('../models/Admin');
   const { User } = await import('../models/User');
   const { Station } = await import('../models/Station');
+  const { Rider } = await import('../models/Rider');
+  const { Order } = await import('../models/Order');
 
   // Create admin
-  const existing = await Admin.findOne({ email: 'admin@GetGas.app' });
-  if (!existing) {
+  let existingAdmin = await Admin.findOne({ $or: [{ email: 'admin@GetGas.app' }, { phone: '+233000000000' }] });
+  if (!existingAdmin) {
     const passwordHash = await bcrypt.hash('Admin@GetGas2025!', 12);
     await Admin.create({
       name: 'Super Admin',
@@ -33,21 +35,41 @@ async function seed() {
     console.log('ℹ️  Admin already exists');
   }
 
-  // Create sample station owner
+  // Create phone-based admin
+  let phoneAdmin = await Admin.findOne({ phone: '+233100000001' });
+  if (!phoneAdmin) {
+    phoneAdmin = await Admin.create({
+      name: 'Phone Admin',
+      phone: '+233100000001',
+      email: 'admin-phone@GetGas.app',
+      passwordHash: 'Admin@123',
+      role: 'super_admin',
+      isActive: true,
+    });
+    console.log('✅ Phone admin created: +233100000001 / Admin@123');
+  } else {
+    console.log('ℹ️  Phone admin already exists');
+  }
+
   let owner = await User.findOne({ phone: '+233200000001' });
   if (!owner) {
     owner = await User.create({
       name: 'Kwame Station Owner',
       phone: '+233200000001',
       isVerified: true,
+      passwordHash: 'Station@123', // Let pre-save hook hash it
     });
-    console.log('✅ Sample station owner created');
+    console.log('✅ Sample station owner created: +233200000001 / Station@123');
+  } else if (!owner.passwordHash) {
+    owner.passwordHash = 'Station@123'; // Let pre-save hook hash it
+    await owner.save();
+    console.log('✅ Password added to existing station owner');
   }
 
   // Create sample stations
   const stationData = [
     {
-      name: 'Accra Central LPG',
+      name: 'Apex Gas',
       address: '12 Liberation Road, Accra',
       city: 'Accra',
       lat: 5.6037, lng: -0.1870,
@@ -212,10 +234,11 @@ async function seed() {
   ];
 
   let created = 0;
+  const stationMap: { [key: string]: any } = {};
   for (const s of stationData) {
-    const exists = await Station.findOne({ name: s.name });
-    if (!exists) {
-      await Station.create({
+    let station = await Station.findOne({ name: s.name });
+    if (!station) {
+      station = await Station.create({
         ownerId: owner._id,
         name: s.name,
         address: s.address,
@@ -240,9 +263,154 @@ async function seed() {
       });
       created++;
     }
+    stationMap[s.name] = station;
   }
   console.log(`✅ ${created} station(s) created (${stationData.length - created} already existed)`);
 
+  // Create sample riders
+  const riderData = [
+    { name: 'Kofi Mensah', phone: '+233501234567', vehicleType: 'motorbike', vehiclePlate: 'GE-1234-21' },
+    { name: 'Ama Boateng', phone: '+233502345678', vehicleType: 'tricycle', vehiclePlate: 'GE-5678-21' },
+    { name: 'Yaw Asante', phone: '+233503456789', vehicleType: 'van', vehiclePlate: 'GE-9012-21' },
+    { name: 'Abena Owusu', phone: '+233504567890', vehicleType: 'motorbike', vehiclePlate: 'GE-3456-21' },
+    { name: 'Kwesi Appiah', phone: '+233505678901', vehicleType: 'tricycle', vehiclePlate: 'GE-7890-21' },
+  ];
+
+  const riderMap: { [key: string]: any } = {};
+  for (const r of riderData) {
+    let rider = await Rider.findOne({ phone: r.phone });
+    if (!rider) {
+      rider = await Rider.create({
+        name: r.name,
+        phone: r.phone,
+        passwordHash: 'Rider@123',
+        nationalId: 'GHA-' + Math.random().toString(36).substring(7).toUpperCase(),
+        vehicleType: r.vehicleType,
+        vehiclePlate: r.vehiclePlate,
+        kycStatus: 'approved',
+        status: 'available',
+        location: { lat: 5.6037, lng: -0.1870, updatedAt: new Date() },
+        totalTrips: Math.floor(Math.random() * 100) + 10,
+        ratingAvg: Math.random() * 1.5 + 3.5,
+        totalRatings: Math.floor(Math.random() * 50) + 5,
+        totalEarnings: Math.random() * 5000 + 500,
+        isActive: true,
+      });
+    }
+    riderMap[r.phone] = rider;
+  }
+  console.log(`✅ ${Object.keys(riderMap).length} rider(s) created/found`);
+
+  // Create sample users
+  const userData = [
+    { name: 'John Doe', phone: '+233501111111' },
+    { name: 'Jane Smith', phone: '+233502222222' },
+    { name: 'Michael Brown', phone: '+233503333333' },
+    { name: 'Sarah Johnson', phone: '+233504444444' },
+    { name: 'David Wilson', phone: '+233505555555' },
+  ];
+
+  const userMap: { [key: string]: any } = {};
+  for (const u of userData) {
+    let user = await User.findOne({ phone: u.phone });
+    if (!user) {
+      user = await User.create({
+        name: u.name,
+        phone: u.phone,
+        isVerified: true,
+        passwordHash: 'User@123',
+      });
+    }
+    userMap[u.phone] = user;
+  }
+  console.log(`✅ ${Object.keys(userMap).length} user(s) created/found`);
+
+  // Create sample orders for Apex Gas station
+  const apexGasStation = stationMap['Apex Gas'];
+  const orderStatuses = ['pending', 'accepted', 'at_station', 'en_route', 'delivered', 'cancelled'];
+  const orderTypes = ['fill', 'delivery', 'exchange'];
+  const paymentMethods = ['mobile_money', 'card', 'cash'];
+
+  let ordersCreated = 0;
+  const riderPhones = Object.keys(riderMap);
+  const userPhones = Object.keys(userMap);
+
+  for (let i = 0; i < 15; i++) {
+    const status = orderStatuses[i % orderStatuses.length];
+    const orderType = orderTypes[i % orderTypes.length];
+    const paymentMethod = paymentMethods[i % paymentMethods.length];
+    const userId = userMap[userPhones[i % userPhones.length]]._id;
+    const riderId = status !== 'pending' && status !== 'cancelled' ? riderMap[riderPhones[i % riderPhones.length]]._id : undefined;
+
+    const cylinders = [
+      { size: 6, quantity: 1, unitPrice: 85, subtotal: 85 },
+    ];
+    const cylinderSubtotal = 85;
+    const deliveryFee = 5;
+    const totalAmount = cylinderSubtotal + deliveryFee;
+    const commissionPct = 10;
+    const commissionAmount = totalAmount * (commissionPct / 100);
+    const stationPayout = totalAmount - commissionAmount;
+
+    const createdAt = new Date();
+    createdAt.setHours(createdAt.getHours() - (i * 2)); // Spread orders over time
+
+    const order = await Order.create({
+      userId,
+      stationId: apexGasStation._id,
+      riderId,
+      cylinders,
+      orderType,
+      cylinderSubtotal,
+      deliveryFee,
+      totalAmount,
+      commissionPct,
+      commissionAmount,
+      stationPayout,
+      surgeMultiplier: 1,
+      loyaltyPointsEarned: Math.floor(totalAmount / 10),
+      loyaltyPointsRedeemed: 0,
+      loyaltyDiscount: 0,
+      status,
+      statusHistory: [
+        {
+          status: 'pending',
+          triggeredBy: 'user',
+          timestamp: createdAt,
+        },
+        ...(status !== 'pending' ? [{
+          status,
+          triggeredBy: status === 'cancelled' ? 'user' : 'station',
+          timestamp: new Date(createdAt.getTime() + 10 * 60000),
+        }] : []),
+      ],
+      deliveryAddress: {
+        street: `${100 + i} Main Street`,
+        city: 'Accra',
+        lat: 5.6037 + (Math.random() - 0.5) * 0.05,
+        lng: -0.1870 + (Math.random() - 0.5) * 0.05,
+      },
+      otpCode: String(Math.floor(Math.random() * 10000)).padStart(4, '0'),
+      otpExpiresAt: new Date(Date.now() + 10 * 60000),
+      otpAttempts: 0,
+      otpVerifiedAt: status !== 'pending' ? new Date(createdAt.getTime() + 5 * 60000) : undefined,
+      paymentMethod,
+      paymentStatus: status === 'delivered' ? 'captured' : 'pending',
+      isScheduled: false,
+      notes: i % 3 === 0 ? 'Please ring the bell twice' : undefined,
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    ordersCreated++;
+  }
+
+  console.log(`✅ ${ordersCreated} sample orders created for "Apex Gas"`);
+
+  console.log('\n📝 To add new cylinder sizes to a station:');
+  console.log('   PATCH /api/v1/stations/{stationId}/prices');
+  console.log('   Body: { "size": 5, "fillPrice": 60, "exchangePrice": 50 }');
+  console.log('   Supported sizes: 3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48');
   console.log('\n🎉 Seed complete!');
   process.exit(0);
 }

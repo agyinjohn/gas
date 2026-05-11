@@ -5,7 +5,9 @@ import { io, Socket } from 'socket.io-client';
 let socketInstance: Socket | null = null;
 
 export function getSocket(): Socket {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('gasgo_token') : null;
+  if (typeof window === 'undefined') throw new Error('getSocket called on server');
+
+  const token = localStorage.getItem('gasgo_token');
 
   // If socket exists but was created without a token (unauthenticated), destroy and recreate
   if (socketInstance) {

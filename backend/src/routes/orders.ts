@@ -96,7 +96,7 @@ router.post(
   [
     body('stationId').isMongoId(),
     body('cylinders').isArray({ min: 1 }).withMessage('At least one cylinder required'),
-    body('cylinders.*.size').isIn([3, 6, 12]),
+    body('cylinders.*.size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]),
     body('cylinders.*.quantity').isInt({ min: 1, max: 20 }),
     body('orderType').isIn(['delivery', 'exchange']),
     body('deliveryAddress.street').trim().notEmpty(),

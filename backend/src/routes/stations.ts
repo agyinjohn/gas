@@ -60,7 +60,7 @@ router.get('/pricing', async (_req: Request, res: Response) => {
  *         schema: { type: number, default: 10 }
  *       - in: query
  *         name: size
- *         schema: { type: integer, enum: [3, 6, 12] }
+ *         schema: { type: integer, enum: [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48] }
  *     responses:
  *       200:
  *         description: List of nearby stations sorted by distance
@@ -71,7 +71,7 @@ router.get(
     query('lat').isFloat({ min: -90, max: 90 }),
     query('lng').isFloat({ min: -180, max: 180 }),
     query('radius').optional().isFloat({ min: 1, max: 25 }),
-    query('size').optional().isIn(['3', '6', '12']),
+    query('size').optional().isIn(['3', '4', '5', '6', '9', '11', '12', '14', '15', '18', '19', '20', '30', '47', '48']),
   ],
   async (req: Request, res: Response) => {
     if (ve(req, res)) return;
@@ -235,7 +235,7 @@ router.post(
  * /api/v1/stations/{id}/prices:
  *   patch:
  *     tags: [Stations]
- *     summary: Update cylinder prices for a size
+ *     summary: Update cylinder prices for a size (supports custom sizes)
  *     parameters:
  *       - in: path
  *         name: id
@@ -249,7 +249,7 @@ router.post(
  *             type: object
  *             required: [size, fillPrice, exchangePrice]
  *             properties:
- *               size:          { type: integer, enum: [3, 6, 12] }
+ *               size:          { type: integer, minimum: 1 }
  *               fillPrice:     { type: number }
  *               exchangePrice: { type: number }
  *     responses:
@@ -261,7 +261,7 @@ router.post(
 router.patch(
   '/:id/prices',
   [
-    body('size').isIn([3, 6, 12]),
+    body('size').isInt({ min: 1 }),
     body('fillPrice').isFloat({ min: 0 }),
     body('exchangePrice').isFloat({ min: 0 }),
   ],
@@ -277,10 +277,17 @@ router.patch(
       return res.status(400).json({ success: false, message: 'Exchange price must be ≤ fill price' });
     }
 
-    const listing = station.cylinderListings.find((l) => l.size === size);
-    if (!listing) return res.status(404).json({ success: false, message: 'Cylinder listing not found' });
+    let listing = station.cylinderListings.find((l) => l.size === size);
+    if (!listing) {
+      station.cylinderListings.push({
+        size, brand: 'LPG', fillType: 'LPG', fillPrice, exchangePrice,
+        stockCount: 0, needsRefillCount: 0, lowStockThreshold: 5,
+        isPaused: false, isAvailable: false,
+      });
+      await station.save();
+      return res.json({ success: true, listing: station.cylinderListings.find((l) => l.size === size) });
+    }
 
-    // Log price change
     station.priceChangeLog.push({
       size,
       oldFillPrice: listing.fillPrice,
@@ -317,7 +324,7 @@ router.patch(
  *             type: object
  *             required: [size]
  *             properties:
- *               size:              { type: integer, enum: [3, 6, 12] }
+ *               size:              { type: integer, enum: [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48] }
  *               stockCount:        { type: integer, minimum: 0 }
  *               isPaused:          { type: boolean }
  *               lowStockThreshold: { type: integer, minimum: 0 }
@@ -328,7 +335,7 @@ router.patch(
 router.patch(
   '/:id/inventory',
   [
-    body('size').isIn([3, 6, 12]),
+    body('size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]),
     body('stockCount').optional().isInt({ min: 0 }),
     body('isPaused').optional().isBoolean(),
     body('lowStockThreshold').optional().isInt({ min: 0 }),
@@ -374,7 +381,7 @@ router.patch(
  *             type: object
  *             required: [size]
  *             properties:
- *               size:     { type: integer, enum: [3, 6, 12] }
+ *               size:     { type: integer, enum: [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48] }
  *               quantity: { type: integer, minimum: 1, default: 1 }
  *     responses:
  *       200:
@@ -382,7 +389,7 @@ router.patch(
  */
 router.post(
   '/:id/exchange-returns',
-  [body('size').isIn([3, 6, 12]), body('quantity').optional().isInt({ min: 1 })],
+  [body('size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]), body('quantity').optional().isInt({ min: 1 })],
   async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
 
@@ -419,7 +426,7 @@ router.post(
  *             type: object
  *             required: [size]
  *             properties:
- *               size:     { type: integer, enum: [3, 6, 12] }
+ *               size:     { type: integer, enum: [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48] }
  *               quantity: { type: integer, minimum: 1 }
  *     responses:
  *       200:
@@ -427,7 +434,7 @@ router.post(
  */
 router.patch(
   '/:id/refill-complete',
-  [body('size').isIn([3, 6, 12]), body('quantity').optional().isInt({ min: 1 })],
+  [body('size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]), body('quantity').optional().isInt({ min: 1 })],
   async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
 

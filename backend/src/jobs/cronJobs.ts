@@ -8,9 +8,9 @@ import { sendSMS, sendPushNotification } from '../services/notificationService';
  * Excludes scheduled orders.
  */
 export function startOrderCleanupJob(): void {
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('*/30 * * * * *', async () => {
     try {
-      const cutoff = new Date(Date.now() - 15 * 60 * 1000);
+      const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours
       const stale = await Order.find({
         status: 'pending',
         isScheduled: { $ne: true },
@@ -20,7 +20,7 @@ export function startOrderCleanupJob(): void {
       for (const order of stale) {
         order.status = 'cancelled';
         order.cancelledBy = 'system';
-        order.cancellationReason = 'No rider available within 15 minutes';
+        order.cancellationReason = 'No rider available within 2 hours';
         order.statusHistory.push({
           status: 'cancelled',
           triggeredBy: 'system',
@@ -57,21 +57,21 @@ export function startOrderCleanupJob(): void {
           await order.save();
         }
 
-        console.log(`[Cron] Auto-cancelled order ${order._id}`);
+        // console.log(`[Cron] Auto-cancelled order ${order._id}`);
       }
     } catch (err) {
       console.error('[Cron] Order cleanup error:', err);
     }
   });
 
-  console.log('⏰ Order cleanup cron started (every 5 min)');
+  // console.log('⏰ Order cleanup cron started (every 30s)');
 }
 
 /**
  * Check stations for low stock and send alerts — runs every hour.
  */
 export function startLowStockAlertJob(): void {
-  cron.schedule('0 * * * *', async () => {
+  cron.schedule('*/30 * * * * *', async () => {
     try {
       const stations = await Station.find({ status: 'active' });
       for (const station of stations) {
@@ -85,9 +85,9 @@ export function startLowStockAlertJob(): void {
                 data: { screen: 'inventory', size: String(listing.size) },
               });
             }
-            console.log(
-              `[Cron] Low stock alert: Station ${station.name}, ${listing.size}kg = ${listing.stockCount}`
-            );
+            // console.log(
+            //   `[Cron] Low stock alert: Station ${station.name}, ${listing.size}kg = ${listing.stockCount}`
+            // );
           }
         }
       }
@@ -96,14 +96,14 @@ export function startLowStockAlertJob(): void {
     }
   });
 
-  console.log('⏰ Low stock alert cron started (every hour)');
+  // console.log('⏰ Low stock alert cron started (every 30s)');
 }
 
 /**
  * Pick up scheduled orders that are due and dispatch them — runs every minute.
  */
 export function startScheduledDispatchJob(): void {
-  cron.schedule('* * * * *', async () => {
+  cron.schedule('*/30 * * * * *', async () => {
     try {
       const now = new Date();
       // Find scheduled orders whose time has come (within the next 2 minutes window)
@@ -138,18 +138,78 @@ export function startScheduledDispatchJob(): void {
           });
         }
 
-        console.log(`[Cron] Dispatched scheduled order ${order._id}`);
+        // console.log(`[Cron] Dispatched scheduled order ${order._id}`);
       }
     } catch (err) {
       console.error('[Cron] Scheduled dispatch error:', err);
     }
   });
 
-  console.log('⏰ Scheduled dispatch cron started (every minute)');
+  // console.log('⏰ Scheduled dispatch cron started (every 30s)');
+}
+
+/**
+ * Retry dispatch for pending orders that exhausted MAX_DISPATCH_ATTEMPTS.
+ * Resets dispatchAttempts so the full rider pool is tried again — runs every 2 minutes.
+ */
+export function startUnassignedOrdersRetryJob(): void {
+  cron.schedule('*/30 * * * * *', async () => {
+    try {
+      const { CONSTANTS } = await import('../config/constants');
+      const { dispatchOrder } = await import('../services/dispatchService');
+
+      // Always log available riders and pending orders for visibility
+      const { Rider } = await import('../models/Rider');
+      const availableRiders = await Rider.find({ status: 'available', kycStatus: 'approved' })
+        .select('name phone status location')
+        .lean();
+      // console.log(`[Cron:Retry] Available riders (${availableRiders.length}):`);
+      // availableRiders.forEach((r: any) => {
+      //   const loc = r.location
+      //     ? `lat=${r.location.lat}, lng=${r.location.lng}, updated=${r.location.updatedAt}`
+      //     : 'NO LOCATION';
+      //   console.log(`  → ${r.name} (${r.phone}) | ${loc}`);
+      // });
+
+      const allPending = await Order.find({ status: 'pending', isScheduled: { $ne: true } }).select('_id dispatchAttempts').lean();
+      // console.log(`[Cron:Retry] Pending unassigned orders (${allPending.length}):`);
+      // allPending.forEach((o: any) => {
+      //   console.log(`  → Order ${o._id} | attempts: ${o.dispatchAttempts?.length ?? 0}`);
+      // });
+
+      const stuckOrders = await Order.find({
+        status: 'pending',
+        isScheduled: { $ne: true },
+        [`dispatchAttempts.${CONSTANTS.MAX_DISPATCH_ATTEMPTS - 1}`]: { $exists: true },
+      }).select('_id dispatchAttempts statusHistory');
+
+      if (stuckOrders.length === 0) return;
+
+      // console.log(`[Cron:Retry] Retrying dispatch for ${stuckOrders.length} stuck order(s)`);
+
+      for (const order of stuckOrders) {
+        order.dispatchAttempts = [];
+        order.statusHistory.push({
+          status: 'pending',
+          triggeredBy: 'system',
+          timestamp: new Date(),
+          note: 'Dispatch attempts reset — retrying rider assignment',
+        });
+        await order.save();
+        dispatchOrder(order._id.toString()).catch(console.error);
+        // console.log(`[Cron] Re-queued order ${order._id}`);
+      }
+    } catch (err) {
+      console.error('[Cron] Unassigned orders retry error:', err);
+    }
+  });
+
+  // console.log('⏰ Unassigned orders retry cron started (every 30s)');
 }
 
 export function startAllJobs(): void {
   startOrderCleanupJob();
   startLowStockAlertJob();
   startScheduledDispatchJob();
+  startUnassignedOrdersRetryJob();
 }

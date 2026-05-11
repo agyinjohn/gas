@@ -57,10 +57,30 @@ export const ORDER_TYPE_LABELS: Record<string, string> = {
 
 // ─── Cylinder helpers ─────────────────────────────────────────────────────────
 
+export const CYLINDER_SIZES = [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48];
+
 export const CYLINDER_LABELS: Record<number, string> = {
-  3:  '3kg — Small Home',
+  3:  '3kg — Portable / Camping',
+  4:  '4kg — Portable / BBQ',
+  5:  '5kg — Small Home',
   6:  '6kg — Standard Home',
-  12: '12kg — Large / Commercial',
+  9:  '9kg — Medium Home',
+  11: '11kg — Domestic Cooking',
+  12: '12kg — Domestic Cooking',
+  14: '14kg — Domestic / Semi-commercial',
+  15: '15kg — Domestic / Semi-commercial',
+  18: '18kg — Commercial',
+  19: '19kg — Commercial',
+  20: '20kg — Commercial',
+  30: '30kg — Large Commercial',
+  47: '47kg — Industrial',
+  48: '48kg — Industrial',
+};
+
+export const CYLINDER_CATEGORY: Record<number, string> = {
+  3: 'Small', 4: 'Small', 5: 'Small', 6: 'Small', 9: 'Small',
+  11: 'Medium', 12: 'Medium', 14: 'Medium', 15: 'Medium',
+  18: 'Large', 19: 'Large', 20: 'Large', 30: 'Large', 47: 'Large', 48: 'Large',
 };
 
 /** Format cylinder line items as a readable string e.g. "1×3kg, 2×6kg" */

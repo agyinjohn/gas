@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, Info } from 'lucide-react';
+import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -20,6 +20,7 @@ export default function PaymentPage() {
   const deliveryCity   = params.get('deliveryCity') ?? '';
   const deliveryLat    = parseFloat(params.get('deliveryLat') ?? '0');
   const deliveryLng    = parseFloat(params.get('deliveryLng') ?? '0');
+  const deliveryLabel  = params.get('deliveryLabel') ?? '';
   // Cart items and totals
   const cartItemsRaw = params.get('cartItems') ?? '[]';
   const cartItems: Array<{ size: number; quantity: number }> = JSON.parse(cartItemsRaw);
@@ -45,7 +46,7 @@ export default function PaymentPage() {
         stationId,
         cylinders: cartItems.map(({ size, quantity }) => ({ size, quantity })),
         orderType: 'delivery',
-        deliveryAddress: { street: deliveryStreet, city: deliveryCity, lat: deliveryLat, lng: deliveryLng },
+        deliveryAddress: { street: deliveryStreet, city: deliveryCity || deliveryStreet || deliveryLabel, lat: deliveryLat, lng: deliveryLng },
         paymentMethod: method,
         paymentProvider: method === 'mobile_money' ? provider : undefined,
         ...(method === 'mobile_money' ? { momoNumber: `+233${momoNumber.replace(/^0/, '')}` } : {}),
@@ -64,14 +65,20 @@ export default function PaymentPage() {
         }
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to place order');
+      const errors = err.response?.data?.errors;
+      if (errors?.length) {
+        console.error('[Order] Validation errors:', JSON.stringify(errors, null, 2));
+        toast.error(errors[0]?.msg || 'Validation failed');
+      } else {
+        toast.error(err.response?.data?.message || 'Failed to place order');
+      }
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-full bg-[var(--bg)] pb-32">
+    <div className="min-h-full bg-[var(--bg)] pb-24 lg:pb-32">
       {/* Header */}
       <div className="bg-[var(--bg-card)] border-b border-[var(--border)] px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={() => router.back()} className="w-9 h-9 rounded-full bg-[var(--bg-card2)] flex items-center justify-center">
@@ -80,7 +87,7 @@ export default function PaymentPage() {
         <h1 className="text-base font-bold text-[var(--text-primary)]">Payment</h1>
       </div>
 
-      <div className="px-4 py-8 max-w-lg mx-auto space-y-6">
+      <div className="px-4 py-8 max-w-lg mx-auto space-y-6 pb-8">
 
         {/* Total amount hero */}
         <div className="text-center">
@@ -164,28 +171,19 @@ export default function PaymentPage() {
           </button>
         </div>
 
-        {/* Info box */}
-        {method === 'mobile_money' && (
-          <div className="flex items-start gap-3 bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4">
-            <div className="w-8 h-8 bg-brand-500/10 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-              <Info className="w-4 h-4 text-brand-500" />
-            </div>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Tap "Confirm &amp; Pay" below. A prompt will appear on your phone. Enter your 4 digit pin to approve the transaction of {grandTotal.toFixed(2)}
-            </p>
-          </div>
-        )}
       </div>
 
       {/* CTA */}
-      <div className="fixed bottom-0 inset-x-0 bg-[var(--bg-card)] border-t border-[var(--border)] px-4 py-4 z-20">
-        <button onClick={handleConfirm} disabled={loading}
-          className="w-full h-14 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white rounded-2xl font-bold text-base flex items-center justify-center gap-2 transition-colors">
-          {loading
-            ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            : <><span>Confirm &amp; Pay</span><CheckCircle2 className="w-5 h-5" /></>
-          }
-        </button>
+      <div className="fixed bottom-0 inset-x-0 px-4 py-6 z-20">
+        <div className="max-w-lg mx-auto">
+          <button onClick={handleConfirm} disabled={loading}
+            className="w-full h-14 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white rounded-2xl font-bold text-base flex items-center justify-center gap-2 transition-colors">
+            {loading
+              ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <><span>Confirm &amp; Pay</span><CheckCircle2 className="w-5 h-5" /></>
+            }
+          </button>
+        </div>
       </div>
     </div>
   );

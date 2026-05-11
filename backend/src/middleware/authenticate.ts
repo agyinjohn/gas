@@ -5,6 +5,7 @@ export interface JWTPayload {
   id: string;
   role: 'user' | 'rider' | 'station' | 'admin';
   phone: string;
+  stationId?: string;
   iat: number;
   exp: number;
 }

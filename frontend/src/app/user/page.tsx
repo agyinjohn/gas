@@ -16,7 +16,7 @@ import type { PickedLocation } from '@/components/LocationPicker';
 
 const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
 
-const QUICK_SIZES = [3, 6, 12];
+const QUICK_SIZES = [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48];
 
 interface Listing {
   size: number;
@@ -301,7 +301,7 @@ export default function UserHomePage() {
         </div>
       </div>
 
-      <div className="px-4 space-y-6 pb-8">
+      <div className="px-4 space-y-6 pb-24 lg:pb-8">
 
         {/* ── Active Order Banner ── */}
         {activeOrder && (

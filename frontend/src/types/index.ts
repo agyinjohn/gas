@@ -1,4 +1,4 @@
-export type CylinderSize = 3 | 6 | 12;
+export type CylinderSize = 3 | 4 | 5 | 6 | 9 | 11 | 12 | 14 | 15 | 18 | 19 | 20 | 30 | 47 | 48;
 export type OrderType = 'delivery' | 'exchange';
 export type OrderStatus =
   | 'scheduled'

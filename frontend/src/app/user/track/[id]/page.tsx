@@ -1,8 +1,8 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Phone, MessageCircle, Headphones, ArrowLeft, Loader2, Flame, ClipboardList, Store, Bike, CheckCircle2 } from 'lucide-react';
+import { Phone, MessageCircle, Headphones, Loader2, Flame, ClipboardList, Store, Bike, CheckCircle2 } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
 import { getSocket } from '@/hooks/useSocket';
 import { formatCurrency } from '@/lib/utils';
@@ -33,14 +33,34 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
   deliveryLng?: number;
   className?: string;
 }) {
-  const mapDivRef = useRef<HTMLDivElement>(null);
-  const mapRef    = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.Marker | null>(null);
+  const mapDivRef    = useRef<HTMLDivElement>(null);
+  const mapRef       = useRef<google.maps.Map | null>(null);
+  const riderMarker  = useRef<google.maps.Marker | null>(null);
+  const destMarker   = useRef<google.maps.Marker | null>(null);
+  const animFrameRef = useRef<number | null>(null);
   const [ready, setReady] = useState(false);
 
+  // Smoothly animate marker from current position to target
+  function animateMarker(marker: google.maps.Marker, target: { lat: number; lng: number }) {
+    const start = marker.getPosition();
+    if (!start) { marker.setPosition(target); return; }
+    const startLat = start.lat(), startLng = start.lng();
+    const deltaLat = target.lat - startLat, deltaLng = target.lng - startLng;
+    const duration = 1500; // ms
+    const startTime = performance.now();
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    function step(now: number) {
+      const t = Math.min((now - startTime) / duration, 1);
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease-in-out
+      marker.setPosition({ lat: startLat + deltaLat * ease, lng: startLng + deltaLng * ease });
+      if (t < 1) animFrameRef.current = requestAnimationFrame(step);
+    }
+    animFrameRef.current = requestAnimationFrame(step);
+  }
+
   const initMap = useCallback(() => {
-    if (!mapDivRef.current) return;
-    const center = riderLocation ?? (deliveryLat && deliveryLng ? { lat: deliveryLat, lng: deliveryLng } : ACCRA);
+    if (!mapDivRef.current || mapRef.current) return;
+    const center = deliveryLat && deliveryLng ? { lat: deliveryLat, lng: deliveryLng } : ACCRA;
     mapRef.current = new google.maps.Map(mapDivRef.current, {
       center, zoom: 15,
       disableDefaultUI: true,
@@ -56,15 +76,39 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
         { featureType: 'poi', stylers: [{ visibility: 'off' }] },
       ],
     });
-    if (center !== ACCRA) {
-      markerRef.current = new google.maps.Marker({
-        position: center,
+
+    // Delivery destination marker (pin)
+    if (deliveryLat && deliveryLng) {
+      destMarker.current = new google.maps.Marker({
+        position: { lat: deliveryLat, lng: deliveryLng },
         map: mapRef.current,
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#E87722', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+        icon: {
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          scale: 6, fillColor: '#ffffff', fillOpacity: 1,
+          strokeColor: '#E87722', strokeWeight: 2,
+        },
+        title: 'Delivery location',
+        zIndex: 1,
       });
     }
+
+    // Rider marker (bike icon using SVG)
+    if (riderLocation) {
+      riderMarker.current = new google.maps.Marker({
+        position: riderLocation,
+        map: mapRef.current,
+        icon: {
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#E87722"/><text x="12" y="16" text-anchor="middle" font-size="13" fill="white">🛵</text></svg>')}`,
+          scaledSize: new google.maps.Size(36, 36),
+          anchor: new google.maps.Point(18, 18),
+        },
+        title: 'Rider',
+        zIndex: 2,
+      });
+    }
+
     setReady(true);
-  }, [riderLocation, deliveryLat, deliveryLng]);
+  }, [deliveryLat, deliveryLng]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -78,14 +122,24 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
     document.head.appendChild(script);
   }, [initMap]);
 
+  // Animate rider marker on location update
   useEffect(() => {
     if (!mapRef.current || !riderLocation) return;
-    markerRef.current?.setMap(null);
-    markerRef.current = new google.maps.Marker({
-      position: riderLocation,
-      map: mapRef.current,
-      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#E87722', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
-    });
+    if (!riderMarker.current) {
+      riderMarker.current = new google.maps.Marker({
+        position: riderLocation,
+        map: mapRef.current,
+        icon: {
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#E87722"/><text x="12" y="16" text-anchor="middle" font-size="13" fill="white">🛵</text></svg>')}`,
+          scaledSize: new google.maps.Size(36, 36),
+          anchor: new google.maps.Point(18, 18),
+        },
+        title: 'Rider',
+        zIndex: 2,
+      });
+    } else {
+      animateMarker(riderMarker.current, riderLocation);
+    }
     mapRef.current.panTo(riderLocation);
   }, [riderLocation]);
 
@@ -204,7 +258,6 @@ function TrackContent({ order, riderLocation }: { order: any; riderLocation: { l
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function TrackOrderPage() {
   const { id }   = useParams<{ id: string }>();
-  const router   = useRouter();
   const queryClient = useQueryClient();
   const { isLoading: authLoading } = useAuth();
   const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -220,15 +273,13 @@ export default function TrackOrderPage() {
   useEffect(() => {
     if (!order || !['accepted', 'at_station', 'en_route'].includes(order.status)) return;
 
-    // Seed initial rider location from order data if available
-    const riderObj = typeof order.riderId === 'object' ? order.riderId : null;
-    if (riderObj?.location?.lat && riderObj?.location?.lng && !riderLocation) {
-      setRiderLocation({ lat: riderObj.location.lat, lng: riderObj.location.lng });
-    }
-
+    // Seed initial rider location from socket only — skip stale DB location
     const socket = getSocket();
     socket.emit('join:order', id);
-    socket.on('rider:location:update', (loc: { lat: number; lng: number }) => setRiderLocation(loc));
+    socket.on('rider:location:update', (loc: { lat: number; lng: number }) => {
+      // console.log('[Track] Rider location update:', loc);
+      setRiderLocation(loc);
+    });
     socket.on('order:status:update', () => queryClient.invalidateQueries({ queryKey: ['order', id] }));
     return () => {
       socket.off('rider:location:update');
@@ -258,14 +309,7 @@ export default function TrackOrderPage() {
             className="w-full h-full"
           />
           {/* Header overlay */}
-          <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 pt-12 pb-4 bg-gradient-to-b from-black/40 to-transparent">
-            <div className="flex items-center gap-3">
-              <button onClick={() => router.back()}
-                className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                <ArrowLeft className="w-5 h-5 text-white" />
-              </button>
-              <h1 className="text-lg font-bold text-white">Live Tracking</h1>
-            </div>
+          <div className="absolute top-0 inset-x-0 flex items-center justify-end px-4 pt-12 pb-4 bg-gradient-to-b from-black/40 to-transparent">
             <button className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
               <Headphones className="w-5 h-5 text-white" />
             </button>
@@ -291,14 +335,7 @@ export default function TrackOrderPage() {
             className="absolute inset-0"
           />
           {/* Header overlay */}
-          <div className="absolute top-0 inset-x-0 flex items-center justify-between px-6 pt-6 pb-4 bg-gradient-to-b from-black/50 to-transparent">
-            <div className="flex items-center gap-3">
-              <button onClick={() => router.back()}
-                className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                <ArrowLeft className="w-5 h-5 text-white" />
-              </button>
-              <h1 className="text-lg font-bold text-white">Live Tracking</h1>
-            </div>
+          <div className="absolute top-0 inset-x-0 flex items-center justify-end px-6 pt-6 pb-4 bg-gradient-to-b from-black/50 to-transparent">
             <button className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
               <Headphones className="w-5 h-5 text-white" />
             </button>

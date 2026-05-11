@@ -1,12 +1,14 @@
 'use client';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import axios from 'axios';
 
 interface AuthUser {
   id: string;
   name: string;
   phone: string;
   role: 'user' | 'rider' | 'station' | 'admin';
+  stationId?: string;
 }
 
 interface AuthContextValue {
@@ -26,7 +28,6 @@ const ROLE_HOME: Record<string, string> = {
   admin:   '/admin',
 };
 
-// Routes each role is allowed to access (prefix match)
 const ROLE_ALLOWED: Record<string, string[]> = {
   user:    ['/user'],
   rider:   ['/rider'],
@@ -34,52 +35,83 @@ const ROLE_ALLOWED: Record<string, string[]> = {
   admin:   ['/admin'],
 };
 
+const ME_ENDPOINTS: Record<string, string> = {
+  user:    '/api/v1/users/me',
+  rider:   '/api/v1/riders/me',
+  station: '/api/v1/users/me',
+  admin:   '/api/v1/admin/metrics',
+};
+
+function clearStorage() {
+  localStorage.removeItem('gasgo_token');
+  localStorage.removeItem('gasgo_user');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser]       = useState<AuthUser | null>(null);
-  const [token, setToken]     = useState<string | null>(null);
+  const [user, setUser]           = useState<AuthUser | null>(null);
+  const [token, setToken]         = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router   = useRouter();
   const pathname = usePathname();
 
-  // Rehydrate from localStorage on mount
   useEffect(() => {
     const storedToken = localStorage.getItem('gasgo_token');
     const storedUser  = localStorage.getItem('gasgo_user');
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem('gasgo_token');
-        localStorage.removeItem('gasgo_user');
-      }
+
+    if (!storedToken || !storedUser) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+
+    let parsed: AuthUser | null = null;
+    try {
+      parsed = JSON.parse(storedUser);
+    } catch {
+      clearStorage();
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate token against backend before trusting it
+    const endpoint = ME_ENDPOINTS[parsed!.role];
+    const baseURL  = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+    axios.get(`${baseURL}${endpoint}`, {
+      headers: { Authorization: `Bearer ${storedToken}` },
+    }).then(() => {
+      setToken(storedToken);
+      setUser(parsed);
+    }).catch(() => {
+      // Token invalid or expired — clear everything and force re-login
+      clearStorage();
+    }).finally(() => {
+      setIsLoading(false);
+    });
   }, []);
 
-  // Guard: once loading is done, enforce route access
+  // Guard: enforce route access once loading is done
   useEffect(() => {
     if (isLoading) return;
 
-    const isRoot = pathname === '/';
+    const isRoot         = pathname === '/';
     const isRiderRegister = pathname === '/rider/register';
-    const isRiderLogin = pathname === '/rider/login';
-    const isAdminLogin = pathname === '/admin/login';
-    const isPublic = isRoot || isRiderRegister || isRiderLogin || isAdminLogin;
+    const isRiderLogin   = pathname === '/rider/login';
+    const isAdminLogin   = pathname === '/admin/login';
+    const isStationLogin = pathname === '/station/login';
+    const isStaffLogin   = pathname === '/staff/login';
+    const isPublic       = isRoot || isRiderRegister || isRiderLogin || isAdminLogin || isStationLogin || isStaffLogin;
 
     if (!user) {
       if (!isPublic) router.replace('/');
       return;
     }
 
-    // Logged in on a public/login page → redirect to their portal
     if (isPublic) {
       router.replace(ROLE_HOME[user.role] ?? '/user');
       return;
     }
 
-    // Logged in but accessing wrong portal → redirect to their own
-    const allowed = ROLE_ALLOWED[user.role] ?? [];
+    const allowed   = ROLE_ALLOWED[user.role] ?? [];
     const onAllowed = allowed.some((prefix) => pathname.startsWith(prefix));
     if (!onAllowed) router.replace(ROLE_HOME[user.role] ?? '/user');
   }, [isLoading, user, pathname]);
@@ -92,12 +124,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('gasgo_token');
-    localStorage.removeItem('gasgo_user');
+    clearStorage();
     setToken(null);
     setUser(null);
     router.replace('/');
   };
+
+  // Keep api.ts 401 interceptor in sync with context logout
+  useEffect(() => {
+    const handler = () => logout();
+    window.addEventListener('gasgo:unauthorized', handler);
+    return () => window.removeEventListener('gasgo:unauthorized', handler);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>

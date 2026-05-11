@@ -70,7 +70,7 @@ const OperatingHoursSchema = new Schema<IOperatingHours>({
 }, { _id: false });
 
 const CylinderListingSchema = new Schema<ICylinderListing>({
-  size: { type: Number, enum: [3, 6, 12], required: true },
+  size: { type: Number, required: true, min: 1 },
   brand: { type: String, required: true, trim: true },
   fillType: { type: String, default: 'LPG' },
   fillPrice: { type: Number, required: true, min: 0 },

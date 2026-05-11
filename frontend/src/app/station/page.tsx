@@ -1,51 +1,50 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Package, BarChart2, Settings, DollarSign, Clock, CheckCircle, Inbox } from 'lucide-react';
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from 'recharts';
+import { Package, DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, Inbox } from 'lucide-react';
 import { ordersApi, stationsApi } from '@/lib/api';
 import { getSocket } from '@/hooks/useSocket';
 import { Order } from '@/types';
-import { Card, StatusBadge } from '@/components/ui';
 import { formatCurrency, formatRelativeTime, ORDER_TYPE_LABELS, formatCylinders } from '@/lib/utils';
-import Link from 'next/link';
 import toast from 'react-hot-toast';
 
-const STATION_ID = typeof window !== 'undefined' ? localStorage.getItem('GetGas_station_id') || '' : '';
+function getStationId(): string {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('gasgo_token') : null;
+    if (!token) return '';
+    return JSON.parse(atob(token.split('.')[1])).stationId || '';
+  } catch { return ''; }
+}
 
-const KANBAN_COLUMNS = [
-  { key: 'pending', label: 'Incoming', icon: Inbox, color: 'text-yellow-600 bg-yellow-50' },
-  { key: 'active', label: 'Active', icon: Clock, color: 'text-blue-600 bg-blue-50' },
-  { key: 'delivered', label: 'Completed', icon: CheckCircle, color: 'text-green-600 bg-green-50' },
-];
+const STATION_ID = getStationId();
+const P = { emerald: '#10b981', orange: '#f97316', blue: '#3b82f6', violet: '#8b5cf6', rose: '#f43f5e' };
+const TT = { borderRadius: 12, border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', fontSize: 12, padding: '8px 14px', backgroundColor: 'var(--bg-card)' };
 
 export default function StationDashboardPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'orders' | 'analytics'>('orders');
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
 
   const { data: ordersData } = useQuery({
     queryKey: ['station', 'orders'],
-    queryFn: () =>
-      ordersApi.list({ stationId: STATION_ID, limit: 50 }).then((r) => r.data.orders as Order[]),
+    queryFn: () => ordersApi.list({ stationId: STATION_ID, limit: 100 }).then((r) => r.data.orders as Order[]),
     refetchInterval: 30000,
   });
 
-  const { data: analyticsData } = useQuery({
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
     queryKey: ['station', 'analytics'],
     queryFn: () => stationsApi.getAnalytics(STATION_ID).then((r) => r.data.analytics),
-    enabled: activeTab === 'analytics',
+    enabled: activeTab === 'overview',
   });
 
-  // Listen for new incoming orders via socket
   useEffect(() => {
     const socket = getSocket();
     socket.on('order:incoming', (order: any) => {
       queryClient.invalidateQueries({ queryKey: ['station', 'orders'] });
-      // Play sound + show toast
-      toast(`New order: ${order.cylinders ? formatCylinders(order.cylinders) : ''} ${order.orderType}`, {
-        icon: '🔔',
-        duration: 8000,
-      });
-      // Vibrate on mobile
+      toast(`🔔 New order: ${formatCylinders(order.cylinders)} ${order.orderType}`, { duration: 8000 });
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     });
     return () => { socket.off('order:incoming'); };
@@ -53,172 +52,206 @@ export default function StationDashboardPage() {
 
   const orders = ordersData || [];
   const pendingOrders = orders.filter((o) => o.status === 'pending');
-  const activeOrders = orders.filter((o) =>
-    ['accepted', 'at_station', 'en_route'].includes(o.status)
-  );
+  const activeOrders = orders.filter((o) => ['accepted', 'at_station', 'en_route'].includes(o.status));
   const completedOrders = orders.filter((o) => o.status === 'delivered');
 
   const analytics = analyticsData;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 pt-12 pb-4 sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Station Dashboard</h1>
-          <Link href="/station/settings">
-            <Settings className="w-5 h-5 text-gray-500" />
-          </Link>
-        </div>
-        <div className="flex gap-4 mt-3">
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`text-sm font-medium pb-1 border-b-2 transition-colors ${
-              activeTab === 'orders' ? 'border-brand-500 text-brand-600' : 'border-transparent text-gray-500'
-            }`}
-          >
-            Orders
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`text-sm font-medium pb-1 border-b-2 transition-colors ${
-              activeTab === 'analytics' ? 'border-brand-500 text-brand-600' : 'border-transparent text-gray-500'
-            }`}
-          >
-            Analytics
-          </button>
-        </div>
+    <div className="px-4 lg:px-6 py-6 max-w-6xl mx-auto pb-8">
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 bg-[var(--bg-card2)] p-1 rounded-xl w-fit">
+        {[
+          { key: 'overview', label: 'Overview' },
+          { key: 'orders', label: 'Orders' },
+        ].map(({ key, label }) => (
+          <button key={key} onClick={() => setActiveTab(key as any)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === key ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}>{label}</button>
+        ))}
       </div>
 
-      {activeTab === 'orders' ? (
-        <div className="px-4 py-4">
-          {/* Quick Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {[
-              { label: 'Incoming', count: pendingOrders.length, color: 'text-yellow-600' },
-              { label: 'Active', count: activeOrders.length, color: 'text-blue-600' },
-              { label: 'Done Today', count: completedOrders.length, color: 'text-green-600' },
-            ].map(({ label, count, color }) => (
-              <Card key={label} className="text-center py-3">
-                <p className={`text-2xl font-black ${color}`}>{count}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-              </Card>
-            ))}
+      {activeTab === 'overview' ? (
+        <div className="space-y-5">
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <KpiCard label="Today's Orders" value={analytics?.today?.count || 0} icon={Package} iconBg="bg-orange-100 dark:bg-orange-500/10" iconColor="text-orange-500" valueColor="text-orange-600 dark:text-orange-400" />
+            <KpiCard label="Today's Revenue" value={formatCurrency(analytics?.today?.revenue || 0)} icon={DollarSign} iconBg="bg-emerald-100 dark:bg-emerald-500/10" iconColor="text-emerald-500" valueColor="text-emerald-600 dark:text-emerald-400" />
+            <KpiCard label="Avg Delivery Time" value={`${Math.round(analytics?.avgDeliveryMinutes || 0)}m`} icon={Clock} iconBg="bg-blue-100 dark:bg-blue-500/10" iconColor="text-blue-500" valueColor="text-blue-600 dark:text-blue-400" />
+            <KpiCard label="This Week" value={analytics?.period?.count || 0} icon={TrendingUp} iconBg="bg-violet-100 dark:bg-violet-500/10" iconColor="text-violet-500" valueColor="text-violet-600 dark:text-violet-400" />
           </div>
 
-          {/* Kanban Columns */}
-          {KANBAN_COLUMNS.map(({ key, label, icon: Icon, color }) => {
-            const colOrders =
-              key === 'pending' ? pendingOrders
-              : key === 'active' ? activeOrders
-              : completedOrders;
+          {/* Revenue & Orders Trend */}
+          <ChartCard title="Revenue & Orders — Last 7 Days" sub="Delivered orders only">
+            {analyticsLoading || !analytics?.dailyChart ? (
+              <div className="h-56 bg-[var(--bg-card2)] rounded-lg animate-pulse" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={analytics.dailyChart} margin={{ top: 5, right: 0, left: -28, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={P.emerald} stopOpacity={0.2} />
+                      <stop offset="100%" stopColor={P.emerald} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gOrd" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={P.orange} stopOpacity={0.15} />
+                      <stop offset="100%" stopColor={P.orange} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="_id" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="r" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="o" orientation="right" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip contentStyle={TT} formatter={(v: any, name: string) => name === 'revenue' ? [`GH₵${Number(v).toFixed(0)}`, 'Revenue'] : [v, 'Orders']} />
+                  <Area yAxisId="r" type="monotone" dataKey="revenue" stroke={P.emerald} strokeWidth={2.5} fill="url(#gRev)" dot={false} />
+                  <Area yAxisId="o" type="monotone" dataKey="orders" stroke={P.orange} strokeWidth={2.5} fill="url(#gOrd)" dot={{ r: 4, fill: P.orange, strokeWidth: 0 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+            <div className="flex items-center gap-5 mt-1 justify-center">
+              <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: P.emerald }} /><span className="text-[11px] text-[var(--text-muted)]">Revenue</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: P.orange }} /><span className="text-[11px] text-[var(--text-muted)]">Orders</span></div>
+            </div>
+          </ChartCard>
 
-            return (
-              <div key={key} className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className={`p-1.5 rounded-lg ${color.split(' ')[1]}`}>
-                    <Icon className={`w-3.5 h-3.5 ${color.split(' ')[0]}`} />
-                  </div>
-                  <h2 className="text-sm font-semibold text-gray-700">{label}</h2>
-                  <span className="ml-auto text-xs text-gray-400 font-medium">{colOrders.length}</span>
+          {/* Cylinder Sizes + Order Type Split */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ChartCard title="Popular Cylinder Sizes" sub="Units sold this week">
+              {analyticsLoading || !analytics?.sizeSplit || analytics.sizeSplit.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)] text-center py-8">No data yet</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={analytics.sizeSplit} margin={{ top: 0, right: 0, left: -28, bottom: 0 }} barSize={44}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="_id" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <Tooltip contentStyle={TT} formatter={(v: any) => [v, 'Units']} />
+                    <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                      {(analytics.sizeSplit || []).map((_: any, i: number) => (
+                        <Cell key={i} fill={[P.orange, P.blue, P.violet, P.emerald][i % 4]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
+
+            <ChartCard title="Order Types" sub="Delivery vs Exchange">
+              {analyticsLoading || !analytics?.orderTypeSplit || analytics.orderTypeSplit.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)] text-center py-8">No data yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {analytics.orderTypeSplit.map((ot: any, i: number) => {
+                    const total = analytics.orderTypeSplit.reduce((a: number, x: any) => a + x.count, 0);
+                    const pct = total > 0 ? Math.round((ot.count / total) * 100) : 0;
+                    const colors = [P.orange, P.blue, P.emerald];
+                    return (
+                      <div key={ot._id}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[i % 3] }} />
+                            <span className="font-medium text-[var(--text-primary)] capitalize">{ORDER_TYPE_LABELS[ot._id] || ot._id}</span>
+                          </div>
+                          <span className="text-[var(--text-muted)] font-semibold">{pct}%</span>
+                        </div>
+                        <div className="h-1.5 bg-[var(--bg-card2)] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: colors[i % 3] }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="space-y-2">
-                  {colOrders.length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center py-3">No orders</p>
-                  ) : (
-                    colOrders.map((order) => (
-                      <StationOrderCard key={order._id} order={order} onUpdate={() =>
-                        queryClient.invalidateQueries({ queryKey: ['station', 'orders'] })
-                      } />
-                    ))
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="px-4 py-4 space-y-4">
-          {/* Today's Stats */}
-          <h2 className="text-sm font-semibold text-gray-700">Today</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Card className="text-center">
-              <DollarSign className="w-5 h-5 text-green-500 mx-auto mb-1" />
-              <p className="text-xl font-black text-gray-900">
-                {formatCurrency(analytics?.today?.revenue || 0)}
-              </p>
-              <p className="text-xs text-gray-500">Revenue</p>
-            </Card>
-            <Card className="text-center">
-              <Package className="w-5 h-5 text-brand-500 mx-auto mb-1" />
-              <p className="text-xl font-black text-gray-900">{analytics?.today?.count || 0}</p>
-              <p className="text-xs text-gray-500">Orders Fulfilled</p>
-            </Card>
+              )}
+            </ChartCard>
           </div>
-
-          {/* Weekly Trend */}
-          <h2 className="text-sm font-semibold text-gray-700 mt-2">This Week</h2>
-          {analytics?.weekly?.length > 0 ? (
-            <Card>
-              <div className="space-y-2">
-                {analytics.weekly.map((day: any) => (
-                  <div key={day._id} className="flex items-center gap-3 text-sm">
-                    <span className="text-gray-500 w-24">{day._id}</span>
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-brand-500 rounded-full"
-                        style={{
-                          width: `${Math.min(100, (day.orders / (analytics.weekly[0]?.orders || 1)) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="font-semibold text-gray-800 w-8">{day.orders}</span>
-                    <span className="text-green-600 font-medium w-20 text-right">
-                      {formatCurrency(day.revenue)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : (
-            <Card className="text-center py-8">
-              <BarChart2 className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No data yet this week</p>
-            </Card>
-          )}
 
           {/* Commission Info */}
           {analytics?.today?.commission > 0 && (
-            <Card className="bg-orange-50 border-orange-100">
-              <p className="text-xs text-orange-600 font-medium">Platform Commission (Today)</p>
-              <p className="text-lg font-bold text-orange-700 mt-1">
-                − {formatCurrency(analytics.today.commission)}
-              </p>
-              <p className="text-xs text-orange-500 mt-1">Deducted before payout</p>
-            </Card>
+            <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-500/20 rounded-2xl p-5">
+              <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">Platform Commission (Today)</p>
+              <p className="text-lg font-bold text-orange-700 dark:text-orange-300 mt-1">− {formatCurrency(analytics.today.commission)}</p>
+              <p className="text-xs text-orange-500 dark:text-orange-400 mt-1">Deducted before payout</p>
+            </div>
           )}
+
+        </div>
+      ) : (
+        <div className="space-y-4">
+
+          {/* Quick Stats */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Incoming', count: pendingOrders.length, icon: Inbox, color: 'text-yellow-600 dark:text-yellow-400' },
+              { label: 'Active', count: activeOrders.length, icon: Clock, color: 'text-blue-600 dark:text-blue-400' },
+              { label: 'Completed', count: completedOrders.length, icon: CheckCircle, color: 'text-green-600 dark:text-green-400' },
+            ].map(({ label, count, icon: Icon, color }) => (
+              <div key={label} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm text-center">
+                <Icon className={`w-5 h-5 ${color} mx-auto mb-2`} />
+                <p className={`text-2xl font-black ${color}`}>{count}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Orders by Status */}
+          {[
+            { key: 'pending', label: 'Incoming Orders', orders: pendingOrders, icon: Inbox, color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10' },
+            { key: 'active', label: 'Active Orders', orders: activeOrders, icon: Clock, color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10' },
+            { key: 'completed', label: 'Completed Orders', orders: completedOrders, icon: CheckCircle, color: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10' },
+          ].map(({ key, label, orders, icon: Icon, color }) => (
+            <div key={key}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`p-1.5 rounded-lg ${color.split(' ')[1]}`}>
+                  <Icon className={`w-3.5 h-3.5 ${color.split(' ')[0]}`} />
+                </div>
+                <h2 className="text-sm font-semibold text-[var(--text-primary)]">{label}</h2>
+                <span className="ml-auto text-xs text-[var(--text-muted)] font-medium">{orders.length}</span>
+              </div>
+              <div className="space-y-2">
+                {orders.length === 0 ? (
+                  <p className="text-xs text-[var(--text-muted)] text-center py-3">No orders</p>
+                ) : (
+                  orders.map((order) => (
+                    <StationOrderCard key={order._id} order={order} onUpdate={() =>
+                      queryClient.invalidateQueries({ queryKey: ['station', 'orders'] })
+                    } />
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
+
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Bottom Nav */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 flex">
-        <Link href="/station" className="flex-1 py-3 flex flex-col items-center gap-1 text-brand-500">
-          <Package className="w-5 h-5" />
-          <span className="text-xs font-medium">Orders</span>
-        </Link>
-        <Link href="/station/inventory" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <div className="w-5 h-5 border-2 border-current rounded-md" />
-          <span className="text-xs">Inventory</span>
-        </Link>
-        <Link href="/station/analytics" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <BarChart2 className="w-5 h-5" />
-          <span className="text-xs">Analytics</span>
-        </Link>
-        <Link href="/station/settings" className="flex-1 py-3 flex flex-col items-center gap-1 text-gray-400">
-          <Settings className="w-5 h-5" />
-          <span className="text-xs">Settings</span>
-        </Link>
+function KpiCard({ label, value, icon: Icon, iconBg, iconColor, valueColor }: {
+  label: string; value: string | number; icon: React.ElementType; iconBg: string; iconColor: string; valueColor: string;
+}) {
+  return (
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm">
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${iconBg} mb-3`}>
+        <Icon className={`w-4 h-4 ${iconColor}`} />
       </div>
+      <p className={`text-2xl font-black leading-none mb-1 ${valueColor}`}>{value}</p>
+      <p className="text-xs font-semibold text-[var(--text-primary)]">{label}</p>
+    </div>
+  );
+}
+
+function ChartCard({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 shadow-sm">
+      <div className="mb-4">
+        <p className="text-sm font-bold text-[var(--text-primary)]">{title}</p>
+        {sub && <p className="text-xs text-[var(--text-muted)] mt-0.5">{sub}</p>}
+      </div>
+      {children}
     </div>
   );
 }
@@ -229,7 +262,6 @@ function StationOrderCard({ order, onUpdate }: { order: Order; onUpdate: () => v
   const handleMarkReady = async () => {
     setLoading(true);
     try {
-      // Station marks cylinder ready for pickup — triggers "at_station" flow
       toast.success('Marked as ready for pickup');
       onUpdate();
     } catch {
@@ -239,21 +271,18 @@ function StationOrderCard({ order, onUpdate }: { order: Order; onUpdate: () => v
     }
   };
 
-  const rider =
-    typeof order.riderId === 'object' ? order.riderId : null;
+  const rider = typeof order.riderId === 'object' ? order.riderId : null;
 
   return (
-    <Card className="text-sm">
+    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm text-sm">
       <div className="flex items-start justify-between mb-2">
         <div>
-          <p className="font-semibold text-gray-900">
-            {formatCylinders(order.cylinders)} · {ORDER_TYPE_LABELS[order.orderType]}
-          </p>
-          <p className="text-xs text-gray-400 font-mono">#{order._id.slice(-6).toUpperCase()}</p>
+          <p className="font-semibold text-[var(--text-primary)]">{formatCylinders(order.cylinders)} · {ORDER_TYPE_LABELS[order.orderType]}</p>
+          <p className="text-xs text-[var(--text-muted)] font-mono">#{order._id.slice(-6).toUpperCase()}</p>
         </div>
-        <StatusBadge status={order.status} />
+        <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400">{order.status}</span>
       </div>
-      <div className="text-xs text-gray-500 space-y-1 mb-2">
+      <div className="text-xs text-[var(--text-muted)] space-y-1 mb-2">
         {rider && <p>Rider: {(rider as any).name}</p>}
         <p>Deliver to: {order.deliveryAddress.street}, {order.deliveryAddress.city}</p>
         <p>{formatRelativeTime(order.createdAt)}</p>
@@ -262,11 +291,11 @@ function StationOrderCard({ order, onUpdate }: { order: Order; onUpdate: () => v
         <button
           onClick={handleMarkReady}
           disabled={loading}
-          className="w-full text-center text-xs font-semibold text-brand-600 bg-brand-50 py-2 rounded-xl hover:bg-brand-100 transition-colors"
+          className="w-full text-center text-xs font-semibold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10 py-2 rounded-xl hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors"
         >
           {loading ? 'Updating...' : 'Mark Ready for Pickup'}
         </button>
       )}
-    </Card>
+    </div>
   );
 }
