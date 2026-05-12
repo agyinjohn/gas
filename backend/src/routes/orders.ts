@@ -98,6 +98,7 @@ router.post(
     body('cylinders').isArray({ min: 1 }).withMessage('At least one cylinder required'),
     body('cylinders.*.size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]),
     body('cylinders.*.quantity').isInt({ min: 1, max: 20 }),
+    body('cylinders.*.customPrice').optional().isFloat({ min: 0 }),
     body('orderType').isIn(['delivery', 'exchange']),
     body('deliveryAddress.street').trim().notEmpty(),
     body('deliveryAddress.city').trim().notEmpty(),
@@ -112,7 +113,11 @@ router.post(
 
     const { stationId, cylinders, orderType, deliveryAddress, paymentMethod, paymentProvider, redeemPoints, scheduledFor } = req.body;
     const userId = req.user!.id;
-
+    // Build a map of customPrice per size if provided
+    const customPriceMap = new Map<number, number>();
+    for (const item of cylinders as { size: number; quantity: number; customPrice?: number }[]) {
+      if (item.customPrice !== undefined) customPriceMap.set(item.size, item.customPrice);
+    }
     // Validate scheduledFor is in the future (min 30 min from now)
     if (scheduledFor) {
       const minSchedule = new Date(Date.now() + 30 * 60 * 1000);
@@ -142,17 +147,19 @@ router.post(
       sizeMap.set(item.size, (sizeMap.get(item.size) ?? 0) + item.quantity);
     }
 
-    // Check station-level out of stock
-    if (station.outOfStock) {
-      return res.status(400).json({ success: false, message: 'This station is currently out of stock' });
-    }
-
-    for (const [size, quantity] of sizeMap) {
-      const listing = station.cylinderListings.find((l) => l.size === size);
+    // ── Validate each cylinder line item against station stock ──────────────────
+    for (const item of cylinders as { size: number; quantity: number; customPrice?: number }[]) {
+      const listing = station.cylinderListings.find((l) => l.size === item.size);
       if (!listing || listing.fillPrice <= 0) {
         return res.status(400).json({
           success: false,
-          message: `${size}kg cylinder is not configured at this station`,
+          message: `${item.size}kg cylinder is not configured at this station`,
+        });
+      }
+      if (item.customPrice !== undefined && item.customPrice < listing.fillPrice) {
+        return res.status(400).json({
+          success: false,
+          message: `Custom price for ${item.size}kg (GHS ${item.customPrice}) is below the minimum of GHS ${listing.fillPrice}`,
         });
       }
     }
@@ -172,32 +179,33 @@ router.post(
     const cylinderLineItems = [];
     let cylinderSubtotal = 0;
 
-    for (const [size, quantity] of sizeMap) {
-      const listing = station.cylinderListings.find((l) => l.size === size)!;
-      let unitPrice = orderType === 'exchange' ? listing.exchangePrice : listing.fillPrice;
+    for (const item of cylinders as { size: number; quantity: number; customPrice?: number }[]) {
+      const listing = station.cylinderListings.find((l) => l.size === item.size)!;
+      const basePrice = orderType === 'exchange' ? listing.exchangePrice : listing.fillPrice;
+      let unitPrice = item.customPrice !== undefined ? item.customPrice : basePrice;
 
       // Apply surge
       unitPrice = +(unitPrice * surgeMultiplier).toFixed(2);
 
       // Enforce min cap
       if (pricingConfig?.minPriceCaps?.length) {
-        const cap = pricingConfig.minPriceCaps.find((c) => c.size === size);
+        const cap = pricingConfig.minPriceCaps.find((c) => c.size === item.size);
         if (cap && unitPrice < cap.min) unitPrice = cap.min;
       }
       // Enforce max cap
       if (pricingConfig?.maxPriceCaps?.length) {
-        const cap = pricingConfig.maxPriceCaps.find((c) => c.size === size);
+        const cap = pricingConfig.maxPriceCaps.find((c) => c.size === item.size);
         if (cap && unitPrice > cap.max) unitPrice = cap.max;
       }
 
-      const subtotal = +(unitPrice * quantity).toFixed(2);
+      const subtotal = +(unitPrice * item.quantity).toFixed(2);
       cylinderSubtotal = +(cylinderSubtotal + subtotal).toFixed(2);
-      cylinderLineItems.push({ size, quantity, unitPrice, subtotal });
+      cylinderLineItems.push({ size: item.size, quantity: item.quantity, unitPrice, subtotal });
     }
 
     // ── Delivery fee scaled by total cylinder count ──────────────────────────
     const baseFee = +(pricingConfig?.deliveryFeeFlat ?? 5).toFixed(2);
-    const totalQty = [...sizeMap.values()].reduce((a, b) => a + b, 0);
+    const totalQty = (cylinders as any[]).reduce((a: number, b: any) => a + b.quantity, 0);
     const feeMultiplier = totalQty === 1 ? 1 : totalQty === 2 ? 1.5 : 2.0;
     const deliveryFee = +(baseFee * feeMultiplier).toFixed(2);
 

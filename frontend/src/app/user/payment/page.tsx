@@ -23,7 +23,7 @@ export default function PaymentPage() {
   const deliveryLabel  = params.get('deliveryLabel') ?? '';
   // Cart items and totals
   const cartItemsRaw = params.get('cartItems') ?? '[]';
-  const cartItems: Array<{ size: number; quantity: number }> = JSON.parse(cartItemsRaw);
+  const cartItems: Array<{ size: number; quantity: number; unitPrice: number; subtotal: number; customPrice?: number }> = JSON.parse(cartItemsRaw);
   const total          = parseFloat(params.get('total') ?? '0');
   // summary display
   const summaryLabel   = cartItems.map((c) => `${c.size}kg ×${c.quantity}`).join(', ');
@@ -44,7 +44,11 @@ export default function PaymentPage() {
     try {
       const { data } = await ordersApi.create({
         stationId,
-        cylinders: cartItems.map(({ size, quantity }) => ({ size, quantity })),
+        cylinders: cartItems.map(({ size, quantity, customPrice }) => ({
+          size,
+          quantity,
+          ...(customPrice !== undefined ? { customPrice } : {}),
+        })),
         orderType: 'delivery',
         deliveryAddress: { street: deliveryStreet, city: deliveryCity || deliveryStreet || deliveryLabel, lat: deliveryLat, lng: deliveryLng },
         paymentMethod: method,

@@ -67,7 +67,7 @@ function StationSelector({ selected, onSelect }: { selected: StationT | null; on
       )}
       {stations.map((s) => {
         const isSel = !!selected && selected.id === s.id;
-        const minPrice = s.cylinderListings?.filter((l: any) => l.isAvailable)
+        const minPrice = s.cylinderListings?.filter((l: any) => l.fillPrice > 0)
           .reduce((min: number, l: any) => Math.min(min, l.fillPrice), Infinity);
         return (
           <button key={s.id} onClick={() => onSelect(s)}
@@ -88,7 +88,7 @@ function StationSelector({ selected, onSelect }: { selected: StationT | null; on
                   <Star className="w-3 h-3 fill-current" />{s.ratingAvg?.toFixed(1)}
                 </span>
                 {minPrice !== Infinity && (
-                  <span className="text-xs font-bold text-brand-500">From GHS {minPrice}</span>
+                  <span className="text-xs font-bold text-brand-500">From ₵{minPrice}</span>
                 )}
               </div>
             </div>
@@ -100,6 +100,13 @@ function StationSelector({ selected, onSelect }: { selected: StationT | null; on
   );
 }
 
+interface LineItem {
+  id: string;       // unique key per line
+  size: number;
+  quantity: number;
+  price: string;    // user-entered price string
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CheckoutPage() {
   const params = useSearchParams();
@@ -108,11 +115,9 @@ export default function CheckoutPage() {
   const stationIdParam = params.get('stationId');
   const initSize       = parseInt(params.get('size') || '0');
 
-  // If stationId provided (from station card click), skip station selection
   const [selectedStation, setSelectedStation] = useState<StationT | null>(null);
   const effectiveStationId = stationIdParam ?? selectedStation?.id ?? null;
 
-  // Fetch station data once we have an ID
   const { data: stationData } = useQuery({
     queryKey: ['station', effectiveStationId],
     queryFn: () => stationsApi.getById(effectiveStationId!).then((r) => r.data.station),
@@ -120,33 +125,54 @@ export default function CheckoutPage() {
     staleTime: 60000,
   });
 
-  // Show all listings with a price set — stock/availability is enforced at order time
   const availableSizes: number[] = stationData?.cylinderListings
     ?.filter((l: any) => l.fillPrice > 0)
     ?.map((l: any) => l.size)
     ?.sort((a: number, b: number) => a - b) ?? [];
 
-  // Cart
-  const [cart, setCart] = useState<Record<number, number>>(
-    initSize ? { [initSize]: 1 } : {}
+  // Cart as array of line items — supports same size at different prices
+  const [lines, setLines] = useState<LineItem[]>(
+    initSize ? [{ id: crypto.randomUUID(), size: initSize, quantity: 1, price: '' }] : []
   );
 
-  function setQty(size: number, delta: number) {
-    setCart((prev) => {
-      const next = (prev[size] ?? 0) + delta;
-      if (next <= 0) { const { [size]: _, ...rest } = prev; return rest; }
-      return { ...prev, [size]: next };
-    });
+  // Pre-fill price for initSize once station data loads
+  useEffect(() => {
+    if (!initSize || !stationData) return;
+    setLines((prev) => prev.map((l) =>
+      l.size === initSize && l.price === ''
+        ? { ...l, price: String(stationData.cylinderListings?.find((c: any) => c.size === initSize)?.fillPrice ?? '') }
+        : l
+    ));
+  }, [stationData]);
+
+  function addLine(size: number) {
+    const minPrice = stationData?.cylinderListings?.find((l: any) => l.size === size)?.fillPrice ?? 0;
+    setLines((prev) => [...prev, { id: crypto.randomUUID(), size, quantity: 1, price: String(minPrice) }]);
   }
 
-  const totalQty  = Object.values(cart).reduce((a, b) => a + b, 0);
-  const cartItems = Object.entries(cart).map(([size, qty]) => {
-    const l = stationData?.cylinderListings?.find((l: any) => l.size === Number(size));
-    const price = l?.fillPrice ?? 0;
-    return { size: Number(size), quantity: qty, unitPrice: price, subtotal: price * qty };
+  function removeLine(id: string) {
+    setLines((prev) => prev.filter((l) => l.id !== id));
+  }
+
+  function updateLine(id: string, field: 'quantity' | 'price', value: string | number) {
+    setLines((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l));
+  }
+
+  function getMinPrice(size: number) {
+    return stationData?.cylinderListings?.find((l: any) => l.size === size)?.fillPrice ?? 0;
+  }
+
+  const cartItems = lines.map((l) => {
+    const minPrice = getMinPrice(l.size);
+    const price = parseFloat(l.price) || minPrice;
+    return { id: l.id, size: l.size, quantity: l.quantity, unitPrice: price, subtotal: price * l.quantity, customPrice: price };
   });
+
+  const totalQty = lines.reduce((a, l) => a + l.quantity, 0);
   const subtotal = cartItems.reduce((a, b) => a + b.subtotal, 0);
   const total    = subtotal + DELIVERY_FEE;
+
+  const hasPriceError = cartItems.some((item) => item.unitPrice < getMinPrice(item.size));
 
   // Schedule
   const [schedule, setSchedule]         = useState<'asap' | 'scheduled'>('asap');
@@ -191,6 +217,7 @@ export default function CheckoutPage() {
   function handleContinue() {
     if (!effectiveStationId)  { toast.error('Please select a station'); return; }
     if (totalQty === 0)        { toast.error('Select at least one cylinder'); return; }
+    if (hasPriceError)         { toast.error('One or more prices are below the station minimum'); return; }
     if (!pickupLoc)            { toast.error('Please set your pickup location'); return; }
     const effectiveDelivery = sameAsPickup ? pickupLoc : deliveryLoc;
     if (!effectiveDelivery)    { toast.error('Please set your delivery location'); return; }
@@ -280,8 +307,8 @@ export default function CheckoutPage() {
           <p className="text-sm font-bold text-[var(--text-primary)] mb-1">
             {stationIdParam ? '1.' : '2.'} Cylinder Details
           </p>
-          <p className="text-xs text-[var(--text-muted)] mb-3">Tick to select, use +/− to adjust quantity</p>
-          <div className="space-y-2.5">
+          <p className="text-xs text-[var(--text-muted)] mb-3">Tap a size to add it to your order</p>
+          <div className="space-y-4">
             {!effectiveStationId && (
               <p className="text-sm text-[var(--text-muted)] py-4 text-center">Select a station above to see available cylinders.</p>
             )}
@@ -293,62 +320,110 @@ export default function CheckoutPage() {
             {effectiveStationId && stationData && availableSizes.length === 0 && (
               <p className="text-sm text-[var(--text-muted)] py-4 text-center">No cylinders currently available at this station.</p>
             )}
-            {availableSizes.map((size) => {
-              const qty     = cart[size] ?? 0;
-              const checked = qty > 0;
-              const l       = stationData?.cylinderListings?.find((li: any) => li.size === size);
-              const price   = l?.fillPrice ?? null;
-              return (
-                <div key={size} className={cn(
-                  'bg-[var(--bg-card)] rounded-2xl border-2 p-4 transition-all',
-                  checked ? 'border-brand-500 bg-brand-500/10' : 'border-[var(--border)] hover:border-brand-500/50'
-                )}>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => checked ? setQty(size, -qty) : setQty(size, 1)} className="shrink-0">
-                      <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
-                        checked ? 'bg-brand-500 border-brand-500' : 'border-[var(--text-muted)] bg-[var(--bg-card2)]'
+
+            {/* Size catalogue */}
+            {effectiveStationId && stationData && availableSizes.length > 0 && (
+              <div className="flex gap-3 overflow-x-auto pb-3 pt-2">
+                {availableSizes.map((size) => {
+                  const listing = stationData?.cylinderListings?.find((l: any) => l.size === size);
+                  const price   = listing?.fillPrice ?? 0;
+                  const count   = lines.filter((l) => l.size === size).length;
+                  return (
+                    <button key={size} onClick={() => addLine(size)}
+                      className={cn(
+                        'relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-center shrink-0 w-24 shadow-sm',
+                        count > 0
+                          ? 'border-brand-500 bg-brand-500/10'
+                          : 'border-[var(--border)] bg-[var(--bg-card)]'
                       )}>
-                        {checked && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
+                      {count > 0 && (
+                        <span className="absolute -top-2 -right-2 w-5 h-5 bg-brand-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                          {count}
+                        </span>
+                      )}
+                      <div className={cn(
+                        'w-12 h-12 rounded-xl flex flex-col items-center justify-center',
+                        count > 0 ? 'bg-brand-500' : 'bg-brand-500/15'
+                      )}>
+                        <span className={cn('text-lg font-black leading-none', count > 0 ? 'text-white' : 'text-brand-500')}>{size}</span>
+                        <span className={cn('text-[10px] font-bold', count > 0 ? 'text-white/70' : 'text-brand-400')}>kg</span>
                       </div>
+                      <p className="text-sm font-black text-[var(--text-primary)]">₵{price}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] font-medium">Full cost</p>
                     </button>
-                    <div className={cn('w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0',
-                      checked ? 'bg-brand-500' : 'bg-[var(--bg-card2)]'
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Added line items */}
+            {lines.length > 0 && (
+              <div className="space-y-2.5">
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Your Order</p>
+                {lines.map((line) => {
+                  const minPrice = getMinPrice(line.size);
+                  const entered  = parseFloat(line.price);
+                  const belowMin = line.price !== '' && entered < minPrice;
+                  const subtotalLine = (entered || minPrice) * line.quantity;
+                  return (
+                    <div key={line.id} className={cn(
+                      'bg-[var(--bg-card)] rounded-2xl border-2 p-4 transition-all',
+                      belowMin ? 'border-red-400' : 'border-brand-500 bg-brand-500/5'
                     )}>
-                      <span className={cn('text-lg font-black leading-none', checked ? 'text-white' : 'text-[var(--text-primary)]')}>{size}</span>
-                      <span className={cn('text-[10px] font-bold', checked ? 'text-white/70' : 'text-[var(--text-muted)]')}>kg</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-[var(--text-primary)] text-sm">
-                        {size}kg{price ? ` · GHS ${price}` : ''}
-                      </p>
-                    </div>
-                    {checked && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={() => setQty(size, -1)}
-                          className="w-7 h-7 rounded-full border-2 border-brand-500/30 bg-[var(--bg-card)] flex items-center justify-center text-brand-500 font-bold">
-                          −
-                        </button>
-                        <span className="w-5 text-center font-black text-sm text-brand-500">{qty}</span>
-                        <button onClick={() => setQty(size, 1)}
-                          className="w-7 h-7 rounded-full border-2 border-brand-500/30 bg-[var(--bg-card)] flex items-center justify-center text-brand-500 font-bold">
-                          +
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-brand-500 flex flex-col items-center justify-center shrink-0">
+                          <span className="text-sm font-black leading-none text-white">{line.size}</span>
+                          <span className="text-[9px] font-bold text-white/70">kg</span>
+                        </div>
+                        <p className="font-bold text-[var(--text-primary)] text-sm flex-1">{line.size}kg Cylinder</p>
+                        {/* Qty controls */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button onClick={() => updateLine(line.id, 'quantity', Math.max(1, line.quantity - 1))}
+                            className="w-7 h-7 rounded-full border-2 border-brand-500/30 bg-[var(--bg-card)] flex items-center justify-center text-brand-500 font-bold">
+                            −
+                          </button>
+                          <span className="w-5 text-center font-black text-sm text-brand-500">{line.quantity}</span>
+                          <button onClick={() => updateLine(line.id, 'quantity', line.quantity + 1)}
+                            className="w-7 h-7 rounded-full border-2 border-brand-500/30 bg-[var(--bg-card)] flex items-center justify-center text-brand-500 font-bold">
+                            +
+                          </button>
+                        </div>
+                        <button onClick={() => removeLine(line.id)}
+                          className="w-7 h-7 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center text-red-500 shrink-0">
+                          <span className="text-base leading-none">×</span>
                         </button>
                       </div>
-                    )}
-                  </div>
-                  {checked && price && (
-                    <div className="mt-3 pt-3 border-t border-brand-500/20 flex justify-between text-xs">
-                      <span className="text-brand-500">{qty} × GHS {price}</span>
-                      <span className="font-bold text-brand-500">GHS {(price * qty).toFixed(2)}</span>
+
+                      {/* Price input */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Full Cost (₵)</label>
+                          <span className="text-[10px] text-[var(--text-muted)]">Station price: ₵{minPrice}</span>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[var(--text-muted)]">₵</span>
+                          <input
+                            type="number" step="0.01" min={minPrice}
+                            value={line.price}
+                            onChange={(e) => updateLine(line.id, 'price', e.target.value)}
+                            placeholder={String(minPrice)}
+                            className={cn(
+                              'w-full h-10 rounded-xl border pl-7 pr-3 text-sm font-semibold text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-2 transition-all',
+                              belowMin ? 'border-red-400 focus:ring-red-400/20' : 'border-[var(--border)] focus:border-brand-500 focus:ring-brand-500/20'
+                            )}
+                          />
+                        </div>
+                        {belowMin && <p className="text-xs text-red-500">Minimum price is ₵{minPrice}</p>}
+                        <div className="flex justify-between text-xs text-brand-500 pt-0.5">
+                          <span>{line.quantity} × ₵{entered || minPrice}</span>
+                          <span className="font-bold">₵{subtotalLine.toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -512,19 +587,19 @@ export default function CheckoutPage() {
         <div className="max-w-lg mx-auto">
           <div className="space-y-1 mb-3 text-sm">
             {cartItems.map((item) => (
-              <div key={item.size} className="flex justify-between text-[var(--text-muted)]">
-                <span>{item.size}kg × {item.quantity}</span>
-                <span>GHS {item.subtotal.toFixed(2)}</span>
+              <div key={item.id} className="flex justify-between text-[var(--text-muted)]">
+                <span>{item.size}kg × {item.quantity} @ ₵{item.unitPrice}</span>
+                <span>₵{item.subtotal.toFixed(2)}</span>
               </div>
             ))}
             {totalQty === 0 && <p className="text-[var(--text-muted)] text-xs">No cylinders selected</p>}
             <div className="flex justify-between text-[var(--text-muted)]">
               <span>Delivery Fee</span>
-              <span>GHS {DELIVERY_FEE.toFixed(2)}</span>
+              <span>₵{DELIVERY_FEE.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-[var(--text-primary)]">
               <span>Total Estimate</span>
-              <span className="text-brand-500">GHS {total.toFixed(2)}</span>
+              <span className="text-brand-500">₵{total.toFixed(2)}</span>
             </div>
           </div>
           <button onClick={handleContinue} disabled={totalQty === 0}
