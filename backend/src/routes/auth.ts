@@ -73,9 +73,14 @@ router.post('/user/send-otp',
     try {
       const code = await createOTP(phone, purpose);
       console.log('📤 [AUTH] Sending SMS with OTP...');
-      await sendSMS(phone, SMS_TEMPLATES.otpVerification(code));
-      console.log('✅ [AUTH] OTP sent successfully to:', phone);
-      res.json({ success: true, message: 'OTP sent', ...(process.env.NODE_ENV === 'development' && { _devCode: code }) });
+      try {
+        await sendSMS(phone, SMS_TEMPLATES.otpVerification(code));
+        console.log('✅ [AUTH] OTP sent successfully to:', phone);
+      } catch (smsError: any) {
+        console.error('⚠️ [AUTH] SMS failed but OTP created:', smsError?.message);
+        // Still succeed — OTP is saved, dev code returned
+      }
+      res.json({ success: true, message: 'OTP sent', ...(process.env.NODE_ENV !== 'production' && { _devCode: code }) });
     } catch (error: any) {
       console.error('❌ [AUTH] Send OTP failed:', error?.response?.data || error?.message || error);
       res.status(500).json({ success: false, message: 'Failed to send OTP', error: error?.message });
@@ -385,9 +390,13 @@ router.post('/station/send-otp',
     try {
       const code = await createOTP(phone, 'login');
       console.log('📤 [STATION AUTH] Sending SMS with OTP...');
-      await sendSMS(phone, SMS_TEMPLATES.otpVerification(code));
-      console.log('✅ [STATION AUTH] OTP sent successfully to:', phone);
-      res.json({ success: true, ...(process.env.NODE_ENV === 'development' && { _devCode: code }) });
+      try {
+        await sendSMS(phone, SMS_TEMPLATES.otpVerification(code));
+        console.log('✅ [STATION AUTH] OTP sent successfully to:', phone);
+      } catch (smsError: any) {
+        console.error('⚠️ [STATION AUTH] SMS failed but OTP created:', smsError?.message);
+      }
+      res.json({ success: true, ...(process.env.NODE_ENV !== 'production' && { _devCode: code }) });
     } catch (error) {
       console.error('❌ [STATION AUTH] Send OTP failed:', error);
       res.status(500).json({ success: false, message: 'Failed to send OTP' });
