@@ -331,7 +331,7 @@ export default function CheckoutPage() {
                   return (
                     <button key={size} onClick={() => addLine(size)}
                       className={cn(
-                        'relative flex flex-col items-center gap-2 py-4 px-5 rounded-2xl border-2 transition-all text-center shrink-0 shadow-sm active:scale-95',
+                        'relative flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all text-center shrink-0 w-32 h-32 justify-center shadow-sm active:scale-95',
                         count > 0
                           ? 'border-brand-500 bg-brand-500/10'
                           : 'border-[var(--border)] bg-[var(--bg-card)] hover:border-brand-500 hover:shadow-md'
@@ -342,7 +342,7 @@ export default function CheckoutPage() {
                         </span>
                       )}
                       <div className={cn(
-                        'w-14 h-14 rounded-2xl flex flex-col items-center justify-center',
+                        'w-14 h-10 rounded-xl flex items-center justify-center gap-0.5 px-2',
                         count > 0 ? 'bg-brand-500' : 'bg-brand-500/15'
                       )}>
                         <span className={cn('text-xl font-black leading-none', count > 0 ? 'text-white' : 'text-brand-500')}>{size}</span>
