@@ -63,7 +63,7 @@ function ve(req: Request, res: Response): boolean {
  *         description: Validation error
  */
 router.post('/user/send-otp',
-  [body('phone').trim().isMobilePhone('any'), body('purpose').isIn(['registration','login'])],
+  [body('phone').trim().matches(/^\+233\d{9}$/), body('purpose').isIn(['registration','login'])],
   async (req: Request, res: Response) => {
     if (ve(req, res)) return;
     const { phone, purpose } = req.body;
