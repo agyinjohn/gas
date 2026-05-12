@@ -331,25 +331,31 @@ export default function CheckoutPage() {
                   return (
                     <button key={size} onClick={() => addLine(size)}
                       className={cn(
-                        'relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-center shrink-0 w-24 shadow-sm',
+                        'relative flex flex-col items-center gap-2 py-4 px-5 rounded-2xl border-2 transition-all text-center shrink-0 shadow-sm active:scale-95',
                         count > 0
                           ? 'border-brand-500 bg-brand-500/10'
-                          : 'border-[var(--border)] bg-[var(--bg-card)]'
+                          : 'border-[var(--border)] bg-[var(--bg-card)] hover:border-brand-500 hover:shadow-md'
                       )}>
                       {count > 0 && (
-                        <span className="absolute -top-2 -right-2 w-5 h-5 bg-brand-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">
+                        <span className="absolute -top-2.5 -right-2.5 w-6 h-6 bg-brand-500 rounded-full text-[11px] font-black text-white flex items-center justify-center shadow">
                           {count}
                         </span>
                       )}
                       <div className={cn(
-                        'w-12 h-12 rounded-xl flex flex-col items-center justify-center',
+                        'w-14 h-14 rounded-2xl flex flex-col items-center justify-center',
                         count > 0 ? 'bg-brand-500' : 'bg-brand-500/15'
                       )}>
-                        <span className={cn('text-lg font-black leading-none', count > 0 ? 'text-white' : 'text-brand-500')}>{size}</span>
-                        <span className={cn('text-[10px] font-bold', count > 0 ? 'text-white/70' : 'text-brand-400')}>kg</span>
+                        <span className={cn('text-xl font-black leading-none', count > 0 ? 'text-white' : 'text-brand-500')}>{size}</span>
+                        <span className={cn('text-[11px] font-bold', count > 0 ? 'text-white/70' : 'text-brand-400')}>kg</span>
                       </div>
                       <p className="text-sm font-black text-[var(--text-primary)]">₵{price}</p>
-                      <p className="text-[10px] text-[var(--text-muted)] font-medium">Full cost</p>
+                      <p className="text-[11px] text-[var(--text-muted)] font-medium">Full cost</p>
+                      <span className={cn(
+                        'text-[10px] font-bold px-2.5 py-0.5 rounded-full',
+                        count > 0 ? 'bg-brand-500 text-white' : 'bg-[var(--bg-card2)] text-[var(--text-muted)]'
+                      )}>
+                        {count > 0 ? 'Added' : 'Tap to add'}
+                      </span>
                     </button>
                   );
                 })}
