@@ -69,20 +69,28 @@ export default function RiderDashboardPage() {
 
   useEffect(() => {
     const socket = getSocket();
-    socket.on('order:new', (order: any) => {
-      toast(`New order: ${formatCylinders(order.cylinders)}`, { icon: '🔔', duration: 10000 });
+
+    function onNewOrder(order: any) {
+      toast.dismiss('new-order');
+      toast(`New order: ${formatCylinders(order.cylinders)}`, { id: 'new-order', icon: '🔔', duration: 5000 });
       queryClient.invalidateQueries({ queryKey: ['rider', 'dashboard'] });
-    });
-    socket.on('order:status', ({ status }: { status: string }) => {
+    }
+    function onOrderStatus({ status }: { status: string }) {
       if (status === 'delivered' || status === 'cancelled') {
         queryClient.invalidateQueries({ queryKey: ['rider', 'dashboard'] });
       }
-    });
+    }
+
+    socket.off('order:new', onNewOrder);
+    socket.off('order:status', onOrderStatus);
+    socket.on('order:new', onNewOrder);
+    socket.on('order:status', onOrderStatus);
+
     return () => {
-      socket.off('order:new');
-      socket.off('order:status');
+      socket.off('order:new', onNewOrder);
+      socket.off('order:status', onOrderStatus);
     };
-  }, [queryClient]);
+  }, []);
 
   const dashboard = dashboardData || {};
   const activeOrder = dashboard.activeOrder;

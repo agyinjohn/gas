@@ -1,7 +1,7 @@
 'use client';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { CheckCircle2, MapPin, Bike, Clock, ArrowRight } from 'lucide-react';
+import { CheckCircle2, MapPin, Bike, Clock, ArrowRight, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { paymentsApi, ordersApi } from '@/lib/api';
@@ -34,6 +34,12 @@ export default function OrderSuccessPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex flex-col items-center justify-center px-6 py-12">
+      {/* Back to home */}
+      <div className="w-full max-w-sm mb-2">
+        <Link href="/user" className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center">
+          <ArrowLeft className="w-5 h-5 text-[var(--text-primary)]" />
+        </Link>
+      </div>
       <div className="w-full max-w-sm space-y-8">
 
         {/* Success animation */}
@@ -49,7 +55,7 @@ export default function OrderSuccessPage() {
           </div>
           <div className="text-center space-y-1">
             <h1 className="text-2xl font-black text-[var(--text-primary)]">Order Placed!</h1>
-            <p className="text-sm text-[var(--text-muted)]">Your gas is on its way 🔥</p>
+            <p className="text-sm text-[var(--text-muted)]">A rider is heading to you for pickup 🛵</p>
           </div>
         </div>
 
@@ -90,9 +96,9 @@ export default function OrderSuccessPage() {
         <div className="space-y-3">
           <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">What happens next</p>
           {[
-            { icon: Clock,  text: 'A rider will be assigned to your order shortly' },
-            { icon: Bike,   text: 'Rider picks up your cylinder from the station'  },
-            { icon: MapPin, text: 'Cylinder delivered to your door'                },
+            { icon: Clock,  text: 'A rider will be assigned and head to your location'              },
+            { icon: Bike,   text: 'Rider collects your cylinder from you for refilling'              },
+            { icon: MapPin, text: 'Rider takes it to the station, fills it, and delivers it back to you' },
           ].map(({ icon: Icon, text }, i) => (
             <div key={i} className="flex items-center gap-3">
               <div className="w-8 h-8 bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">

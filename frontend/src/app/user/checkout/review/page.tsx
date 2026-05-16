@@ -3,6 +3,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, MapPin, Tag } from 'lucide-react';
 import Image from 'next/image';
+import { checkoutPhoto } from '@/lib/checkoutPhoto';
 
 const DELIVERY_FEE = 15;
 
@@ -38,8 +39,7 @@ export default function ReviewOrderPage() {
   // Load photo from sessionStorage (not URL to avoid 431)
   const [photo, setPhoto] = useState<string | null>(null);
   useEffect(() => {
-    const stored = sessionStorage.getItem('checkout_photo');
-    if (stored) setPhoto(stored);
+    setPhoto(checkoutPhoto.get());
   }, []);
 
   function handleProceed() {

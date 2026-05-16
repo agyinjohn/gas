@@ -1,14 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, ChevronDown, Bell, User, Flame,
+import { MapPin, ChevronDown, Bell, Flame,
   Plus, Navigation, AlertCircle, Loader2, Star, Gift, Map,
-  Sun, Moon, SlidersHorizontal,
+  Sun, Moon, SlidersHorizontal, Truck, ChevronRight,
 } from 'lucide-react';
 import { stationsApi, ordersApi, notificationsApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
-import { cn } from '@/lib/utils';
+import { cn, calcDeliveryFee } from '@/lib/utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -44,41 +44,81 @@ function StationCard({ station }: { station: Station }) {
   const minPrice = station.cylinderListings.length > 0
     ? Math.min(...station.cylinderListings.filter((l) => l.fillPrice > 0).map((l) => l.fillPrice))
     : null;
+  const deliveryFee = calcDeliveryFee(station.distanceKm);
 
   return (
     <Link href={`/user/stations/${station.id}`}>
       <div className={cn(
-        'bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 h-full transition-all',
-        station.outOfStock ? 'opacity-60' : 'active:scale-[0.98]'
+        'bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 h-full transition-all active:scale-[0.98]',
+        station.outOfStock && 'opacity-60'
       )}>
-        {/* Icon */}
-        <div className={cn(
-          'w-10 h-10 rounded-xl flex items-center justify-center mb-3',
-          station.outOfStock ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
-        )}>
-          <Flame className={cn('w-5 h-5', station.outOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
+
+        {/* Top row: icon + name/address + chevron */}
+        <div className="flex items-start gap-3">
+          <div className={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+            station.outOfStock ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
+          )}>
+            <Flame className={cn('w-5 h-5', station.outOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-[var(--text-primary)] text-sm leading-snug truncate">
+              {station.name}
+            </h3>
+            <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{station.address}</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
         </div>
 
-        <h3 className="font-semibold text-[var(--text-primary)] text-sm leading-snug mb-0.5 truncate">
-          {station.name}
-        </h3>
-        <p className="text-xs text-[var(--text-muted)] truncate mb-2">{station.address}</p>
+        {/* Divider */}
+        <div className="border-t border-[var(--border)] my-3" />
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
-            <MapPin className="w-3 h-3" />{station.distanceKm} km
-          </span>
-          <span className="flex items-center gap-1 text-xs text-amber-500">
-            <Star className="w-3 h-3 fill-current" />{station.ratingAvg.toFixed(1)}
-          </span>
+        {/* Stats row */}
+        <div className="flex items-center justify-between">
+          {/* Left: distance + rating */}
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+              <MapPin className="w-3 h-3 shrink-0" />
+              {station.distanceKm} km
+            </span>
+            <span className="flex items-center gap-1 text-xs text-amber-500 font-medium">
+              <Star className="w-3 h-3 fill-current shrink-0" />
+              {station.ratingAvg.toFixed(1)}
+            </span>
+          </div>
+
+          {/* Right: stock status */}
+          {station.outOfStock ? (
+            <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
+              Out of stock
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
+              Available
+            </span>
+          )}
         </div>
 
-        {!station.outOfStock && minPrice && (
-          <p className="text-xs font-bold text-brand-500 mt-2">From GHS {minPrice}</p>
-        )}
-        {station.outOfStock && (
-          <p className="text-xs font-bold text-red-500 mt-2">Out of stock</p>
-        )}
+        {/* Bottom row: gas price + delivery fee */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border)]">
+          <div>
+            <p className="text-[10px] text-[var(--text-muted)] mb-0.5">Gas from</p>
+            <p className={cn(
+              'text-sm font-bold',
+              station.outOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500'
+            )}>
+              {minPrice ? `GHS ${minPrice}` : '—'}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-[var(--text-muted)] mb-0.5">Delivery</p>
+            <p className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1 justify-end">
+              <Truck className="w-3 h-3 text-[var(--text-muted)]" />
+              GHS {deliveryFee}
+            </p>
+          </div>
+        </div>
+
       </div>
     </Link>
   );
@@ -87,10 +127,22 @@ function StationCard({ station }: { station: Station }) {
 function StationSkeleton() {
   return (
     <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 animate-pulse">
-      <div className="w-10 h-10 bg-[var(--bg-card2)] rounded-xl mb-3" />
-      <div className="h-4 bg-[var(--bg-card2)] rounded w-3/4 mb-1.5" />
-      <div className="h-3 bg-[var(--bg-card2)] rounded w-1/2 mb-2" />
-      <div className="h-3 bg-[var(--bg-card2)] rounded w-1/3" />
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 bg-[var(--bg-card2)] rounded-xl shrink-0" />
+        <div className="flex-1">
+          <div className="h-4 bg-[var(--bg-card2)] rounded w-3/4 mb-1.5" />
+          <div className="h-3 bg-[var(--bg-card2)] rounded w-1/2" />
+        </div>
+      </div>
+      <div className="border-t border-[var(--border)] my-3" />
+      <div className="flex justify-between mb-3">
+        <div className="h-3 bg-[var(--bg-card2)] rounded w-1/3" />
+        <div className="h-3 bg-[var(--bg-card2)] rounded w-1/4" />
+      </div>
+      <div className="border-t border-[var(--border)] pt-3 flex justify-between">
+        <div className="h-4 bg-[var(--bg-card2)] rounded w-1/4" />
+        <div className="h-4 bg-[var(--bg-card2)] rounded w-1/4" />
+      </div>
     </div>
   );
 }
@@ -232,7 +284,7 @@ export default function UserHomePage() {
   };
 
   return (
-    <div className="min-h-full bg-[var(--bg)]">
+    <div className="flex flex-col h-screen bg-[var(--bg)]">
 
       {showPicker && (
         <LocationPicker
@@ -243,33 +295,33 @@ export default function UserHomePage() {
       )}
 
       {/* ── Header ── */}
-      <div className="px-4 pt-12 pb-4 lg:pt-6">
+      <div className="shrink-0 bg-[var(--bg)] px-4 pt-8 pb-3 lg:pt-4">
         <div className="flex items-center justify-between">
           {/* Location */}
-          <div>
+          <div className="min-w-0 flex-1 mr-3">
             <p className="text-xs text-[var(--text-muted)] mb-1">Current location</p>
             <button
               onClick={() => setShowPicker(true)}
-              className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-full px-3 py-1.5"
+              className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-full px-3 py-1.5 max-w-full"
             >
               {locationState === 'detecting' ? (
-                <Loader2 className="w-3.5 h-3.5 text-[var(--text-muted)] animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 text-[var(--text-muted)] animate-spin shrink-0" />
               ) : locationState === 'denied' ? (
-                <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               ) : (
-                <MapPin className="w-3.5 h-3.5 text-brand-500" />
+                <MapPin className="w-3.5 h-3.5 text-brand-500 shrink-0" />
               )}
-              <span className="text-sm text-[var(--text-primary)] font-medium max-w-[160px] truncate">
+              <span className="text-sm text-[var(--text-primary)] font-medium truncate">
                 {locationState === 'detecting' && !coords ? 'Detecting…' :
                  locationState === 'denied'              ? 'Set location' :
                  locationLabel || 'Detecting…'}
               </span>
-              <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
             </button>
           </div>
 
           {/* Right icons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Theme toggle — mobile only */}
             <button
               onClick={toggle}
@@ -293,16 +345,11 @@ export default function UserHomePage() {
                 </span>
               )}
             </button>
-            <Link
-              href="/user/profile"
-              className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center"
-            >
-              <User className="w-4 h-4 text-[var(--text-muted)]" />
-            </Link>
           </div>
         </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto">
       <div className="px-4 space-y-6 pb-24 lg:pb-8">
 
         {/* ── Active Order Banner ── */}
@@ -461,6 +508,7 @@ export default function UserHomePage() {
           </Link>
         </div>
 
+      </div>
       </div>
     </div>
   );

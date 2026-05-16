@@ -28,12 +28,12 @@ export default function RiderHomePage() {
     queryFn: () => ridersApi.getMe().then((r) => r.data.rider),
   });
 
-  const { data: activeOrderData } = useQuery({
+  const { data: activeOrdersData } = useQuery({
     queryKey: ['orders', 'rider', 'active'],
     queryFn: () =>
       ordersApi
-        .list({ status: 'accepted,at_station,en_route', limit: 1 })
-        .then((r) => r.data.orders[0] ?? null),
+        .list({ status: 'accepted,at_station,en_route', limit: 20 })
+        .then((r) => r.data.orders ?? []),
     refetchInterval: 10000,
     refetchOnWindowFocus: true,
   });
@@ -109,6 +109,7 @@ export default function RiderHomePage() {
       await ordersApi.updateStatus(pendingOrder.orderId, 'accepted');
       setPendingOrder(null);
       queryClient.invalidateQueries({ queryKey: ['orders', 'rider', 'active'] });
+      queryClient.invalidateQueries({ queryKey: ['rider', 'dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast.success('Order accepted!');
     } catch {
@@ -121,7 +122,7 @@ export default function RiderHomePage() {
     toast('Order declined', { icon: '❌' });
   };
 
-  const activeOrder = activeOrderData;
+  const activeOrders: Order[] = activeOrdersData ?? [];
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -204,26 +205,31 @@ export default function RiderHomePage() {
         </div>
       )}
 
-      {/* Active Order Card */}
-      {activeOrder && (
-        <div className="px-4 mt-4">
-          <Link href={`/rider/orders/${activeOrder._id}`}>
-            <Card className="border-2 border-brand-200">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-brand-600 uppercase tracking-wide">Active Order</p>
-                <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">
-                  {(ORDER_STATUS_LABELS as Record<string, string>)[activeOrder.status]}
-                </span>
-              </div>
-              <p className="font-semibold text-gray-900">
-                {formatCylinders(activeOrder.cylinders)} · {activeOrder.orderType}
-              </p>
-              <p className="text-sm text-gray-500 mt-1">
-                {activeOrder.deliveryAddress.street}, {activeOrder.deliveryAddress.city}
-              </p>
-              <p className="text-xs text-brand-500 mt-2 font-medium">Tap to view details →</p>
-            </Card>
-          </Link>
+      {/* Active Orders */}
+      {activeOrders.length > 0 && (
+        <div className="px-4 mt-4 space-y-3">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+            Active Orders ({activeOrders.length})
+          </p>
+          {activeOrders.map((activeOrder) => (
+            <Link key={activeOrder._id} href={`/rider/orders/${activeOrder._id}`}>
+              <Card className="border-2 border-brand-200">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-brand-600 uppercase tracking-wide">Active Order</p>
+                  <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">
+                    {(ORDER_STATUS_LABELS as Record<string, string>)[activeOrder.status]}
+                  </span>
+                </div>
+                <p className="font-semibold text-gray-900">
+                  {formatCylinders(activeOrder.cylinders)} · {activeOrder.orderType}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {activeOrder.deliveryAddress.street}, {activeOrder.deliveryAddress.city}
+                </p>
+                <p className="text-xs text-brand-500 mt-2 font-medium">Tap to view details →</p>
+              </Card>
+            </Link>
+          ))}
         </div>
       )}
 
@@ -299,7 +305,7 @@ function RecentOrders() {
             </div>
             <div className="text-right">
               <p className="text-sm font-bold text-green-600">
-                +{formatCurrency(order.stationPayout * 0.15)}
+                +{formatCurrency(order.deliveryFee ?? 0)}
               </p>
               <p className="text-xs text-gray-400">{(ORDER_STATUS_LABELS as Record<string, string>)[order.status]}</p>
             </div>

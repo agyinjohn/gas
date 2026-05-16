@@ -111,7 +111,7 @@ router.post(
   async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
 
-    const { stationId, cylinders, orderType, deliveryAddress, paymentMethod, paymentProvider, redeemPoints, scheduledFor } = req.body;
+    const { stationId, cylinders, orderType, deliveryAddress, pickupAddress, paymentMethod, paymentProvider, redeemPoints, scheduledFor } = req.body;
     const userId = req.user!.id;
     // Build a map of customPrice per size if provided
     const customPriceMap = new Map<number, number>();
@@ -211,8 +211,8 @@ router.post(
 
     const totalAmount = +(cylinderSubtotal + deliveryFee).toFixed(2);
     const commissionPct = station.commissionPct;
-    const commissionAmount = +((totalAmount * commissionPct) / 100).toFixed(2);
-    const stationPayout = +(totalAmount - commissionAmount).toFixed(2);
+    const commissionAmount = +((cylinderSubtotal * commissionPct) / 100).toFixed(2);
+    const stationPayout = +(cylinderSubtotal - commissionAmount).toFixed(2);
 
     // ── Loyalty redemption ───────────────────────────────────────────────
     let loyaltyDiscount = 0;
@@ -245,6 +245,7 @@ router.post(
       commissionAmount,
       stationPayout,
       deliveryAddress,
+      pickupAddress: pickupAddress || deliveryAddress,
       paymentMethod,
       paymentProvider,
       otpCode,
@@ -530,20 +531,42 @@ router.patch(
     if (status === 'accepted' && role === 'rider') {
       order.riderId = new mongoose.Types.ObjectId(id);
       const { Rider } = await import('../models/Rider');
-      await Rider.findByIdAndUpdate(id, { status: 'busy', currentOrderId: order._id });
+      const riderDoc = await Rider.findById(id).select('vehicleType');
+      const capacity = CONSTANTS.VEHICLE_ORDER_LIMITS[riderDoc?.vehicleType ?? 'motorbike'] ?? 3;
+      // Count active orders AFTER this one is accepted
+      const activeCount = await Order.countDocuments({
+        riderId: id,
+        status: { $in: ['accepted', 'at_station', 'en_route'] },
+        _id: { $ne: order._id },
+      });
+      const newActiveCount = activeCount + 1;
+      // Set busy only when at capacity, keep available if still has room
+      const newRiderStatus = newActiveCount >= capacity ? 'busy' : 'available';
+      await Rider.findByIdAndUpdate(id, { status: newRiderStatus, currentOrderId: order._id });
+      console.log(`[Order] Rider ${id} accepted order — active: ${newActiveCount}/${capacity} — status: ${newRiderStatus}`);
       await markDispatchAccepted(order._id.toString(), id);
     }
 
     if (status === 'delivered' && role === 'rider') {
       order.paymentStatus = 'released';
 
-      // Free up rider
       const { Rider } = await import('../models/Rider');
+      // Count remaining active orders after this one is delivered
+      const remainingActive = await Order.countDocuments({
+        riderId: id,
+        status: { $in: ['accepted', 'at_station', 'en_route'] },
+        _id: { $ne: order._id },
+      });
+      const riderDoc = await Rider.findById(id).select('vehicleType bankAccount');
+      const capacity = CONSTANTS.VEHICLE_ORDER_LIMITS[riderDoc?.vehicleType ?? 'motorbike'] ?? 3;
+      // If still has active orders, stay busy or available based on count
+      const newRiderStatus = remainingActive === 0 ? 'available' : remainingActive < capacity ? 'available' : 'busy';
       const rider = await Rider.findByIdAndUpdate(
         order.riderId,
-        { status: 'available', currentOrderId: null, $inc: { totalTrips: 1, totalEarnings: order.deliveryFee } },
+        { status: newRiderStatus, ...(remainingActive === 0 ? { currentOrderId: null } : {}), $inc: { totalTrips: 1, totalEarnings: order.deliveryFee } },
         { new: true }
       );
+      console.log(`[Order] Rider ${id} delivered — remaining active: ${remainingActive} — status: ${newRiderStatus}`);
 
       // Rider payout record
       const riderEarning = +order.deliveryFee.toFixed(2);
@@ -772,9 +795,17 @@ router.post(
     // Free up rider
     if (order.riderId) {
       const { Rider } = await import('../models/Rider');
+      const remainingActive = await Order.countDocuments({
+        riderId: order.riderId,
+        status: { $in: ['accepted', 'at_station', 'en_route'] },
+        _id: { $ne: order._id },
+      });
+      const riderDoc = await Rider.findById(order.riderId).select('vehicleType');
+      const capacity = CONSTANTS.VEHICLE_ORDER_LIMITS[riderDoc?.vehicleType ?? 'motorbike'] ?? 3;
+      const newRiderStatus = remainingActive === 0 ? 'available' : remainingActive < capacity ? 'available' : 'busy';
       const rider = await Rider.findByIdAndUpdate(
         order.riderId,
-        { status: 'available', currentOrderId: null, $inc: { totalTrips: 1, totalEarnings: order.deliveryFee } },
+        { status: newRiderStatus, ...(remainingActive === 0 ? { currentOrderId: null } : {}), $inc: { totalTrips: 1, totalEarnings: order.deliveryFee } },
         { new: true }
       );
 

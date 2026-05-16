@@ -38,6 +38,13 @@ export const CONSTANTS = {
   ORDER_ACCEPT_TIMEOUT_MS: parseInt(process.env.ORDER_ACCEPT_TIMEOUT_SECONDS || '60') * 1000,
   MAX_DISPATCH_ATTEMPTS: parseInt(process.env.MAX_DISPATCH_ATTEMPTS || '3'),
 
+  // Vehicle order capacity limits
+  VEHICLE_ORDER_LIMITS: {
+    motorbike: 3,
+    tricycle:  9,
+    van:       15,
+  } as Record<string, number>,
+
   // OTP
   OTP_LENGTH: 4,
   OTP_EXPIRES_MINUTES: 30,
