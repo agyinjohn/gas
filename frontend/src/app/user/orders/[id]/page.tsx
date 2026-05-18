@@ -66,6 +66,7 @@ export default function OrderDetailsPage() {
   const { isLoading: authLoading } = useAuth();
 
   const isPaymentCallback = searchParams.get('payment') === 'callback';
+  const originTab = (searchParams.get('tab') as 'active' | 'past' | null) ?? 'active';
 
   const [showOTPSheet,     setShowOTPSheet]     = useState(false);
   const [showRatingSheet,  setShowRatingSheet]  = useState(false);
@@ -197,7 +198,7 @@ export default function OrderDetailsPage() {
 
       {/* ── Header ── */}
       <div className="bg-[var(--bg-card)] border-b border-[var(--border)] px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => router.back()}
+        <button onClick={() => router.push(`/user/orders?tab=${originTab}`)}
           className="w-9 h-9 rounded-full bg-[var(--bg-card2)] flex items-center justify-center shrink-0">
           <ArrowLeft className="w-4 h-4 text-[var(--text-primary)]" />
         </button>

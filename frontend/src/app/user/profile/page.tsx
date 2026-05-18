@@ -217,12 +217,6 @@ export default function UserProfilePage() {
                 )} />
               </div>
             </button>
-
-            <button onClick={handleLogout}
-              className="w-full h-11 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-500/20 transition-colors">
-              <LogOut className="w-4 h-4" /> Sign Out
-            </button>
-            <p className="text-center text-xs text-[var(--text-muted)]">GetGas v1.0.0</p>
           </div>
 
           {/* ── Right: addresses ── */}
@@ -351,6 +345,15 @@ export default function UserProfilePage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Sign Out & Version - Bottom */}
+        <div className="px-4 lg:px-8 py-6 border-t border-[var(--border)] max-w-4xl mx-auto w-full">
+          <button onClick={handleLogout}
+            className="w-full h-12 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-500/20 transition-colors mb-3">
+            <LogOut className="w-4 h-4" /> Sign Out
+          </button>
+          <p className="text-center text-xs text-[var(--text-muted)]">GetGas v1.0.0</p>
         </div>
       </div>
     </div>
