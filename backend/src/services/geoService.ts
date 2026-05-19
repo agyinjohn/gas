@@ -119,7 +119,8 @@ export async function getNearbyRiders(
   const lngDelta = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
 
   const riders = await Rider.find({
-    status: 'available',
+    // Include both available and busy — capacity check happens in dispatch
+    status: { $in: ['available', 'busy'] },
     kycStatus: 'approved',
     'location.lat': { $gte: lat - latDelta, $lte: lat + latDelta },
     'location.lng': { $gte: lng - lngDelta, $lte: lng + lngDelta },

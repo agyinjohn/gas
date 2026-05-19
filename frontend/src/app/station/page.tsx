@@ -1,15 +1,16 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
 } from 'recharts';
-import { Package, DollarSign, TrendingUp, ShoppingBag, CheckCircle, AlertCircle, Inbox, Clock } from 'lucide-react';
+import { Package, DollarSign, TrendingUp, ShoppingBag, CheckCircle, AlertCircle, Inbox, Clock, Percent, CreditCard } from 'lucide-react';
 import { ordersApi, stationsApi } from '@/lib/api';
 import { getSocket } from '@/hooks/useSocket';
 import { Order } from '@/types';
 import { formatCurrency, formatRelativeTime, ORDER_TYPE_LABELS, formatCylinders } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 function getStationId(): string {
@@ -26,7 +27,6 @@ const TT = { borderRadius: 12, border: 'none', boxShadow: '0 4px 24px rgba(0,0,0
 
 export default function StationDashboardPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders'>('overview');
 
   const { data: ordersData } = useQuery({
     queryKey: ['station', 'orders'],
@@ -37,7 +37,6 @@ export default function StationDashboardPage() {
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
     queryKey: ['station', 'analytics'],
     queryFn: () => stationsApi.getAnalytics(STATION_ID).then((r) => r.data.analytics),
-    enabled: activeTab === 'overview',
   });
 
   useEffect(() => {
@@ -51,181 +50,339 @@ export default function StationDashboardPage() {
   }, [queryClient]);
 
   const orders = ordersData || [];
+  
+  // Status breakdowns
   const pendingOrders = orders.filter((o) => o.status === 'pending');
   const activeOrders = orders.filter((o) => ['accepted', 'at_station', 'en_route'].includes(o.status));
   const completedOrders = orders.filter((o) => o.status === 'delivered');
+  const cancelledOrders = orders.filter((o) => o.status === 'cancelled');
 
-  const analytics = analyticsData;
+  // Analytics calculations
+  const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  const completedRevenue = completedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  const avgOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
+  const completionRate = orders.length > 0 ? (completedOrders.length / orders.length) * 100 : 0;
+  const cancellationRate = orders.length > 0 ? (cancelledOrders.length / orders.length) * 100 : 0;
+
+  // Payment methods breakdown
+  const paymentMethods = orders.reduce((acc: any, o) => {
+    const method = o.paymentMethod || 'cash';
+    acc[method] = (acc[method] || 0) + 1;
+    return acc;
+  }, {});
+  const paymentData = Object.entries(paymentMethods).map(([method, count]: any) => ({
+    name: method.replace('_', ' ').toUpperCase(),
+    value: count,
+  }));
+
+  // Most popular cylinder size
+  const sizeStats: any = {};
+  orders.forEach((o) => {
+    if (o.cylinders) {
+      o.cylinders.forEach((c: any) => {
+        sizeStats[c.size] = (sizeStats[c.size] || 0) + c.quantity;
+      });
+    }
+  });
+  const topSize = Object.entries(sizeStats).sort((a: any, b: any) => b[1] - a[1])[0];
+
+  // Hour-based distribution for peak times
+  const hourlyData: any = {};
+  orders.forEach((o) => {
+    const hour = new Date(o.createdAt).getHours();
+    hourlyData[hour] = (hourlyData[hour] || 0) + 1;
+  });
+  const peakHour = Object.entries(hourlyData).sort((a: any, b: any) => b[1] - a[1])[0];
+
+  // Today's data
+  const today = new Date().toDateString();
+  const todayOrders = orders.filter((o) => new Date(o.createdAt).toDateString() === today);
+  const todayCompleted = todayOrders.filter((o) => o.status === 'delivered');
+  const todayRevenue = todayOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+  const todayCommission = analyticsData?.today?.commission || 0;
 
   return (
-    <div className="px-4 lg:px-6 py-6 max-w-6xl mx-auto pb-8">
+    <div className="px-4 lg:px-6 py-6 max-w-7xl mx-auto pb-8">
+      <div className="space-y-5">
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 bg-[var(--bg-card2)] p-1 rounded-xl w-fit">
-        {[
-          { key: 'overview', label: 'Overview' },
-          { key: 'orders', label: 'Orders' },
-        ].map(({ key, label }) => (
-          <button key={key} onClick={() => setActiveTab(key as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === key ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}>{label}</button>
-        ))}
-      </div>
+        {/* Header Section */}
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-black text-[var(--text-primary)]">Dashboard</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-1">Real-time insights and performance metrics</p>
+        </div>
 
-      {activeTab === 'overview' ? (
-        <div className="space-y-5">
+        {/* Top KPI Cards - 4 Column Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard label="Today's Revenue" value={formatCurrency(todayRevenue)} icon={DollarSign} iconBg="bg-emerald-100 dark:bg-emerald-500/10" iconColor="text-emerald-500" valueColor="text-emerald-600 dark:text-emerald-400" />
+          <KpiCard label="Completed Orders" value={completedOrders.length} icon={CheckCircle} iconBg="bg-green-100 dark:bg-green-500/10" iconColor="text-green-500" valueColor="text-green-600 dark:text-green-400" />
+          <KpiCard label="Pending Orders" value={pendingOrders.length} icon={ShoppingBag} iconBg="bg-yellow-100 dark:bg-yellow-500/10" iconColor="text-yellow-500" valueColor="text-yellow-600 dark:text-yellow-400" />
+          <KpiCard label="Avg Order Value" value={formatCurrency(avgOrderValue)} icon={TrendingUp} iconBg="bg-violet-100 dark:bg-violet-500/10" iconColor="text-violet-500" valueColor="text-violet-600 dark:text-violet-400" />
+        </div>
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Today's Orders" value={analytics?.today?.count ?? 0} icon={Package} iconBg="bg-orange-100 dark:bg-orange-500/10" iconColor="text-orange-500" valueColor="text-orange-600 dark:text-orange-400" />
-            <KpiCard label="Today's Revenue" value={formatCurrency(analytics?.today?.revenue ?? 0)} icon={DollarSign} iconBg="bg-emerald-100 dark:bg-emerald-500/10" iconColor="text-emerald-500" valueColor="text-emerald-600 dark:text-emerald-400" />
-            <KpiCard label="Pending Orders" value={pendingOrders.length} icon={ShoppingBag} iconBg="bg-yellow-100 dark:bg-yellow-500/10" iconColor="text-yellow-500" valueColor="text-yellow-600 dark:text-yellow-400" />
-            <KpiCard label="Week Revenue" value={formatCurrency(analytics?.period?.revenue ?? 0)} icon={TrendingUp} iconBg="bg-violet-100 dark:bg-violet-500/10" iconColor="text-violet-500" valueColor="text-violet-600 dark:text-violet-400" />
+        {/* Main Content - Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column - Status Overview */}
+          <div className="space-y-5">
+            {/* Status Cards - Full Width 3 Column */}
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">Order Status Overview</h2>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Active', count: activeOrders.length, icon: Clock, color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10', borderColor: 'border-blue-200 dark:border-blue-500/20' },
+                  { label: 'Pending', count: pendingOrders.length, icon: Inbox, color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10', borderColor: 'border-yellow-200 dark:border-yellow-500/20' },
+                  { label: 'Completed', count: completedOrders.length, icon: CheckCircle, color: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10', borderColor: 'border-green-200 dark:border-green-500/20' },
+                ].map(({ label, count, icon: Icon, color, borderColor }) => (
+                  <div key={label} className={`bg-[var(--bg-card)] rounded-2xl border ${borderColor} p-4 text-center hover:shadow-md transition-shadow`}>
+                    <Icon className={`w-5 h-5 ${color.split(' ')[0]} mx-auto mb-2`} />
+                    <p className={`text-2xl font-black ${color.split(' ')[0]}`}>{count}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5 font-medium">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Status Distribution Pie */}
+            <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-5 shadow-sm">
+              <div className="mb-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Distribution</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)] mt-1">Order Status Mix</p>
+              </div>
+              {orders.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)] text-center py-8">No orders yet</p>
+              ) : (
+                <div className="space-y-4">
+                  <ResponsiveContainer width="100%" height={160}>
+                    <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                      <Pie
+                        data={[
+                          { name: 'Active', value: activeOrders.length, color: P.blue },
+                          { name: 'Pending', value: pendingOrders.length, color: P.orange },
+                          { name: 'Completed', value: completedOrders.length, color: P.emerald },
+                        ]}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={50}
+                        paddingAngle={2}
+                        label={false}
+                      >
+                        {[
+                          { name: 'Active', value: activeOrders.length, color: P.blue },
+                          { name: 'Pending', value: pendingOrders.length, color: P.orange },
+                          { name: 'Completed', value: completedOrders.length, color: P.emerald },
+                        ].map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={TT} formatter={(v: any) => [v, 'Orders']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Active', value: activeOrders.length, color: P.blue },
+                      { label: 'Pending', value: pendingOrders.length, color: P.orange },
+                      { label: 'Completed', value: completedOrders.length, color: P.emerald },
+                    ].map(({ label, value, color }) => {
+                      const pct = orders.length > 0 ? (value / orders.length * 100).toFixed(0) : '0';
+                      return (
+                        <div key={label} className="text-center p-2 bg-[var(--bg-card2)] rounded-xl">
+                          <p className="text-xs font-bold text-[var(--text-primary)]">{pct}%</p>
+                          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{label}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Revenue & Orders Trend */}
-          <ChartCard title="Revenue & Orders — Last 7 Days" sub="Delivered orders only">
-            {analyticsLoading || !analytics?.dailyChart ? (
-              <div className="h-56 bg-[var(--bg-card2)] rounded-lg animate-pulse" />
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={analytics.dailyChart} margin={{ top: 5, right: 0, left: -28, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={P.emerald} stopOpacity={0.2} />
-                      <stop offset="100%" stopColor={P.emerald} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="gOrd" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={P.orange} stopOpacity={0.15} />
-                      <stop offset="100%" stopColor={P.orange} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="_id" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="r" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="o" orientation="right" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={TT} formatter={(v: any, name: string) => name === 'revenue' ? [`GH₵${Number(v).toFixed(0)}`, 'Revenue'] : [v, 'Orders']} />
-                  <Area yAxisId="r" type="monotone" dataKey="revenue" stroke={P.emerald} strokeWidth={2.5} fill="url(#gRev)" dot={false} />
-                  <Area yAxisId="o" type="monotone" dataKey="orders" stroke={P.orange} strokeWidth={2.5} fill="url(#gOrd)" dot={{ r: 4, fill: P.orange, strokeWidth: 0 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-            <div className="flex items-center gap-5 mt-1 justify-center">
-              <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: P.emerald }} /><span className="text-[11px] text-[var(--text-muted)]">Revenue</span></div>
-              <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: P.orange }} /><span className="text-[11px] text-[var(--text-muted)]">Orders</span></div>
+          {/* Right Column - Financial & Performance */}
+          <div className="space-y-5">
+            {/* Net Revenue Card - Top Priority - Enhanced */}
+            <div className="bg-gradient-to-br from-violet-50 to-blue-50 dark:from-violet-500/10 dark:to-blue-500/10 border border-violet-100 dark:border-violet-500/20 rounded-2xl p-6 shadow-sm">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">Today's Net Revenue</p>
+                  <p className="text-4xl font-black text-violet-700 dark:text-violet-300 mt-2">
+                    {formatCurrency(todayRevenue - todayCommission)}
+                  </p>
+                </div>
+                <DollarSign className="w-8 h-8 text-violet-300 dark:text-violet-500/40" />
+              </div>
+              <div className="space-y-2 text-xs text-violet-600 dark:text-violet-400">
+                <div className="flex justify-between">
+                  <span>Gross Revenue:</span>
+                  <span className="font-semibold">{formatCurrency(todayRevenue)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-violet-200 dark:border-violet-500/20">
+                  <span>Commission:</span>
+                  <span className="font-semibold">−{formatCurrency(todayCommission)}</span>
+                </div>
+              </div>
             </div>
-          </ChartCard>
 
-          {/* Cylinder Sizes + Order Type Split */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ChartCard title="Popular Cylinder Sizes" sub="Units sold this week">
-              {analyticsLoading || !analytics?.sizeSplit || analytics.sizeSplit.length === 0 ? (
-                <p className="text-xs text-[var(--text-muted)] text-center py-8">No data yet</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={analytics.sizeSplit} margin={{ top: 0, right: 0, left: -28, bottom: 0 }} barSize={44}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                    <XAxis dataKey="_id" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={TT} formatter={(v: any) => [v, 'Units']} />
-                    <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-                      {(analytics.sizeSplit || []).map((_: any, i: number) => (
-                        <Cell key={i} fill={[P.orange, P.blue, P.violet, P.emerald][i % 4]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
+            {/* Performance Metrics */}
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">Performance</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Completion Rate */}
+                <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Completion</p>
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  </div>
+                  <p className="text-2xl font-black text-green-600 dark:text-green-400">{completionRate.toFixed(1)}%</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-2 font-medium">{completedOrders.length} of {orders.length}</p>
+                </div>
 
-            <ChartCard title="Order Types" sub="Delivery vs Exchange">
-              {analyticsLoading || !analytics?.orderTypeSplit || analytics.orderTypeSplit.length === 0 ? (
-                <p className="text-xs text-[var(--text-muted)] text-center py-8">No data yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {analytics.orderTypeSplit.map((ot: any, i: number) => {
-                    const total = analytics.orderTypeSplit.reduce((a: number, x: any) => a + x.count, 0);
-                    const pct = total > 0 ? Math.round((ot.count / total) * 100) : 0;
-                    const colors = [P.orange, P.blue, P.emerald];
-                    return (
-                      <div key={ot._id}>
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[i % 3] }} />
-                            <span className="font-medium text-[var(--text-primary)] capitalize">{ORDER_TYPE_LABELS[ot._id] || ot._id}</span>
-                          </div>
-                          <span className="text-[var(--text-muted)] font-semibold">{pct}%</span>
-                        </div>
-                        <div className="h-1.5 bg-[var(--bg-card2)] rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: colors[i % 3] }} />
-                        </div>
+                {/* Cancellation Rate */}
+                <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Cancellations</p>
+                    <AlertCircle className="w-4 h-4 text-red-500" />
+                  </div>
+                  <p className="text-2xl font-black text-red-600 dark:text-red-400">{cancellationRate.toFixed(1)}%</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-2 font-medium">{cancelledOrders.length} orders</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Full Width - Revenue Trend */}
+        <ChartCard title="Revenue & Orders Trend" sub="Last 7 days - Delivered orders only">
+          {analyticsLoading || !analyticsData?.dailyChart ? (
+            <div className="h-56 bg-[var(--bg-card2)] rounded-lg animate-pulse" />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={analyticsData.dailyChart} margin={{ top: 5, right: 0, left: -28, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={P.emerald} stopOpacity={0.2} />
+                    <stop offset="100%" stopColor={P.emerald} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gOrd" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={P.orange} stopOpacity={0.15} />
+                    <stop offset="100%" stopColor={P.orange} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="_id" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="r" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="o" orientation="right" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={TT} formatter={(v: any, name: string) => name === 'revenue' ? [`GH₵${Number(v).toFixed(0)}`, 'Revenue'] : [v, 'Orders']} />
+                <Area yAxisId="r" type="monotone" dataKey="revenue" stroke={P.emerald} strokeWidth={2.5} fill="url(#gRev)" dot={false} />
+                <Area yAxisId="o" type="monotone" dataKey="orders" stroke={P.orange} strokeWidth={2.5} fill="url(#gOrd)" dot={{ r: 4, fill: P.orange, strokeWidth: 0 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+          <div className="flex items-center gap-5 mt-1 justify-center">
+            <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: P.emerald }} /><span className="text-[11px] text-[var(--text-muted)]">Revenue</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: P.orange }} /><span className="text-[11px] text-[var(--text-muted)]">Orders</span></div>
+          </div>
+        </ChartCard>
+
+        {/* Cylinder Sizes */}
+        <ChartCard title="Cylinder Sizes" sub="Units sold this period">
+          {analyticsLoading || !analyticsData?.sizeSplit || analyticsData.sizeSplit.length === 0 ? (
+            <p className="text-xs text-[var(--text-muted)] text-center py-8">No data yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={analyticsData.sizeSplit} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barSize={40}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="_id" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={TT} formatter={(v: any) => [v, 'Units']} />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {(analyticsData.sizeSplit || []).map((_: any, i: number) => (
+                    <Cell key={i} fill={[P.orange, P.blue, P.violet, P.emerald][i % 4]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        {/* Commission Notice */}
+        {todayCommission > 0 && (
+          <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-500/20 rounded-2xl p-5">
+            <p className="text-xs text-orange-600 dark:text-orange-400 font-semibold uppercase mb-1">Platform Commission (Today)</p>
+            <p className="text-2xl font-black text-orange-700 dark:text-orange-300">− {formatCurrency(todayCommission)}</p>
+            <p className="text-xs text-orange-500 dark:text-orange-400 mt-2">Deducted before payout</p>
+          </div>
+        )}
+
+        {/* Daily Breakdown Table - Full Width */}
+        {analyticsData?.dailyChart && analyticsData.dailyChart.length > 0 && (
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-[var(--border)] bg-gradient-to-r from-[var(--bg-card)] to-[var(--bg-card2)]">
+              <p className="text-sm font-bold text-[var(--text-primary)]">Daily Performance Breakdown</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Last 7 days - Orders, Revenue & Average Value per day</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--bg-card2)] border-b border-[var(--border)]">
+                  <tr>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-[var(--text-muted)]">Date</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-muted)]">
+                      <div className="flex items-center justify-end gap-1">
+                        <Package className="w-3 h-3" />
+                        <span>Orders</span>
                       </div>
+                    </th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-muted)]">
+                      <div className="flex items-center justify-end gap-1">
+                        <DollarSign className="w-3 h-3" />
+                        <span>Revenue</span>
+                      </div>
+                    </th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-[var(--text-muted)]">
+                      <div className="flex items-center justify-end gap-1">
+                        <TrendingUp className="w-3 h-3" />
+                        <span>Avg Value</span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {analyticsData.dailyChart.map((row: any, i: number) => {
+                    const avgValue = row.orders > 0 ? row.revenue / row.orders : 0;
+                    return (
+                      <tr key={row._id} className="hover:bg-[var(--bg-card2)] transition-colors">
+                        <td className="px-5 py-3 text-[var(--text-primary)] font-semibold text-sm">
+                          {new Date(row._id).toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <span className="inline-flex items-center gap-1.5 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-lg text-xs font-bold">
+                            {row.orders}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <span className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded-lg text-xs font-bold">
+                            GH₵{Number(row.revenue).toFixed(0)}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <span className="text-[var(--text-muted)] font-semibold text-sm">
+                            GH₵{Number(avgValue).toFixed(2)}
+                          </span>
+                        </td>
+                      </tr>
                     );
                   })}
-                </div>
-              )}
-            </ChartCard>
-          </div>
-
-          {/* Commission Info */}
-          {analytics?.today?.commission > 0 && (
-            <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-500/20 rounded-2xl p-5">
-              <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">Platform Commission (Today)</p>
-              <p className="text-lg font-bold text-orange-700 dark:text-orange-300 mt-1">− {formatCurrency(analytics.today.commission)}</p>
-              <p className="text-xs text-orange-500 dark:text-orange-400 mt-1">Deducted before payout</p>
+                </tbody>
+              </table>
             </div>
-          )}
-
-        </div>
-      ) : (
-        <div className="space-y-4">
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Incoming', count: pendingOrders.length, icon: Inbox, color: 'text-yellow-600 dark:text-yellow-400' },
-              { label: 'Active', count: activeOrders.length, icon: Clock, color: 'text-blue-600 dark:text-blue-400' },
-              { label: 'Completed', count: completedOrders.length, icon: CheckCircle, color: 'text-green-600 dark:text-green-400' },
-            ].map(({ label, count, icon: Icon, color }) => (
-              <div key={label} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm text-center">
-                <Icon className={`w-5 h-5 ${color} mx-auto mb-2`} />
-                <p className={`text-2xl font-black ${color}`}>{count}</p>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">{label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Orders by Status */}
-          {[
-            { key: 'pending', label: 'Incoming Orders', orders: pendingOrders, icon: Inbox, color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10' },
-            { key: 'active', label: 'Active Orders', orders: activeOrders, icon: Clock, color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10' },
-            { key: 'completed', label: 'Completed Orders', orders: completedOrders, icon: CheckCircle, color: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10' },
-          ].map(({ key, label, orders, icon: Icon, color }) => (
-            <div key={key}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`p-1.5 rounded-lg ${color.split(' ')[1]}`}>
-                  <Icon className={`w-3.5 h-3.5 ${color.split(' ')[0]}`} />
-                </div>
-                <h2 className="text-sm font-semibold text-[var(--text-primary)]">{label}</h2>
-                <span className="ml-auto text-xs text-[var(--text-muted)] font-medium">{orders.length}</span>
-              </div>
-              <div className="space-y-2">
-                {orders.length === 0 ? (
-                  <p className="text-xs text-[var(--text-muted)] text-center py-3">No orders</p>
-                ) : (
-                  orders.map((order) => (
-                    <StationOrderCard key={order._id} order={order} onUpdate={() =>
-                      queryClient.invalidateQueries({ queryKey: ['station', 'orders'] })
-                    } />
-                  ))
-                )}
-              </div>
+            <div className="px-5 py-3 bg-[var(--bg-card2)] border-t border-[var(--border)] text-xs text-[var(--text-muted)]">
+              <p>📊 Tip: Monitor daily trends to identify patterns and optimize staffing and inventory management</p>
             </div>
-          ))}
+          </div>
+        )}
 
-        </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -252,50 +409,6 @@ function ChartCard({ title, sub, children }: { title: string; sub?: string; chil
         {sub && <p className="text-xs text-[var(--text-muted)] mt-0.5">{sub}</p>}
       </div>
       {children}
-    </div>
-  );
-}
-
-function StationOrderCard({ order, onUpdate }: { order: Order; onUpdate: () => void }) {
-  const [loading, setLoading] = useState(false);
-
-  const handleMarkReady = async () => {
-    setLoading(true);
-    try {
-      toast.success('Marked as ready for pickup');
-      onUpdate();
-    } catch {
-      toast.error('Failed to update');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const rider = typeof order.riderId === 'object' ? order.riderId : null;
-
-  return (
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm text-sm">
-      <div className="flex items-start justify-between mb-2">
-        <div>
-          <p className="font-semibold text-[var(--text-primary)]">{formatCylinders(order.cylinders)} · {ORDER_TYPE_LABELS[order.orderType]}</p>
-          <p className="text-xs text-[var(--text-muted)] font-mono">#{order._id.slice(-6).toUpperCase()}</p>
-        </div>
-        <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400">{order.status}</span>
-      </div>
-      <div className="text-xs text-[var(--text-muted)] space-y-1 mb-2">
-        {rider && <p>Rider: {(rider as any).name}</p>}
-        <p>Deliver to: {order.deliveryAddress.street}, {order.deliveryAddress.city}</p>
-        <p>{formatRelativeTime(order.createdAt)}</p>
-      </div>
-      {order.status === 'accepted' && (
-        <button
-          onClick={handleMarkReady}
-          disabled={loading}
-          className="w-full text-center text-xs font-semibold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10 py-2 rounded-xl hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors"
-        >
-          {loading ? 'Updating...' : 'Mark Ready for Pickup'}
-        </button>
-      )}
     </div>
   );
 }

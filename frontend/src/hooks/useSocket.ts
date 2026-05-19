@@ -4,25 +4,24 @@ import { io, Socket } from 'socket.io-client';
 import { ridersApi } from '@/lib/api';
 
 let socketInstance: Socket | null = null;
+let listenersAttached = false;
 
 export function getSocket(): Socket {
   if (typeof window === 'undefined') throw new Error('getSocket called on server');
 
   const token = localStorage.getItem('gasgo_token');
 
-  // If socket exists but was created without a token (unauthenticated), destroy and recreate
   if (socketInstance) {
     const currentAuth = (socketInstance as any).auth?.token;
     if (!currentAuth && token) {
-      console.log('[Socket] Recreating socket with auth token');
       socketInstance.disconnect();
       socketInstance = null;
+      listenersAttached = false;
     } else {
       return socketInstance;
     }
   }
 
-  console.log('[Socket] Creating new socket connection, token present:', !!token);
   socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000', {
     auth: { token },
     transports: ['websocket'],
@@ -32,15 +31,12 @@ export function getSocket(): Socket {
     reconnectionDelay: 1000,
   });
 
-  socketInstance.on('connect', () => {
-    console.log('[Socket] Connected:', socketInstance?.id);
-  });
-  socketInstance.on('disconnect', (reason) => {
-    console.log('[Socket] Disconnected:', reason);
-  });
-  socketInstance.on('connect_error', (err) => {
-    console.error('[Socket] Connection error:', err.message);
-  });
+  if (!listenersAttached) {
+    listenersAttached = true;
+    socketInstance.on('connect', () => console.log('[Socket] Connected:', socketInstance?.id));
+    socketInstance.on('disconnect', (reason) => console.log('[Socket] Disconnected:', reason));
+    socketInstance.on('connect_error', (err) => console.error('[Socket] Connection error:', err.message));
+  }
 
   return socketInstance;
 }
@@ -56,13 +52,16 @@ export function useOrderTracking(
     const socket = getSocket();
     socket.emit('join:order', orderId);
 
-    socket.on('order:status', ({ status }: { status: string }) => onStatusChange(status));
-    socket.on('rider:location:update', onLocationUpdate);
+    const handleStatus = ({ status }: { status: string }) => onStatusChange(status);
+    const handleLocation = (loc: { lat: number; lng: number }) => onLocationUpdate(loc);
+
+    socket.on('order:status', handleStatus);
+    socket.on('rider:location:update', handleLocation);
 
     return () => {
       socket.emit('leave:order', orderId);
-      socket.off('order:status');
-      socket.off('rider:location:update');
+      socket.off('order:status', handleStatus);
+      socket.off('rider:location:update', handleLocation);
     };
   }, [orderId, onStatusChange, onLocationUpdate]);
 }
@@ -83,15 +82,23 @@ export function useRiderLocationBroadcast(orderId: string | null, onPosition?: (
     const socket = getSocket();
     socket.emit('join:order', orderId);
 
-    // Use watchPosition for continuous streaming — no stale cache
+    const broadcast = (coords: GeolocationCoordinates) => {
+      const loc = { lat: coords.latitude, lng: coords.longitude };
+      socket.emit('rider:location', { orderId, ...loc });
+      ridersApi.updateLocation(loc.lat, loc.lng).catch(() => {});
+      onPosition?.(loc);
+    };
+
+    // Get position immediately so the map can draw the route right away
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => broadcast(coords),
+      (err) => console.warn('[Rider:Broadcast] getCurrentPosition error:', err.message),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+
+    // Then keep watching for updates
     watchIdRef.current = navigator.geolocation.watchPosition(
-      ({ coords }) => {
-        const loc = { lat: coords.latitude, lng: coords.longitude };
-        console.log('[Rider:Broadcast] GPS fix → lat:', loc.lat, 'lng:', loc.lng, '| orderId:', orderId);
-        socket.emit('rider:location', { orderId, ...loc });
-        ridersApi.updateLocation(loc.lat, loc.lng).catch(() => {});
-        onPosition?.(loc);
-      },
+      ({ coords }) => broadcast(coords),
       (err) => console.warn('[Rider:Broadcast] watchPosition error:', err.code, err.message),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );

@@ -19,6 +19,7 @@ const HIDE_NAV_PATTERNS = [
   /^\/user\/orders\/[^/]+/,
   /^\/user\/checkout/,
   /^\/user\/payment/,
+  /^\/user\/order-success/,
 ];
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
@@ -98,7 +99,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* ── Main content ── */}
-      <main className="flex-1 lg:ml-64 flex flex-col min-h-screen overflow-y-auto">
+      <main className="flex-1 lg:ml-64 flex flex-col min-h-screen overflow-x-hidden">
         <div className="flex-1">
           {children}
         </div>

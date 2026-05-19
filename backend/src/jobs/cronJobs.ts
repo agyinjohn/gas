@@ -212,4 +212,44 @@ export function startAllJobs(): void {
   startLowStockAlertJob();
   startScheduledDispatchJob();
   startUnassignedOrdersRetryJob();
+  startPendingOrdersOnBoot();
+}
+
+/**
+ * On server boot, re-dispatch any pending orders that were left hanging
+ * (e.g. server restarted mid-dispatch, killing all setTimeout callbacks).
+ */
+export async function startPendingOrdersOnBoot(): Promise<void> {
+  try {
+    // Wait 5s for socket server to be ready
+    await new Promise((r) => setTimeout(r, 5000));
+
+    // Fix any riders stuck as 'busy' with no active order
+    const activeOrders = await Order.find(
+      { status: { $in: ['accepted', 'at_station', 'en_route'] } },
+      'riderId'
+    ).lean();
+    const activeRiderIds = new Set(activeOrders.map((o: any) => o.riderId?.toString()).filter(Boolean));
+    const { Rider } = await import('../models/Rider');
+    // Only reset to available if they have NO active orders at all
+    const allBusy = await Rider.find({ status: 'busy' }).select('_id').lean();
+    for (const r of allBusy) {
+      if (!activeRiderIds.has(r._id.toString())) {
+        await Rider.findByIdAndUpdate(r._id, { status: 'available', currentOrderId: null });
+        console.log(`[Boot] Fixed stuck busy rider: ${r._id}`);
+      }
+    }
+
+    // Re-dispatch all pending orders
+    const pending = await Order.find({ status: 'pending', isScheduled: { $ne: true } }).select('_id').lean();
+    if (pending.length === 0) return;
+    console.log(`[Boot] Re-dispatching ${pending.length} pending order(s)`);
+    const { dispatchOrder } = await import('../services/dispatchService');
+    for (const order of pending) {
+      dispatchOrder((order._id as any).toString()).catch(console.error);
+      await new Promise((r) => setTimeout(r, 500)); // stagger to avoid race
+    }
+  } catch (err) {
+    console.error('[Boot] Pending orders re-dispatch error:', err);
+  }
 }

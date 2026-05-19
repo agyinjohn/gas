@@ -29,18 +29,18 @@ const RIDER_PIN = encodeURIComponent(
 );
 // ─── Rider steps ──────────────────────────────────────────────────────────────
 const STEPS = [
-  { status: 'accepted',   label: 'Pick Up Cylinder',    Icon: Package },
-  { status: 'at_station', label: 'Go to Station',       Icon: Store   },
-  { status: 'en_route',   label: 'Deliver to Customer', Icon: Bike    },
-  { status: 'delivered',  label: 'Delivered',           Icon: User    },
+  { status: 'accepted',   label: 'Go to Customer',      Icon: User    },
+  { status: 'at_station', label: 'Go to Station',        Icon: Store   },
+  { status: 'en_route',   label: 'Return to Customer',   Icon: Bike    },
+  { status: 'delivered',  label: 'Delivered',            Icon: Package },
 ];
 const STATUS_INDEX: Record<string, number> = {
   accepted: 0, at_station: 1, en_route: 2, delivered: 3,
 };
 const STATUS_ACTIONS: Record<string, { label: string; next: string }> = {
-  accepted:   { label: 'Arrived at Station',            next: 'at_station' },
-  at_station: { label: 'Cylinder Picked Up — En Route', next: 'en_route'   },
-  en_route:   { label: 'Mark as Delivered',             next: 'delivered'  },
+  accepted:   { label: 'Cylinder Collected — Head to Station', next: 'at_station' },
+  at_station: { label: 'Cylinder Filled — En Route to Customer', next: 'en_route'   },
+  en_route:   { label: 'Mark as Delivered',                      next: 'delivered'  },
 };
 const PAYMENT_LABELS: Record<string, string> = {
   mobile_money: 'Mobile Money',
@@ -59,125 +59,121 @@ function NavMap({ destination, riderPos, fullscreen, onToggleFullscreen }: {
   const mapRef         = useRef<google.maps.Map | null>(null);
   const rendererRef    = useRef<google.maps.DirectionsRenderer | null>(null);
   const riderMarkerRef = useRef<google.maps.Marker | null>(null);
+  const destMarkerRef  = useRef<google.maps.Marker | null>(null);
   const lastRouteRef   = useRef<{ lat: number; lng: number } | null>(null);
   const destRef        = useRef(destination);
+  const riderPosRef    = useRef(riderPos);
   const [ready, setReady] = useState(false);
 
   useEffect(() => { destRef.current = destination; }, [destination]);
+  useEffect(() => { riderPosRef.current = riderPos; }, [riderPos]);
 
-  // Called from parent's broadcast position — no second watchPosition needed
   const requestRoute = useCallback((origin: { lat: number; lng: number }) => {
-    console.log('[NavMap] requestRoute called', { origin, hasMap: !!mapRef.current, hasRenderer: !!rendererRef.current });
-    if (!mapRef.current || !rendererRef.current) {
-      console.warn('[NavMap] requestRoute: map or renderer not ready yet');
-      return;
-    }
-    // Throttle: skip if rider hasn't moved > ~30 m (but always run the first time)
-    if (lastRouteRef.current) {
-      const dlat = origin.lat - lastRouteRef.current.lat;
-      const dlng = origin.lng - lastRouteRef.current.lng;
-      if (Math.sqrt(dlat * dlat + dlng * dlng) < 0.0003) {
-        console.log('[NavMap] requestRoute: throttled (rider hasn\'t moved enough)');
-        return;
-      }
-    }
+    if (!mapRef.current || !rendererRef.current) return;
     const dest = destRef.current;
-    console.log('[NavMap] Requesting directions', { origin, dest });
     new google.maps.DirectionsService().route(
-      {
-        origin,
-        destination: { lat: dest.lat, lng: dest.lng },
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
+      { origin, destination: { lat: dest.lat, lng: dest.lng }, travelMode: google.maps.TravelMode.DRIVING },
       (result, status) => {
-        console.log('[NavMap] DirectionsService response:', status, result ? 'has result' : 'no result');
         if (status === 'OK' && result && rendererRef.current) {
-          lastRouteRef.current = origin; // only throttle after success
+          lastRouteRef.current = origin;
           rendererRef.current.setDirections(result);
           mapRef.current?.fitBounds(result.routes[0].bounds, 60);
         }
       }
     );
-  }, []); // stable — reads dest via ref
+  }, []);
 
-  const initMap = useCallback(() => {
-    if (!mapDivRef.current || mapRef.current) return;
-    console.log('[NavMap] initMap called, destination:', destination);
-    mapRef.current = new google.maps.Map(mapDivRef.current, {
-      center: { lat: destination.lat, lng: destination.lng },
-      zoom: 15,
-      disableDefaultUI: true,
-      gestureHandling: 'greedy',
-      zoomControl: true,
-      clickableIcons: false,
-      styles: [
-        { elementType: 'geometry',           stylers: [{ color: '#1e1e2e' }] },
-        { elementType: 'labels.text.stroke', stylers: [{ color: '#1e1e2e' }] },
-        { elementType: 'labels.text.fill',   stylers: [{ color: '#6b7280' }] },
-        { featureType: 'road', elementType: 'geometry',         stylers: [{ color: '#2d2d3f' }] },
-        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
-        { featureType: 'water', elementType: 'geometry',        stylers: [{ color: '#111827' }] },
-        { featureType: 'poi',     stylers: [{ visibility: 'off' }] },
-        { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-      ],
-    });
-
-    // Destination pin (shown when no route yet)
-    new google.maps.Marker({
-      position: { lat: destination.lat, lng: destination.lng },
-      map: mapRef.current,
-      icon: {
-        url: `data:image/svg+xml;charset=UTF-8,${DEST_PIN}`,
-        scaledSize: new google.maps.Size(24, 30),
-        anchor: new google.maps.Point(12, 30),
-      },
-      title: destination.label,
-      zIndex: 2,
-    });
-
-    // Directions renderer — orange route line, suppresses default markers
+  const attachRenderer = useCallback(() => {
+    if (!mapRef.current) return;
+    if (rendererRef.current) { rendererRef.current.setMap(null); }
     rendererRef.current = new google.maps.DirectionsRenderer({
       map: mapRef.current,
       suppressMarkers: true,
       polylineOptions: { strokeColor: '#E87722', strokeWeight: 5, strokeOpacity: 0.9 },
     });
+  }, []);
+
+  const initMap = useCallback(() => {
+    if (!mapDivRef.current) return;
+    if (!mapRef.current) {
+      mapRef.current = new google.maps.Map(mapDivRef.current, {
+        center: { lat: destRef.current.lat, lng: destRef.current.lng },
+        zoom: 15,
+        disableDefaultUI: true,
+        gestureHandling: 'greedy',
+        zoomControl: true,
+        clickableIcons: false,
+        styles: [
+          { elementType: 'geometry',           stylers: [{ color: '#1e1e2e' }] },
+          { elementType: 'labels.text.stroke', stylers: [{ color: '#1e1e2e' }] },
+          { elementType: 'labels.text.fill',   stylers: [{ color: '#6b7280' }] },
+          { featureType: 'road', elementType: 'geometry',         stylers: [{ color: '#2d2d3f' }] },
+          { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
+          { featureType: 'water', elementType: 'geometry',        stylers: [{ color: '#111827' }] },
+          { featureType: 'poi',     stylers: [{ visibility: 'off' }] },
+          { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+        ],
+      });
+    }
+
+    attachRenderer();
+
+    // Place / update destination marker
+    if (destMarkerRef.current) {
+      destMarkerRef.current.setPosition({ lat: destRef.current.lat, lng: destRef.current.lng });
+    } else {
+      destMarkerRef.current = new google.maps.Marker({
+        position: { lat: destRef.current.lat, lng: destRef.current.lng },
+        map: mapRef.current,
+        icon: {
+          url: `data:image/svg+xml;charset=UTF-8,${DEST_PIN}`,
+          scaledSize: new google.maps.Size(24, 30),
+          anchor: new google.maps.Point(12, 30),
+        },
+        title: destRef.current.label,
+        zIndex: 2,
+      });
+    }
 
     setReady(true);
-    console.log('[NavMap] map ready');
-  }, []); // eslint-disable-line
 
+    // Draw route immediately if rider position is already known
+    if (riderPosRef.current) {
+      requestRoute(riderPosRef.current);
+    }
+  }, [attachRenderer, requestRoute]);
+
+  // Re-draw when destination changes (status update)
   useEffect(() => {
-    // Reset map instance when destination changes so it re-centers
-    rendererRef.current = null;
-    riderMarkerRef.current = null;
+    if (!mapRef.current) return;
     lastRouteRef.current = null;
-    mapRef.current = null;
-    setReady(false);
-  }, [destination.lat, destination.lng]);
+    attachRenderer();
+    mapRef.current.setCenter({ lat: destination.lat, lng: destination.lng });
+    mapRef.current.setZoom(15);
+    destMarkerRef.current?.setPosition({ lat: destination.lat, lng: destination.lng });
+    if (riderPosRef.current) requestRoute(riderPosRef.current);
+  }, [destination.lat, destination.lng, attachRenderer, requestRoute]);
 
+  // Load Google Maps script once
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if ((window as any).google?.maps) { initMap(); return; }
     const existing = document.getElementById('gmaps-script');
-    if (existing) { existing.addEventListener('load', initMap); return () => existing.removeEventListener('load', initMap); }
+    if (existing) {
+      existing.addEventListener('load', initMap);
+      return () => existing.removeEventListener('load', initMap);
+    }
     const s = document.createElement('script');
-    s.id = 'gmaps-script';
+    s.id  = 'gmaps-script';
     s.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}`;
     s.async = true; s.defer = true; s.onload = initMap;
     document.head.appendChild(s);
   }, [initMap]);
 
-  // Trigger re-init after reset
+  // Update rider marker and draw/refresh route when position changes
   useEffect(() => {
-    if (!ready && (window as any).google?.maps) initMap();
-  }, [ready, initMap]);
-
-  // Update rider marker + route whenever riderPos changes or map becomes ready
-  useEffect(() => {
-    console.log('[NavMap] riderPos/ready effect', { riderPos, ready });
     if (!riderPos || !ready || !mapRef.current) return;
 
-    // Place or move rider marker
     if (!riderMarkerRef.current) {
       riderMarkerRef.current = new google.maps.Marker({
         position: riderPos,
@@ -194,6 +190,12 @@ function NavMap({ destination, riderPos, fullscreen, onToggleFullscreen }: {
       riderMarkerRef.current.setPosition(riderPos);
     }
 
+    // Throttle route re-requests to ~30m movement
+    const prev = lastRouteRef.current;
+    if (prev) {
+      const d = Math.sqrt((riderPos.lat - prev.lat) ** 2 + (riderPos.lng - prev.lng) ** 2);
+      if (d < 0.0003) return;
+    }
     requestRoute(riderPos);
   }, [riderPos, ready, requestRoute]);
 
@@ -250,6 +252,16 @@ export default function RiderOrderPage() {
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Seed rider position immediately on mount so map can draw route as soon as it's ready
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setRiderPos({ lat: coords.latitude, lng: coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+  }, []);
+
   const { data: order, refetch } = useQuery({
     queryKey: ['order', id],
     queryFn: () => ordersApi.getById(id).then((r) => r.data.order as Order),
@@ -295,11 +307,17 @@ export default function RiderOrderPage() {
   const station   = typeof order.stationId === 'object' ? order.stationId as any : null;
   const customer  = typeof order.userId    === 'object' ? order.userId    as any : null;
 
-  const navDest = order.status === 'accepted' && station
-    ? { lat: station.lat, lng: station.lng, label: station.name }
-    : (order.status === 'at_station' || order.status === 'en_route') && order.deliveryAddress
-    ? { lat: order.deliveryAddress.lat, lng: order.deliveryAddress.lng, label: 'Customer Location' }
-    : null;
+  // accepted   → navigate to customer (pickup)
+  // at_station  → navigate to station (fill)
+  // en_route    → navigate back to customer (deliver)
+  const navDest =
+    order.status === 'accepted' && order.deliveryAddress
+      ? { lat: order.deliveryAddress.lat, lng: order.deliveryAddress.lng, label: 'Customer — Pickup' }
+      : order.status === 'at_station' && station
+      ? { lat: station.lat, lng: station.lng, label: station.name }
+      : order.status === 'en_route' && order.deliveryAddress
+      ? { lat: order.deliveryAddress.lat, lng: order.deliveryAddress.lng, label: 'Customer — Delivery' }
+      : null;
 
   return (
     <div className="min-h-screen bg-[var(--bg)] pb-10">
@@ -361,12 +379,49 @@ export default function RiderOrderPage() {
 
         {/* ── In-app map ── */}
         {navDest && (
-          <NavMap
-            destination={navDest}
-            riderPos={riderPos}
-            fullscreen={mapFullscreen}
-            onToggleFullscreen={() => setMapFullscreen((v) => !v)}
-          />
+          <>
+            <NavMap
+              destination={navDest}
+              riderPos={riderPos}
+              fullscreen={mapFullscreen}
+              onToggleFullscreen={() => setMapFullscreen((v) => !v)}
+            />
+            {/* Destination info strip */}
+            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl px-4 py-3 flex items-center gap-3">
+              <div className="w-9 h-9 bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">
+                <Navigation className="w-4 h-4 text-brand-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
+                  {order.status === 'accepted' ? 'Head to Customer' :
+                   order.status === 'at_station' ? 'Head to Station' :
+                   'Return to Customer'}
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{navDest.label}</p>
+                {order.status === 'accepted' && order.deliveryAddress && (
+                  <p className="text-xs text-[var(--text-muted)] truncate">
+                    {order.deliveryAddress.street}{order.deliveryAddress.city ? `, ${order.deliveryAddress.city}` : ''}
+                  </p>
+                )}
+                {order.status === 'at_station' && station && (
+                  <p className="text-xs text-[var(--text-muted)] truncate">{station.address}</p>
+                )}
+                {order.status === 'en_route' && order.deliveryAddress && (
+                  <p className="text-xs text-[var(--text-muted)] truncate">
+                    {order.deliveryAddress.street}{order.deliveryAddress.city ? `, ${order.deliveryAddress.city}` : ''}
+                  </p>
+                )}
+              </div>
+              <a
+                href={`https://maps.google.com/?q=${navDest.lat},${navDest.lng}`}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 bg-brand-500 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
+              >
+                <Navigation className="w-3 h-3" /> Go
+              </a>
+            </div>
+          </>
         )}
 
         {/* ── Current action ── */}
@@ -418,7 +473,7 @@ export default function RiderOrderPage() {
         {/* ── Station ── */}
         {station && (
           <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] shadow-sm p-4">
-            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3">Pickup Station</p>
+            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3">Refill Station</p>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-orange-500/10 rounded-xl flex items-center justify-center shrink-0">
                 <Store className="w-5 h-5 text-orange-500" />

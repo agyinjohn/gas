@@ -57,6 +57,13 @@ export interface IOrder extends Document {
     lng: number;
   };
 
+  pickupAddress: {
+    street: string;
+    city: string;
+    lat: number;
+    lng: number;
+  };
+
   // OTP confirmation
   otpCode: string;
   otpExpiresAt: Date;
@@ -167,6 +174,13 @@ const OrderSchema = new Schema<IOrder>(
       city: { type: String, required: true },
       lat: { type: Number, required: true },
       lng: { type: Number, required: true },
+    },
+
+    pickupAddress: {
+      street: { type: String, default: '' },
+      city:   { type: String, default: '' },
+      lat:    { type: Number, default: 0 },
+      lng:    { type: Number, default: 0 },
     },
 
     otpCode: { type: String, required: true },

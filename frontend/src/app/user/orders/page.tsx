@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import { Search, Package, X } from 'lucide-react';
@@ -12,22 +13,34 @@ import { useAuth } from '@/lib/auth';
 
 const ACTIVE_STATUSES = ['pending', 'accepted', 'at_station', 'en_route'];
 
-function OrderCard({ order, active }: { order: Order; active: boolean }) {
+function OrderCard({ order, active, tab }: { order: Order; active: boolean; tab: 'active' | 'past' }) {
   const date = new Date(order.createdAt).toLocaleString('en-GH', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 
+  const PAST_STATUSES = ['delivered', 'cancelled'];
+  const statusColor = order.status === 'cancelled' ? 'text-red-500 bg-red-500/10' : 'text-green-500 bg-green-500/10';
+  const statusLabel = order.status === 'cancelled' ? 'Cancelled' : 'Completed';
+  const showStatus = !active && PAST_STATUSES.includes(order.status);
+
   return (
-    <Link href={`/user/orders/${order._id}`} className="block">
+    <Link href={`/user/orders/${order._id}?tab=${tab}`} className="block">
       <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 active:scale-[0.99] transition-transform">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-bold text-[var(--text-primary)]">
               Order #{order._id.slice(-8).toUpperCase()}
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">{date}</p>
           </div>
-          <p className="text-sm font-black text-brand-500">{formatCurrency(order.totalAmount)}</p>
+          <div className="flex flex-col items-end shrink-0">
+            <p className="text-sm font-black text-brand-500">{formatCurrency(order.totalAmount)}</p>
+            {showStatus && (
+              <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap mt-1', statusColor)}>
+                {statusLabel}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="border-t border-[var(--border)] mt-3 pt-3 space-y-2">
@@ -60,7 +73,8 @@ function OrderCard({ order, active }: { order: Order; active: boolean }) {
 }
 
 export default function UserOrdersPage() {
-  const [tab, setTab]           = useState<'active' | 'past'>('active');
+  const searchParams = useSearchParams();
+  const currentTab = (searchParams.get('tab') as 'active' | 'past' | null) ?? 'active';
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch]     = useState('');
   const { isLoading: authLoading } = useAuth();
@@ -84,7 +98,7 @@ export default function UserOrdersPage() {
 
   const active = filtered.filter((o) => ACTIVE_STATUSES.includes(o.status));
   const past   = filtered.filter((o) => !ACTIVE_STATUSES.includes(o.status));
-  const shown  = tab === 'active' ? active : past;
+  const shown  = currentTab === 'active' ? active : past;
 
   return (
     <div className="min-h-full bg-[var(--bg)] pb-24">
@@ -130,18 +144,18 @@ export default function UserOrdersPage() {
         {/* Tabs */}
         <div className="flex">
           {(['active', 'past'] as const).map((t) => (
-            <button
+            <Link
               key={t}
-              onClick={() => setTab(t)}
+              href={`/user/orders?tab=${t}`}
               className={cn(
                 'flex-1 pb-3 text-sm font-semibold transition-colors border-b-2',
-                tab === t
+                currentTab === t
                   ? 'text-brand-500 border-brand-500'
                   : 'text-[var(--text-muted)] border-transparent'
               )}
             >
               {t === 'active' ? 'Active Orders' : 'Past Orders'}
-            </button>
+            </Link>
           ))}
         </div>
       </div>
@@ -186,7 +200,7 @@ export default function UserOrdersPage() {
 
         {/* Order cards */}
         {!isLoading && shown.map((o) => (
-          <OrderCard key={o._id} order={o} active={tab === 'active'} />
+          <OrderCard key={o._id} order={o} active={currentTab === 'active'} tab={currentTab} />
         ))}
       </div>
     </div>

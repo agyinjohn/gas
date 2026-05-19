@@ -93,11 +93,20 @@ export function totalCylinderCount(cylinders: CylinderLineItem[]): number {
   return cylinders.reduce((sum, c) => sum + c.quantity, 0);
 }
 
-// ─── Delivery fee scaling ─────────────────────────────────────────────────────
+// ─── Delivery fee ─────────────────────────────────────────────────────────────
 
-export function calcDeliveryFee(baseFee: number, totalQty: number): number {
-  const multiplier = totalQty === 1 ? 1 : totalQty === 2 ? 1.5 : 2.0;
-  return +(baseFee * multiplier).toFixed(2);
+export const DELIVERY_BASE_FEE        = 15;    // GHS — floor, never charge less
+export const DELIVERY_RATE_PER_KM     = 5 // GHS per km (adjustable)
+export const DELIVERY_DISTANCE_FACTOR = 1.5;   // effective trip multiplier (round-trip discount)
+
+/**
+ * Calculate delivery fee based on straight-line distance from customer to station.
+ * Effective distance = 1.5 × distanceKm (round-trip with discount).
+ * Fee = max(DELIVERY_BASE_FEE, round(effectiveDistance × DELIVERY_RATE_PER_KM))
+ */
+export function calcDeliveryFee(distanceKm: number): number {
+  const effective = DELIVERY_DISTANCE_FACTOR * distanceKm;
+  return Math.max(DELIVERY_BASE_FEE, Math.round(effective * DELIVERY_RATE_PER_KM));
 }
 
 // ─── Order progress ───────────────────────────────────────────────────────────
