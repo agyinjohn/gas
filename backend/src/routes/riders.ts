@@ -6,6 +6,7 @@ import { Order } from '../models/Order';
 import { Payout } from '../models/Payout';
 import { authenticate, AuthRequest } from '../middleware/authenticate';
 import { io } from '../services/realtimeService';
+import { handleRiderWentOffline } from '../services/dispatchService';
 import { createTransferRecipient, transferToBeneficiary, generatePaymentReference } from '../services/paymentService';
 
 const router = Router();
@@ -72,6 +73,14 @@ router.patch(
 
     rider.status = req.body.status;
     await rider.save();
+
+    // Re-dispatch any pending order assigned to this rider if they go offline
+    if (req.body.status === 'offline') {
+      handleRiderWentOffline(rider._id.toString()).catch((err) =>
+        console.error('[Riders] handleRiderWentOffline error:', err)
+      );
+    }
+
     res.json({ success: true, status: rider.status });
   }
 );

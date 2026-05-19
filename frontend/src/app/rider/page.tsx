@@ -45,23 +45,6 @@ export default function RiderHomePage() {
 
   const isOnline = riderData?.status === 'available' || riderData?.status === 'busy';
 
-  // GPS broadcasting while online — fire immediately then every 12s
-  useEffect(() => {
-    if (!isOnline) return;
-    function sendLocation() {
-      navigator.geolocation?.getCurrentPosition(
-        ({ coords }) => {
-          console.log('[Rider] Sending GPS:', coords.latitude, coords.longitude);
-          ridersApi.updateLocation(coords.latitude, coords.longitude).catch(console.error);
-        },
-        (err) => console.warn('[Rider] GPS error:', err.message)
-      );
-    }
-    sendLocation(); // immediate
-    const interval = setInterval(sendLocation, 12000);
-    return () => clearInterval(interval);
-  }, [isOnline]);
-
   // Join personal rider socket room — wait for connection if needed
   useEffect(() => {
     if (!riderData?._id) return;
@@ -207,29 +190,31 @@ export default function RiderHomePage() {
 
       {/* Active Orders */}
       {activeOrders.length > 0 && (
-        <div className="px-4 mt-4 space-y-3">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+        <div className="mt-4">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest px-4 mb-3">
             Active Orders ({activeOrders.length})
           </p>
-          {activeOrders.map((activeOrder) => (
-            <Link key={activeOrder._id} href={`/rider/orders/${activeOrder._id}`}>
-              <Card className="border-2 border-brand-200">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-brand-600 uppercase tracking-wide">Active Order</p>
-                  <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">
-                    {(ORDER_STATUS_LABELS as Record<string, string>)[activeOrder.status]}
-                  </span>
-                </div>
-                <p className="font-semibold text-gray-900">
-                  {formatCylinders(activeOrder.cylinders)} · {activeOrder.orderType}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {activeOrder.deliveryAddress.street}, {activeOrder.deliveryAddress.city}
-                </p>
-                <p className="text-xs text-brand-500 mt-2 font-medium">Tap to view details →</p>
-              </Card>
-            </Link>
-          ))}
+          <div className={activeOrders.length === 1 ? 'px-4' : 'flex gap-3 overflow-x-auto pb-2 px-4 scrollbar-hide'}>
+            {activeOrders.map((activeOrder) => (
+              <Link key={activeOrder._id} href={`/rider/orders/${activeOrder._id}`} className={activeOrders.length === 1 ? 'block' : 'shrink-0 w-64'}>
+                <Card className="border-2 border-brand-200 h-full">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">
+                      {(ORDER_STATUS_LABELS as Record<string, string>)[activeOrder.status]}
+                    </span>
+                    <p className="text-[10px] text-gray-400 font-medium">#{activeOrder._id.slice(-6).toUpperCase()}</p>
+                  </div>
+                  <p className="font-semibold text-gray-900 text-sm">
+                    {formatCylinders(activeOrder.cylinders)} · {activeOrder.orderType}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 truncate">
+                    {activeOrder.deliveryAddress.street}, {activeOrder.deliveryAddress.city}
+                  </p>
+                  <p className="text-xs text-brand-500 mt-2 font-medium">Tap to view →</p>
+                </Card>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 

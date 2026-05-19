@@ -21,6 +21,12 @@ export function initSocketIO(socketServer: SocketServer): void {
   io.on('connection', (socket: Socket) => {
     console.log(`[Socket] New connection: ${socket.id}`);
 
+    // Admin joins their room to receive escalation alerts
+    socket.on('join:admin', () => {
+      socket.join('admin');
+      console.log(`[Socket] Admin joined admin room — socket=${socket.id}`);
+    });
+
     // Join order-specific room for scoped broadcasts
     socket.on('join:order', (orderId: string) => {
       socket.join(`order:${orderId}`);

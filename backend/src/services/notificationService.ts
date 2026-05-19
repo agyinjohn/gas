@@ -6,28 +6,9 @@ interface PushPayload {
   data?: Record<string, string>;
 }
 
-/**
- * Send Firebase Cloud Messaging push notification.
- */
-export async function sendPushNotification(fcmToken: string, payload: PushPayload): Promise<void> {
-  try {
-    await axios.post(
-      'https://fcm.googleapis.com/fcm/send',
-      {
-        to: fcmToken,
-        notification: { title: payload.title, body: payload.body },
-        data: payload.data || {},
-      },
-      {
-        headers: {
-          Authorization: `key=${process.env.FCM_SERVER_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-  } catch (err) {
-    console.error('[FCM] Push notification failed:', err);
-  }
+/** @deprecated FCM removed — use sendSMS instead */
+export async function sendPushNotification(_fcmToken: string, _payload: PushPayload): Promise<void> {
+  console.warn('[Notification] sendPushNotification called but FCM is disabled — use sendSMS');
 }
 
 /**

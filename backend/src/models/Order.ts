@@ -3,6 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IDispatchAttempt {
   riderId: mongoose.Types.ObjectId;
   sentAt: Date;
+  respondedAt?: Date;
   outcome: 'accepted' | 'declined' | 'timeout';
 }
 
@@ -129,13 +130,14 @@ const StatusEventSchema = new Schema<IStatusEvent>({
 }, { _id: false });
 
 const DispatchAttemptSchema = new Schema<IDispatchAttempt>({
-  riderId: { type: Schema.Types.ObjectId, required: true, ref: 'Rider' },
-  sentAt: { type: Date, default: Date.now },
-  outcome: { type: String, enum: ['accepted', 'declined', 'timeout'] },
+  riderId:     { type: Schema.Types.ObjectId, required: true, ref: 'Rider' },
+  sentAt:      { type: Date, default: Date.now },
+  respondedAt: { type: Date },
+  outcome:     { type: String, enum: ['accepted', 'declined', 'timeout'] },
 }, { _id: false });
 
 const CylinderLineItemSchema = new Schema<ICylinderLineItem>({
-  size:      { type: Number, enum: [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48], required: true },
+  size:      { type: Number, enum: [3, 5, 6, 7, 8, 10, 13, 14, 16, 19, 25, 30, 35, 49, 50, 55, 60, 72], required: true },
   quantity:  { type: Number, required: true, min: 1 },
   unitPrice: { type: Number, required: true, min: 0 },
   subtotal:  { type: Number, required: true, min: 0 },
@@ -219,7 +221,7 @@ const OrderSchema = new Schema<IOrder>(
 
     dispatchAttempts: [DispatchAttemptSchema],
     deliveryPhotoUrl: String,
-    exchangeOldSize: { type: Number, enum: [3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48] },
+    exchangeOldSize: { type: Number, enum: [3, 5, 6, 7, 8, 10, 13, 14, 16, 19, 25, 30, 35, 49, 50, 55, 60, 72] },
     cancellationReason: String,
     cancelledBy: { type: String, enum: ['user', 'station', 'admin', 'system'] },
     isScheduled: { type: Boolean, default: false },

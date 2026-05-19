@@ -182,7 +182,7 @@ export default function RiderEarningsPage() {
                           {formatCurrency(payout.amountGHS)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Order #{payout.orderId?.slice(-6).toUpperCase()}
+                          Order #{(typeof payout.orderId === 'string' ? payout.orderId : payout.orderId?._id)?.slice(-6).toUpperCase()}
                         </p>
                       </div>
                       <Badge className={

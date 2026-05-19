@@ -1,15 +1,40 @@
 import mongoose from 'mongoose';
 import { Order } from '../models/Order';
 import { Rider } from '../models/Rider';
+import { Admin } from '../models/Admin';
 import { CONSTANTS } from '../config/constants';
 import { getNearbyRiders } from './geoService';
-import { emitOrderToRider, emitOrderToStation } from './realtimeService';
-import { sendPushNotification } from './notificationService';
+import { emitOrderToRider, emitOrderToStation, io } from './realtimeService';
+import { sendSMS } from './notificationService';
 
-// In-memory lock to prevent concurrent dispatch for the same order
-const dispatchLocks = new Set<string>();
+// Max hard declines before escalating — timeouts don't count toward this
+const MAX_DECLINES = 5;
 
-/** Returns how many active (undelivered) orders a rider currently has */
+// Radius expansion per retry tier (km)
+const RADIUS_TIERS = [
+  CONSTANTS.DISPATCH_RADIUS_KM,
+  CONSTANTS.DISPATCH_RADIUS_KM * 1.5,
+  CONSTANTS.DISPATCH_RADIUS_KM * 2,
+];
+
+// Redis-based distributed lock would be ideal at scale;
+// using in-memory map with expiry as a safe fallback for single-instance
+const dispatchLocks = new Map<string, NodeJS.Timeout>();
+
+function acquireLock(orderId: string): boolean {
+  if (dispatchLocks.has(orderId)) return false;
+  // Auto-release lock after 2× timeout to prevent permanent locks on crash
+  const timer = setTimeout(() => dispatchLocks.delete(orderId), CONSTANTS.ORDER_ACCEPT_TIMEOUT_MS * 2);
+  dispatchLocks.set(orderId, timer);
+  return true;
+}
+
+function releaseLock(orderId: string): void {
+  const timer = dispatchLocks.get(orderId);
+  if (timer) clearTimeout(timer);
+  dispatchLocks.delete(orderId);
+}
+
 async function getRiderActiveOrderCount(riderId: mongoose.Types.ObjectId | string): Promise<number> {
   return Order.countDocuments({
     riderId,
@@ -17,21 +42,24 @@ async function getRiderActiveOrderCount(riderId: mongoose.Types.ObjectId | strin
   });
 }
 
-/** Returns the max concurrent orders allowed for a vehicle type */
 function getVehicleCapacity(vehicleType: string): number {
   return CONSTANTS.VEHICLE_ORDER_LIMITS[vehicleType] ?? 3;
 }
 
+function isRiderOnline(riderId: string): boolean {
+  const roomSize = io?.sockets?.adapter?.rooms?.get(`rider:${riderId}`)?.size ?? 0;
+  return roomSize > 0;
+}
+
 export async function dispatchOrder(orderId: string): Promise<void> {
-  if (dispatchLocks.has(orderId)) {
+  if (!acquireLock(orderId)) {
     console.log(`[Dispatch] Order ${orderId} already being dispatched — skipping`);
     return;
   }
-  dispatchLocks.add(orderId);
   try {
     await _dispatchOrder(orderId);
   } finally {
-    dispatchLocks.delete(orderId);
+    releaseLock(orderId);
   }
 }
 
@@ -43,74 +71,81 @@ async function _dispatchOrder(orderId: string): Promise<void> {
   }
 
   const station = order.stationId as unknown as { _id: mongoose.Types.ObjectId; lat: number; lng: number; name: string };
-  console.log(`[Dispatch] Order ${orderId} — station: ${station.name} (${station.lat}, ${station.lng})`);
-  console.log(`[Dispatch] Dispatch attempts so far: ${order.dispatchAttempts.length}/${CONSTANTS.MAX_DISPATCH_ATTEMPTS}`);
 
-  if (order.dispatchAttempts.length >= CONSTANTS.MAX_DISPATCH_ATTEMPTS) {
-    console.log(`[Dispatch] Max attempts reached — escalating`);
-    await escalateToAdmin(orderId);
+  // Count only hard declines — timeouts don't block escalation
+  const declineCount = order.dispatchAttempts.filter((a) => a.outcome === 'declined').length;
+  const attemptTier  = order.dispatchAttempts.length;
+
+  console.log(`[Dispatch] Order ${orderId} — declines: ${declineCount}/${MAX_DECLINES}, attempts: ${attemptTier}`);
+
+  if (declineCount >= MAX_DECLINES) {
+    console.log(`[Dispatch] Max declines reached — escalating`);
+    await escalateToAdmin(orderId, 'Max rider declines reached');
     return;
   }
 
-  // Already-attempted rider IDs for this order
   const attemptedIds = new Set(order.dispatchAttempts.map((a) => a.riderId.toString()));
 
-  // ── Find eligible riders within dispatch radius of the station ────────────
-  // Only riders physically near the station are eligible — no cross-city dispatch
-  const nearbyRiders = await getNearbyRiders(station.lat, station.lng, CONSTANTS.DISPATCH_RADIUS_KM);
-  console.log(`[Dispatch] Nearby riders within ${CONSTANTS.DISPATCH_RADIUS_KM}km: ${nearbyRiders.length}`);
+  // Expand search radius on each retry tier
+  const radiusKm = RADIUS_TIERS[Math.min(attemptTier, RADIUS_TIERS.length - 1)];
+  console.log(`[Dispatch] Searching radius: ${radiusKm}km (tier ${Math.min(attemptTier, RADIUS_TIERS.length - 1)})`);
 
-  // Filter out already-attempted riders
+  const nearbyRiders = await getNearbyRiders(station.lat, station.lng, radiusKm);
   const nearbyEligible = nearbyRiders.filter((r) => !attemptedIds.has(r.riderId));
-  console.log(`[Dispatch] Eligible after filtering attempted: ${nearbyEligible.length}`);
+
+  console.log(`[Dispatch] Nearby: ${nearbyRiders.length}, eligible (not attempted): ${nearbyEligible.length}`);
 
   if (nearbyEligible.length === 0) {
-    console.log(`[Dispatch] No nearby eligible riders — escalating`);
-    await escalateToAdmin(orderId);
+    await escalateToAdmin(orderId, 'No eligible riders in range');
     return;
   }
 
-  // Fetch full rider docs for capacity check, sorted by distance (nearest first)
   const riderDocs = await Rider.find({
     _id: { $in: nearbyEligible.map((r) => new mongoose.Types.ObjectId(r.riderId)) },
     kycStatus: 'approved',
     status: { $in: ['available', 'busy'] },
-  }).select('_id name status vehicleType location').lean();
+    isActive: true,
+  }).select('_id name status vehicleType location phone').lean();
 
-  // Re-sort by distance order from geo query
   const distanceMap = new Map(nearbyEligible.map((r) => [r.riderId, r.distanceKm]));
   riderDocs.sort((a, b) => (distanceMap.get(a._id.toString()) ?? 999) - (distanceMap.get(b._id.toString()) ?? 999));
 
-  console.log(`[Dispatch] Riders in radius with valid status: ${riderDocs.length}`);
-
-  // Find first rider under their vehicle capacity
+  // Pick first rider who is: online via socket AND under vehicle capacity
+  // Falls back to offline riders (SMS-only) if no online rider found
   let rider = null;
+  let riderIsOnline = false;
+
   for (const candidate of riderDocs) {
-    const capacity = getVehicleCapacity(candidate.vehicleType);
+    const capacity    = getVehicleCapacity(candidate.vehicleType);
     const activeCount = await getRiderActiveOrderCount(candidate._id);
-    console.log(`[Dispatch] Candidate ${candidate.name} (${candidate.vehicleType}) — active: ${activeCount}/${capacity} — dist: ${distanceMap.get(candidate._id.toString())?.toFixed(1)}km`);
+    const online      = isRiderOnline(candidate._id.toString());
+    console.log(`[Dispatch] Candidate ${candidate.name} — active: ${activeCount}/${capacity}, online: ${online}, dist: ${distanceMap.get(candidate._id.toString())?.toFixed(1)}km`);
+
     if (activeCount < capacity) {
-      rider = candidate;
-      break;
+      if (online) {
+        rider = candidate;
+        riderIsOnline = true;
+        break;
+      }
+      // Keep as fallback if no online rider found
+      if (!rider) rider = candidate;
     }
   }
 
   if (!rider) {
-    console.log(`[Dispatch] All nearby riders at capacity — escalating`);
-    await escalateToAdmin(orderId);
+    await escalateToAdmin(orderId, 'All nearby riders at capacity');
     return;
   }
 
-  console.log(`[Dispatch] Selected rider: ${rider.name} (${rider._id}) — emitting order:new`);
+  console.log(`[Dispatch] Selected rider: ${rider.name} (${rider._id}) — online: ${riderIsOnline}`);
 
+  const attemptIndex = order.dispatchAttempts.length;
   order.dispatchAttempts.push({
     riderId: new mongoose.Types.ObjectId(rider._id.toString()),
-    sentAt: new Date(),
+    sentAt:  new Date(),
     outcome: 'timeout',
   });
   await order.save();
-
-  const attemptIndex = order.dispatchAttempts.length - 1;
 
   const orderSummary = {
     orderId:         order._id.toString(),
@@ -121,19 +156,18 @@ async function _dispatchOrder(orderId: string): Promise<void> {
     timeoutSeconds:  CONSTANTS.ORDER_ACCEPT_TIMEOUT_MS / 1000,
   };
 
+  // Always emit socket event (rider may reconnect within timeout window)
   emitOrderToRider(rider._id.toString(), orderSummary);
-  const roomSize = (require('./realtimeService').io as any)?.sockets?.adapter?.rooms?.get(`rider:${rider._id}`)?.size ?? 0;
-  console.log(`[Dispatch] Socket emitted to rider:${rider._id} — room size: ${roomSize}`);
 
-  // Push notification
-  const fullRider = await Rider.findById(rider._id).select('fcmToken');
-  if (fullRider?.fcmToken) {
-    const sizes = order.cylinders.map((c) => `${c.quantity}×${c.size}kg`).join(', ');
-    await sendPushNotification(fullRider.fcmToken, {
-      title: 'New Delivery Order 🛵',
-      body: `${sizes} — GH₵${orderSummary.earning}. Tap to accept.`,
-      data: { orderId: order._id.toString(), screen: 'OrderAccept' },
-    });
+  // Always send SMS — primary notification channel
+  const sizes = order.cylinders.map((c) => `${c.quantity}x${c.size}kg`).join(', ');
+  try {
+    await sendSMS(
+      rider.phone,
+      `GetGas: New delivery order! ${sizes} — GH₵${order.deliveryFee}. Open the app to accept. Order #${order._id.toString().slice(-6).toUpperCase()}`
+    );
+  } catch (err) {
+    console.error('[Dispatch] SMS to rider failed:', err);
   }
 
   emitOrderToStation(station._id.toString(), {
@@ -144,14 +178,15 @@ async function _dispatchOrder(orderId: string): Promise<void> {
     riderName:       rider.name,
   });
 
-  // Timeout — try next rider if not accepted
+  // Timeout — re-dispatch to next rider if still pending
   setTimeout(async () => {
     try {
       const freshOrder = await Order.findById(orderId);
       if (!freshOrder || freshOrder.status !== 'pending') return;
+
       const attempt = freshOrder.dispatchAttempts[attemptIndex];
-      if (attempt && attempt.riderId.toString() === rider!._id.toString()) {
-        attempt.outcome = 'timeout';
+      if (attempt && attempt.outcome === 'timeout') {
+        attempt.respondedAt = new Date();
         await freshOrder.save();
       }
       await dispatchOrder(orderId);
@@ -164,28 +199,83 @@ async function _dispatchOrder(orderId: string): Promise<void> {
 export async function markDispatchAccepted(orderId: string, riderId: string): Promise<void> {
   await Order.updateOne(
     { _id: orderId, 'dispatchAttempts.riderId': new mongoose.Types.ObjectId(riderId) },
-    { $set: { 'dispatchAttempts.$.outcome': 'accepted' } }
+    { $set: { 'dispatchAttempts.$.outcome': 'accepted', 'dispatchAttempts.$.respondedAt': new Date() } }
   );
 }
 
 export async function markDispatchDeclined(orderId: string, riderId: string): Promise<void> {
   await Order.updateOne(
     { _id: orderId, 'dispatchAttempts.riderId': new mongoose.Types.ObjectId(riderId) },
-    { $set: { 'dispatchAttempts.$.outcome': 'declined' } }
+    { $set: { 'dispatchAttempts.$.outcome': 'declined', 'dispatchAttempts.$.respondedAt': new Date() } }
   );
   await dispatchOrder(orderId);
 }
 
-async function escalateToAdmin(orderId: string): Promise<void> {
+/**
+ * Called when a rider goes offline — immediately re-dispatches any pending
+ * order that was sent to this rider and hasn't been accepted yet.
+ */
+export async function handleRiderWentOffline(riderId: string): Promise<void> {
+  const order = await Order.findOne({
+    status: 'pending',
+    'dispatchAttempts': {
+      $elemMatch: {
+        riderId: new mongoose.Types.ObjectId(riderId),
+        outcome: 'timeout', // still waiting on this rider
+      },
+    },
+  }).select('_id dispatchAttempts');
+
+  if (!order) return;
+
+  // Mark the pending attempt as timed out with respondedAt
+  const attempt = order.dispatchAttempts.find(
+    (a) => a.riderId.toString() === riderId && a.outcome === 'timeout'
+  );
+  if (attempt) {
+    attempt.outcome     = 'timeout';
+    attempt.respondedAt = new Date();
+    await order.save();
+  }
+
+  console.log(`[Dispatch] Rider ${riderId} went offline — re-dispatching order ${order._id}`);
+  await dispatchOrder(order._id.toString());
+}
+
+async function escalateToAdmin(orderId: string, reason: string): Promise<void> {
   await Order.findByIdAndUpdate(orderId, {
     $push: {
       statusHistory: {
-        status: 'pending',
+        status:      'pending',
         triggeredBy: 'system',
-        timestamp: new Date(),
-        note: 'Escalated to admin — no riders available or all at capacity',
+        timestamp:   new Date(),
+        note:        `Escalated to admin — ${reason}`,
       },
     },
   });
-  console.warn(`[Dispatch] Order ${orderId} escalated — no riders available or all at capacity`);
+
+  console.warn(`[Dispatch] Order ${orderId} escalated — ${reason}`);
+
+  // Notify all active admins via SMS
+  try {
+    const admins = await Admin.find({ isActive: true }).select('phone').lean();
+    const shortId = orderId.slice(-6).toUpperCase();
+    await Promise.allSettled(
+      admins.map((admin) =>
+        sendSMS(
+          admin.phone,
+          `GetGas ALERT: Order #${shortId} needs manual rider assignment. Reason: ${reason}. Login to admin dashboard.`
+        )
+      )
+    );
+  } catch (err) {
+    console.error('[Dispatch] Admin SMS escalation failed:', err);
+  }
+
+  // Emit to admin socket room
+  try {
+    io?.to('admin').emit('order:escalated', { orderId, reason, timestamp: new Date() });
+  } catch (err) {
+    console.error('[Dispatch] Admin socket emit failed:', err);
+  }
 }

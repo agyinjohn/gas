@@ -283,7 +283,7 @@ export default function RiderOrderPage() {
       toast.success(action.next === 'delivered' ? 'Delivery confirmed! 🎉' : 'Status updated!');
       if (action.next === 'delivered') {
         queryClient.invalidateQueries({ queryKey: ['rider', 'dashboard'] });
-        router.push('/rider/dashboard');
+        router.push('/rider');
       } else {
         refetch();
         queryClient.invalidateQueries({ queryKey: ['rider', 'dashboard'] });
