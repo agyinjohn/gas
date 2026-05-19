@@ -185,9 +185,9 @@ export default function UserOrdersPage() {
               <Package className="w-7 h-7 text-brand-500" />
             </div>
             <p className="text-sm font-bold text-[var(--text-primary)]">
-              {search ? 'No orders match your search' : tab === 'active' ? 'No active orders' : 'No past orders'}
+              {search ? 'No orders match your search' : currentTab === 'active' ? 'No active orders' : 'No past orders'}
             </p>
-            {!search && tab === 'active' && (
+            {!search && currentTab === 'active' && (
               <>
                 <p className="text-xs text-[var(--text-muted)] mt-1 mb-4">Order gas from your nearest station.</p>
                 <Link href="/user" className="inline-block bg-brand-500 text-white text-sm font-bold px-5 py-3 rounded-xl">
