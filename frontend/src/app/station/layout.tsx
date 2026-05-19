@@ -18,7 +18,7 @@ const NAV = [
   { href: '/station',           icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { href: '/station/orders',    icon: Package,         label: 'Orders'                 },
   { href: '/station/pricing',   icon: DollarSign,      label: 'Pricing'                },
-  { href: '/station/analytics', icon: BarChart2,       label: 'Analytics'              },
+  // { href: '/station/analytics', icon: BarChart2,       label: 'Analytics'              },
   { href: '/station/settings',  icon: Settings,        label: 'Settings'               },
 ];
 
