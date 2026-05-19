@@ -1,6 +1,6 @@
 export const CONSTANTS = {
   // Cylinder sizes in kg
-  CYLINDER_SIZES: [3, 6, 12] as const,
+  CYLINDER_SIZES: [3, 5, 6, 7, 8, 10, 13, 14, 16, 19, 25, 30, 35, 49, 50, 55, 60, 72] as const,
 
   // Order types
   ORDER_TYPES: ['fill', 'delivery', 'exchange'] as const,

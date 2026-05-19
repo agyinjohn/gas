@@ -71,7 +71,7 @@ router.get(
     query('lat').isFloat({ min: -90, max: 90 }),
     query('lng').isFloat({ min: -180, max: 180 }),
     query('radius').optional().isFloat({ min: 1, max: 25 }),
-    query('size').optional().isIn(['3', '4', '5', '6', '9', '11', '12', '14', '15', '18', '19', '20', '30', '47', '48']),
+    query('size').optional().isIn(['3', '5', '6', '7', '8', '10', '13', '14', '16', '19', '25', '30', '35', '49', '50', '55', '60', '72']),
   ],
   async (req: Request, res: Response) => {
     if (ve(req, res)) return;
@@ -399,7 +399,7 @@ router.patch(
  */
 router.post(
   '/:id/exchange-returns',
-  [body('size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]), body('quantity').optional().isInt({ min: 1 })],
+  [body('size').isIn([3, 5, 6, 7, 8, 10, 13, 14, 16, 19, 25, 30, 35, 49, 50, 55, 60, 72]), body('quantity').optional().isInt({ min: 1 })],
   async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
 
@@ -444,7 +444,7 @@ router.post(
  */
 router.patch(
   '/:id/refill-complete',
-  [body('size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]), body('quantity').optional().isInt({ min: 1 })],
+  [body('size').isIn([3, 5, 6, 7, 8, 10, 13, 14, 16, 19, 25, 30, 35, 49, 50, 55, 60, 72]), body('quantity').optional().isInt({ min: 1 })],
   async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
 

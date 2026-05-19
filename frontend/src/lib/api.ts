@@ -84,7 +84,7 @@ export const stationsApi = {
   getReviews: (id: string, page = 1) =>
     api.get(`/api/v1/stations/${id}/reviews`, { params: { page } }),
   updateOperatingHours: (id: string, data: object) =>
-    api.patch(`/api/v1/stations/${id}/operating-hours`, data),
+    api.patch(`/api/v1/stations/${id}/settings`, data),
 };
 
 export const ordersApi = {

@@ -51,7 +51,7 @@ export default function StationSettingsPage() {
 
   const hoursUpdateMutation = useMutation({
     mutationFn: ({ day, isOpen }: { day: string; isOpen: boolean }) =>
-      stationsApi.updateOperatingHours(stationId, { day, isOpen }),
+      stationsApi.updateOperatingHours(stationId, { operatingHours: { [day]: { isOpen } } }),
     onSuccess: (_data, { day, isOpen }) => {
       queryClient.invalidateQueries({ queryKey: ['station', stationId] });
       toast.success(isOpen ? `${DAY_LABELS[day as keyof typeof DAY_LABELS]} is now open` : `${DAY_LABELS[day as keyof typeof DAY_LABELS]} is now closed`);
