@@ -15,7 +15,7 @@ import type { PickedLocation } from '@/components/LocationPicker';
 
 const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
 
-const MIN_CYLINDER_PRICE = 50; // GHS — floor price regardless of station listing
+const MIN_CYLINDER_PRICE = 20; // GHS — floor price regardless of station listing
 
 interface StationT {
   id: string; _id?: string; name: string; address: string;
@@ -237,7 +237,7 @@ export default function CheckoutPage() {
   function handleContinue() {
     if (!effectiveStationId)  { toast.error('Please select a station'); return; }
     if (totalQty === 0)        { toast.error('Select at least one cylinder'); return; }
-    if (hasPriceError)         { toast.error('One or more prices are outside the allowed range (₵50 – full fill cost)'); return; }
+    if (hasPriceError)         { toast.error('One or more prices are outside the allowed range (₵20 – full fill cost)'); return; }
     if (!pickupLoc)            { toast.error('Please set your pickup location'); return; }
     const effectiveDelivery = sameAsPickup ? pickupLoc : deliveryLoc;
     if (!effectiveDelivery)    { toast.error('Please set your delivery location'); return; }
