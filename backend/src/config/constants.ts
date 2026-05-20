@@ -1,6 +1,6 @@
 export const CONSTANTS = {
   // Cylinder sizes in kg
-  CYLINDER_SIZES: [3, 5, 6, 7, 8, 10, 13, 14, 16, 19, 25, 30, 35, 49, 50, 55, 60, 72] as const,
+  CYLINDER_SIZES: [3, 4, 5, 6, 7, 8, 10, 13, 14, 16, 19, 25, 30, 35, 49, 50, 55, 60, 72] as const,
 
   // Order types
   ORDER_TYPES: ['fill', 'delivery', 'exchange'] as const,
@@ -41,8 +41,8 @@ export const CONSTANTS = {
   // Vehicle order capacity limits
   VEHICLE_ORDER_LIMITS: {
     motorbike: 3,
-    tricycle:  9,
-    van:       15,
+    tricycle: 9,
+    van: 15,
   } as Record<string, number>,
 
   // OTP
