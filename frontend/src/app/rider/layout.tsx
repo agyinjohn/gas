@@ -80,7 +80,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
 
     console.log('[Rider:Location] Starting location tracking...');
 
-    // Trigger permission prompt + get first fix immediately
+    // Trigger permission prompt + get first fix — try high accuracy, fall back to low
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         setLocationPermission('granted');
@@ -89,14 +89,26 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
           console.error('[Rider:Location] Initial DB update failed:', err)
         );
       },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setLocationPermission('denied');
-        console.warn(`[Rider:Location] Initial fix failed — code=${err.code} (1=denied, 2=unavailable, 3=timeout), message=${err.message}`);
+      () => {
+        // High accuracy failed — retry with low accuracy (works on desktop/weak GPS)
+        console.warn('[Rider:Location] High accuracy fix failed, retrying with low accuracy...');
+        navigator.geolocation.getCurrentPosition(
+          ({ coords }) => {
+            setLocationPermission('granted');
+            console.log(`[Rider:Location] Initial fix (low accuracy) — lat=${coords.latitude}, lng=${coords.longitude}, accuracy=${coords.accuracy}m`);
+            ridersApi.updateLocation(coords.latitude, coords.longitude).catch(() => {});
+          },
+          (err) => {
+            if (err.code === err.PERMISSION_DENIED) setLocationPermission('denied');
+            console.warn(`[Rider:Location] Initial fix failed — code=${err.code} (1=denied, 2=unavailable, 3=timeout), message=${err.message}`);
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+        );
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
-    // Continuous watch — fires on every position change
+    // Continuous watch — try high accuracy, fall back gracefully
     watchIdRef.current = navigator.geolocation.watchPosition(
       ({ coords }) => {
         const { latitude: lat, longitude: lng, accuracy } = coords;
@@ -105,14 +117,22 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
         ridersApi.updateLocation(lat, lng).catch((err) =>
           console.error('[Rider:Location] DB update failed:', err)
         );
-        // Emit for any socket listeners (station dashboard, admin map)
         getSocket().emit('rider:location:idle', { lat, lng });
       },
       (err) => {
-        if (err.code === err.PERMISSION_DENIED) setLocationPermission('denied');
-        console.error(`[Rider:Location] watchPosition error — code=${err.code} (1=denied, 2=unavailable, 3=timeout), message=${err.message}`);
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationPermission('denied');
+          console.error('[Rider:Location] Permission denied — stopping watch');
+          if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+          }
+          return;
+        }
+        // code=2 or code=3 — log but keep watching, device may recover
+        console.warn(`[Rider:Location] watchPosition error — code=${err.code} (1=denied, 2=unavailable, 3=timeout), message=${err.message}`);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 10000 }
     );
 
     return () => {

@@ -6,6 +6,7 @@ import { Station } from '../models/Station';
 import { User } from '../models/User';
 import { PricingConfig } from '../models/PricingConfig';
 import { authenticate, AuthRequest } from '../middleware/authenticate';
+import { orderLimiter } from '../middleware/rateLimiter';
 import { generateDeliveryOTP } from '../services/otpService';
 import { dispatchOrder, markDispatchAccepted, markDispatchDeclined } from '../services/dispatchService';
 import { emitOrderStatus } from '../services/realtimeService';
@@ -93,6 +94,7 @@ function ve(req: Request, res: Response): boolean {
  */
 router.post(
   '/',
+  orderLimiter,
   [
     body('stationId').isMongoId(),
     body('cylinders').isArray({ min: 1 }).withMessage('At least one cylinder required'),

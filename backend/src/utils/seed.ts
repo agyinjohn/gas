@@ -76,9 +76,9 @@ async function seed() {
       geohash: 's174mu8',
       ratingAvg: 4.8, totalOrders: 312,
       listings: [
-        { size: 3,  fillPrice: 45,  exchangePrice: 35,  stock: 20 },
-        { size: 6,  fillPrice: 85,  exchangePrice: 70,  stock: 15 },
-        { size: 12, fillPrice: 160, exchangePrice: 140, stock: 8  },
+        { size: 6,  fillPrice: 85,  exchangePrice: 70,  stock: 20 },
+        { size: 13, fillPrice: 160, exchangePrice: 140, stock: 8  },
+        { size: 19, fillPrice: 220, exchangePrice: 200, stock: 5  },
       ],
     },
     {
@@ -89,9 +89,9 @@ async function seed() {
       geohash: 's174k3p',
       ratingAvg: 4.5, totalOrders: 198,
       listings: [
-        { size: 3,  fillPrice: 48,  exchangePrice: 38,  stock: 10 },
+        { size: 5,  fillPrice: 55,  exchangePrice: 45,  stock: 10 },
         { size: 6,  fillPrice: 88,  exchangePrice: 72,  stock: 12 },
-        { size: 12, fillPrice: 165, exchangePrice: 145, stock: 5  },
+        { size: 13, fillPrice: 165, exchangePrice: 145, stock: 5  },
       ],
     },
     {
@@ -103,7 +103,8 @@ async function seed() {
       ratingAvg: 4.6, totalOrders: 421,
       listings: [
         { size: 6,  fillPrice: 82,  exchangePrice: 68,  stock: 25 },
-        { size: 12, fillPrice: 155, exchangePrice: 135, stock: 14 },
+        { size: 13, fillPrice: 155, exchangePrice: 135, stock: 14 },
+        { size: 19, fillPrice: 215, exchangePrice: 195, stock: 8  },
       ],
     },
     {
@@ -114,7 +115,7 @@ async function seed() {
       geohash: 's174wy5',
       ratingAvg: 4.3, totalOrders: 156,
       listings: [
-        { size: 3,  fillPrice: 44,  exchangePrice: 34,  stock: 18 },
+        { size: 5,  fillPrice: 52,  exchangePrice: 42,  stock: 18 },
         { size: 6,  fillPrice: 83,  exchangePrice: 69,  stock: 9  },
       ],
     },
@@ -126,9 +127,9 @@ async function seed() {
       geohash: 's174d8m',
       ratingAvg: 4.7, totalOrders: 287,
       listings: [
-        { size: 3,  fillPrice: 46,  exchangePrice: 36,  stock: 30 },
+        { size: 5,  fillPrice: 54,  exchangePrice: 44,  stock: 30 },
         { size: 6,  fillPrice: 86,  exchangePrice: 71,  stock: 20 },
-        { size: 12, fillPrice: 162, exchangePrice: 142, stock: 10 },
+        { size: 13, fillPrice: 162, exchangePrice: 142, stock: 10 },
       ],
     },
     {
@@ -140,7 +141,8 @@ async function seed() {
       ratingAvg: 4.9, totalOrders: 534,
       listings: [
         { size: 6,  fillPrice: 90,  exchangePrice: 75,  stock: 22 },
-        { size: 12, fillPrice: 170, exchangePrice: 150, stock: 11 },
+        { size: 13, fillPrice: 170, exchangePrice: 150, stock: 11 },
+        { size: 19, fillPrice: 225, exchangePrice: 205, stock: 6  },
       ],
     },
     {
@@ -151,7 +153,7 @@ async function seed() {
       geohash: 's174b7k',
       ratingAvg: 4.2, totalOrders: 89,
       listings: [
-        { size: 3,  fillPrice: 43,  exchangePrice: 33,  stock: 0  }, // out of stock
+        { size: 5,  fillPrice: 50,  exchangePrice: 40,  stock: 0  },
         { size: 6,  fillPrice: 81,  exchangePrice: 67,  stock: 7  },
       ],
     },
@@ -163,9 +165,9 @@ async function seed() {
       geohash: 's174t9n',
       ratingAvg: 4.4, totalOrders: 203,
       listings: [
-        { size: 3,  fillPrice: 47,  exchangePrice: 37,  stock: 14 },
+        { size: 5,  fillPrice: 55,  exchangePrice: 45,  stock: 14 },
         { size: 6,  fillPrice: 87,  exchangePrice: 73,  stock: 18 },
-        { size: 12, fillPrice: 163, exchangePrice: 143, stock: 6  },
+        { size: 13, fillPrice: 163, exchangePrice: 143, stock: 6  },
       ],
     },
     // ── Kumasi stations ──
@@ -177,9 +179,9 @@ async function seed() {
       geohash: 's17098k',
       ratingAvg: 4.7, totalOrders: 389,
       listings: [
-        { size: 3,  fillPrice: 44,  exchangePrice: 34,  stock: 25 },
+        { size: 5,  fillPrice: 52,  exchangePrice: 42,  stock: 25 },
         { size: 6,  fillPrice: 84,  exchangePrice: 69,  stock: 18 },
-        { size: 12, fillPrice: 158, exchangePrice: 138, stock: 10 },
+        { size: 13, fillPrice: 158, exchangePrice: 138, stock: 10 },
       ],
     },
     {
@@ -191,7 +193,7 @@ async function seed() {
       ratingAvg: 4.5, totalOrders: 214,
       listings: [
         { size: 6,  fillPrice: 83,  exchangePrice: 68,  stock: 20 },
-        { size: 12, fillPrice: 156, exchangePrice: 136, stock: 8  },
+        { size: 13, fillPrice: 156, exchangePrice: 136, stock: 8  },
       ],
     },
     {
@@ -202,7 +204,7 @@ async function seed() {
       geohash: 's1709s7',
       ratingAvg: 4.6, totalOrders: 176,
       listings: [
-        { size: 3,  fillPrice: 45,  exchangePrice: 35,  stock: 16 },
+        { size: 5,  fillPrice: 53,  exchangePrice: 43,  stock: 16 },
         { size: 6,  fillPrice: 85,  exchangePrice: 70,  stock: 14 },
       ],
     },
@@ -214,9 +216,9 @@ async function seed() {
       geohash: 's1709ub',
       ratingAvg: 4.3, totalOrders: 142,
       listings: [
-        { size: 3,  fillPrice: 43,  exchangePrice: 33,  stock: 30 },
+        { size: 5,  fillPrice: 51,  exchangePrice: 41,  stock: 30 },
         { size: 6,  fillPrice: 82,  exchangePrice: 67,  stock: 22 },
-        { size: 12, fillPrice: 154, exchangePrice: 134, stock: 12 },
+        { size: 13, fillPrice: 154, exchangePrice: 134, stock: 12 },
       ],
     },
     {
@@ -228,7 +230,7 @@ async function seed() {
       ratingAvg: 4.8, totalOrders: 298,
       listings: [
         { size: 6,  fillPrice: 86,  exchangePrice: 71,  stock: 17 },
-        { size: 12, fillPrice: 160, exchangePrice: 140, stock: 9  },
+        { size: 13, fillPrice: 160, exchangePrice: 140, stock: 9  },
       ],
     },
   ];

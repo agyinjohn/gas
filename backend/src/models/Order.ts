@@ -16,10 +16,10 @@ export interface IStatusEvent {
 }
 
 export interface ICylinderLineItem {
-  size: 3 | 6 | 12;
+  size: number;
   quantity: number;
-  unitPrice: number;    // price per cylinder at time of order
-  subtotal: number;     // unitPrice * quantity
+  unitPrice: number;
+  subtotal: number;
 }
 
 export interface IOrder extends Document {

@@ -14,3 +14,11 @@ export const authLimiter = rateLimit({
   max: 10,
   message: { success: false, message: 'Too many auth attempts, please try again in 10 minutes.' },
 });
+
+// Order placement — per user token (keyGenerator uses Authorization header)
+export const orderLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
+  message: { success: false, message: 'Too many order requests, please slow down.' },
+});
