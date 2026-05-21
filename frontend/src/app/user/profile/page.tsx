@@ -16,6 +16,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import type { PickedLocation } from '@/components/LocationPicker';
+import SignOutConfirmModal from '@/components/SignOutConfirmModal';
 
 const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
 
@@ -51,6 +52,7 @@ export default function UserProfilePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [showPicker, setShowPicker]       = useState(false);
   const [showForm, setShowForm]           = useState(false);
   const [editingAddr, setEditingAddr]     = useState<Address | null>(null);
@@ -140,6 +142,13 @@ export default function UserProfilePage() {
 
   return (
     <div className="bg-[var(--bg)] pb-24 lg:pb-0">
+
+      {showSignOutConfirm && (
+        <SignOutConfirmModal
+          onConfirm={handleLogout}
+          onCancel={() => setShowSignOutConfirm(false)}
+        />
+      )}
 
       {showPicker && (
         <LocationPicker
@@ -349,7 +358,7 @@ export default function UserProfilePage() {
 
         {/* Sign Out & Version - Bottom */}
         <div className="px-4 lg:px-8 py-6 border-t border-[var(--border)] max-w-4xl mx-auto w-full">
-          <button onClick={handleLogout}
+          <button onClick={() => setShowSignOutConfirm(true)}
             className="w-full h-12 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-500/20 transition-colors mb-3">
             <LogOut className="w-4 h-4" /> Sign Out
           </button>

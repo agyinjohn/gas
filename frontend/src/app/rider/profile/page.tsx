@@ -1,7 +1,8 @@
 'use client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Star, Truck, Phone, LogOut, Package, TrendingUp, DollarSign } from 'lucide-react';
+import { Star, Truck, Phone, LogOut, AlertTriangle } from 'lucide-react';
 import { ridersApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Card, Button, Skeleton } from '@/components/ui';
@@ -9,10 +10,12 @@ import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
 import RiderNav from '@/components/RiderNav';
 import toast from 'react-hot-toast';
+import SignOutConfirmModal from '@/components/SignOutConfirmModal';
 
 export default function RiderProfilePage() {
   const { logout } = useAuth();
   const router = useRouter();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['rider', 'me'],
@@ -39,6 +42,12 @@ export default function RiderProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      {showSignOutConfirm && (
+        <SignOutConfirmModal
+          onConfirm={handleLogout}
+          onCancel={() => setShowSignOutConfirm(false)}
+        />
+      )}
       {/* Profile Hero */}
       <div className="bg-gray-900 text-white px-4 pt-12 pb-8">
         <div className="flex items-center gap-4">
@@ -132,7 +141,7 @@ export default function RiderProfilePage() {
         </Card>
 
         {/* Logout */}
-        <Button variant="danger" className="w-full" onClick={handleLogout}>
+        <Button variant="danger" className="w-full" onClick={() => setShowSignOutConfirm(true)}>
           <LogOut className="w-4 h-4" /> Sign Out
         </Button>
       </div>

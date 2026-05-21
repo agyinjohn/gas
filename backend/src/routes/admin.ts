@@ -6,6 +6,7 @@ import { Rider } from '../models/Rider';
 import { Order } from '../models/Order';
 import { User } from '../models/User';
 import { PricingConfig } from '../models/PricingConfig';
+import { SystemConfig } from '../models/SystemConfig';
 import { authenticate, AuthRequest } from '../middleware/authenticate';
 import { requireRole } from '../middleware/requireRole';
 import { initiateRefund } from '../services/paymentService';
@@ -771,10 +772,15 @@ router.patch(
   '/pricing',
   [
     body('deliveryFeeFlat').optional().isFloat({ min: 0 }),
+    body('baseFee').optional().isFloat({ min: 0 }),
+    body('pricePerKm').optional().isFloat({ min: 0 }),
+    body('freeKm').optional().isFloat({ min: 0 }),
+    body('maxDeliveryFee').optional().isFloat({ min: 0 }),
     body('surgeMultiplier').optional().isFloat({ min: 1.0, max: 5.0 }),
     body('surgeActive').optional().isBoolean(),
     body('surgeReason').optional().isString(),
     body('priceFreezeActive').optional().isBoolean(),
+    body('riderCommissionPct').optional().isFloat({ min: 0, max: 100 }),
     body('minPriceCaps').optional().isArray(),
     body('maxPriceCaps').optional().isArray(),
   ],
@@ -789,6 +795,67 @@ router.patch(
     );
 
     res.json({ success: true, pricing: config });
+  }
+);
+
+// ─── System Configuration ─────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/v1/admin/system-config:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get system configuration
+ *     responses:
+ *       200:
+ *         description: System config with WhatsApp, support info, etc.
+ */
+router.get('/system-config', async (_req: AuthRequest, res: Response) => {
+  const config = await SystemConfig.findOne().sort({ createdAt: -1 });
+  res.json({ success: true, config: config || {} });
+});
+
+/**
+ * @swagger
+ * /api/v1/admin/system-config:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Update system configuration
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               supportWhatsApp:
+ *                 type: string
+ *               supportPhoneNumber:
+ *                 type: string
+ *               supportEmail:
+ *                 type: string
+ *               companyName:
+ *                 type: string
+ */
+router.patch(
+  '/system-config',
+  [
+    body('supportWhatsApp').optional().isString().matches(/^\+?[0-9\s\-()]+$/).withMessage('Invalid phone format'),
+    body('supportPhoneNumber').optional().isString(),
+    body('supportEmail').optional().isEmail(),
+    body('companyName').optional().isString(),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    if (ve(req, res)) return;
+
+    const update = { ...req.body, updatedBy: req.user!.id };
+    const config = await SystemConfig.findOneAndUpdate(
+      {},
+      { $set: update },
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, config });
   }
 );
 

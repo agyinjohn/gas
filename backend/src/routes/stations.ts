@@ -32,10 +32,32 @@ router.get('/pricing', async (_req: Request, res: Response) => {
   const { PricingConfig } = await import('../models/PricingConfig');
   const config = await PricingConfig.findOne()
     .sort({ createdAt: -1 })
-    .select('deliveryFeeFlat surgeActive surgeMultiplier surgeReason priceFreezeActive');
+    .select('baseFee pricePerKm freeKm maxDeliveryFee riderCommissionPct surgeActive surgeMultiplier surgeReason priceFreezeActive');
   res.json({
     success: true,
-    pricing: config || { deliveryFeeFlat: 5, surgeActive: false, surgeMultiplier: 1, priceFreezeActive: false },
+    pricing: config || { baseFee: 5, pricePerKm: 2, freeKm: 2, maxDeliveryFee: 50, surgeActive: false, surgeMultiplier: 1, priceFreezeActive: false },
+  });
+});
+
+/**
+ * @swagger
+ * /api/v1/stations/system-config:
+ *   get:
+ *     tags: [Stations]
+ *     summary: Get public system configuration (WhatsApp, support info)
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: System config
+ */
+router.get('/system-config', async (_req: Request, res: Response) => {
+  const { SystemConfig } = await import('../models/SystemConfig');
+  const config = await SystemConfig.findOne()
+    .sort({ createdAt: -1 })
+    .select('supportWhatsApp supportPhoneNumber supportEmail companyName');
+  res.json({
+    success: true,
+    config: config || { supportWhatsApp: '', companyName: 'GasGo' },
   });
 });
 
@@ -83,19 +105,27 @@ router.get(
 
     const results = await getNearbyStations({ lat, lng, radiusKm, cylinderSize, limit: 20 });
 
+    const DAY_MAP = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+    const todayKey = DAY_MAP[new Date().getDay()];
+
     res.json({
       success: true,
-      stations: results.map(({ station, distanceKm }) => ({
-        id: station._id,
-        name: station.name,
-        address: station.address,
-        lat: station.lat,
-        lng: station.lng,
-        distanceKm: Math.round(distanceKm * 10) / 10,
-        ratingAvg: station.ratingAvg,
-        outOfStock: station.outOfStock,
-        cylinderListings: station.cylinderListings,
-      })),
+      stations: results.map(({ station, distanceKm }) => {
+        const todayHours = station.operatingHours?.[todayKey];
+        const isOpenNow = todayHours?.isOpen !== false;
+        return {
+          id: station._id,
+          name: station.name,
+          address: station.address,
+          lat: station.lat,
+          lng: station.lng,
+          distanceKm: Math.round(distanceKm * 10) / 10,
+          ratingAvg: station.ratingAvg,
+          outOfStock: station.outOfStock,
+          isOpenNow,
+          cylinderListings: station.cylinderListings,
+        };
+      }),
     });
   }
 );

@@ -352,16 +352,16 @@ export default function RiderOrderPage() {
                 <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
                   <div className={cn(
                     'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all',
-                    done ? 'bg-green-400' : active ? 'bg-white' : 'bg-white/20'
+                    done || (active && order.status === 'delivered') ? 'bg-green-400' : active ? 'bg-white' : 'bg-white/20'
                   )}>
-                    {done
+                    {done || (active && order.status === 'delivered')
                       ? <CheckCircle className="w-4 h-4 text-white" />
                       : <Icon className={cn('w-4 h-4', active ? 'text-brand-500' : 'text-white/40')} />
                     }
                   </div>
                   <span className={cn(
                     'text-[9px] font-semibold text-center leading-tight px-0.5',
-                    active ? 'text-white' : done ? 'text-green-300' : 'text-white/40'
+                    active && order.status === 'delivered' ? 'text-green-300' : active ? 'text-white' : done ? 'text-green-300' : 'text-white/40'
                   )}>
                     {step.label}
                   </span>

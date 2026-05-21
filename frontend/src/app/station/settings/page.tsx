@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import SignOutConfirmModal from '@/components/SignOutConfirmModal';
 
 function getStationId(): string {
   try {
@@ -28,6 +29,7 @@ export default function StationSettingsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [pendingClose, setPendingClose] = useState<string | null>(null);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [notificationPrefs, setNotificationPrefs] = useState({
     newOrderAlerts: true,
     lowStockAlerts: true,
@@ -120,6 +122,12 @@ export default function StationSettingsPage() {
 
   return (
     <div className="px-4 lg:px-6 py-6 max-w-6xl mx-auto pb-8">
+        {showSignOutConfirm && (
+          <SignOutConfirmModal
+            onConfirm={handleLogout}
+            onCancel={() => setShowSignOutConfirm(false)}
+          />
+        )}
         <div className="space-y-6">
 
           {/* Station Info */}
@@ -315,7 +323,7 @@ export default function StationSettingsPage() {
 
           {/* Sign Out */}
           <button
-            onClick={handleLogout}
+            onClick={() => setShowSignOutConfirm(true)}
             className="w-full h-12 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2"
           >
             <LogOut className="w-4 h-4" />

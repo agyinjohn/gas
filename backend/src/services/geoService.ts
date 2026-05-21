@@ -67,6 +67,21 @@ export interface NearbyStationsOptions {
 }
 
 /**
+ * Calculate delivery fee based on distance between user and station.
+ * formula: max(baseFee, min(maxDeliveryFee, baseFee + max(0, distKm - freeKm) * pricePerKm))
+ */
+export function calcDeliveryFee(
+  userLat: number, userLng: number,
+  stationLat: number, stationLng: number,
+  config: { baseFee: number; pricePerKm: number; freeKm: number; maxDeliveryFee: number }
+): number {
+  const distKm = haversineDistanceKm(userLat, userLng, stationLat, stationLng);
+  const billableKm = Math.max(0, distKm - config.freeKm);
+  const fee = config.baseFee + billableKm * config.pricePerKm;
+  return +Math.min(config.maxDeliveryFee, Math.max(config.baseFee, fee)).toFixed(2);
+}
+
+/**
  * Find stations within radiusKm of the user's coordinates.
  * Returns stations sorted by Haversine distance ascending.
  */

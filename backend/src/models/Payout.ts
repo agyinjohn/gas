@@ -6,7 +6,11 @@ export interface IPayout extends Document {
   recipientId: mongoose.Types.ObjectId;
   orderId: mongoose.Types.ObjectId;
   amountGHS: number;
+  grossAmountGHS?: number;          // before commission deduction (rider only)
+  commissionPct?: number;           // rider commission % applied
+  commissionAmountGHS?: number;     // amount deducted as commission
   status: 'pending' | 'processing' | 'paid' | 'failed';
+  scheduledFor?: Date;              // for deferred payouts (rider next-day)
   paystackTransferCode?: string;
   paystackReference?: string;
   failureReason?: string;
@@ -21,12 +25,16 @@ const PayoutSchema = new Schema<IPayout>(
     recipientId:   { type: Schema.Types.ObjectId, required: true, index: true },
     orderId:       { type: Schema.Types.ObjectId, required: true, ref: 'Order', index: true },
     amountGHS:     { type: Number, required: true, min: 0 },
+    grossAmountGHS:      { type: Number, min: 0 },
+    commissionPct:       { type: Number, min: 0, max: 100 },
+    commissionAmountGHS: { type: Number, min: 0 },
     status: {
       type: String,
       enum: ['pending', 'processing', 'paid', 'failed'],
       default: 'pending',
       index: true,
     },
+    scheduledFor:         { type: Date, index: true },
     paystackTransferCode: String,
     paystackReference:    { type: String, sparse: true, index: true },
     failureReason:        String,

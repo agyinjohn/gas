@@ -18,7 +18,7 @@ function generateCode(length = CONSTANTS.OTP_LENGTH): string {
  */
 export async function createOTP(
   phone: string,
-  purpose: 'registration' | 'login' | 'password_reset'
+  purpose: 'registration' | 'login' | 'password_reset' | 'forgot_password'
 ): Promise<string> {
   console.log('🔐 [OTP] Creating OTP:', { phone, purpose });
 
@@ -49,7 +49,7 @@ export async function createOTP(
 export async function verifyOTP(
   phone: string,
   code: string,
-  purpose: 'registration' | 'login' | 'password_reset'
+  purpose: 'registration' | 'login' | 'password_reset' | 'forgot_password'
 ): Promise<boolean> {
   const otp = await OTP.findOne({ phone, purpose, usedAt: null });
 
