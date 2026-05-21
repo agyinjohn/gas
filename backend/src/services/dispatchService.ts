@@ -256,22 +256,6 @@ async function escalateToAdmin(orderId: string, reason: string): Promise<void> {
 
   console.warn(`[Dispatch] Order ${orderId} escalated — ${reason}`);
 
-  // Notify all active admins via SMS
-  try {
-    const admins = await Admin.find({ isActive: true }).select('phone').lean();
-    const shortId = orderId.slice(-6).toUpperCase();
-    await Promise.allSettled(
-      admins.map((admin) =>
-        sendSMS(
-          admin.phone,
-          `GetGas ALERT: Order #${shortId} needs manual rider assignment. Reason: ${reason}. Login to admin dashboard.`
-        )
-      )
-    );
-  } catch (err) {
-    console.error('[Dispatch] Admin SMS escalation failed:', err);
-  }
-
   // Emit to admin socket room
   try {
     io?.to('admin').emit('order:escalated', { orderId, reason, timestamp: new Date() });
