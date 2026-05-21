@@ -153,20 +153,24 @@ export default function QuickOrderModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  // Handle photo upload
-  async function handlePhotoCapture() {
-    try {
-      setUploadingPhoto(true);
-      const data = await checkoutPhoto();
-      if (data?.url) {
-        setPhotoUrl(data.url);
-        toast.success('Photo uploaded');
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Photo upload failed');
-    } finally {
-      setUploadingPhoto(false);
-    }
+  // Handle photo — open file input instead
+  function handlePhotoCapture() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        checkoutPhoto.set(reader.result as string);
+        setPhotoUrl(reader.result as string);
+        toast.success('Photo added');
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
   }
 
   // Place the order
@@ -413,10 +417,11 @@ export default function QuickOrderModal({ onClose }: { onClose: () => void }) {
                 </button>
               </div>
               <LocationPicker
-                onPick={(loc) => {
+                onConfirm={(loc) => {
                   setDeliveryLocation(loc);
                   setShowLocationPicker(false);
                 }}
+                onClose={() => setShowLocationPicker(false)}
               />
             </div>
           </div>
