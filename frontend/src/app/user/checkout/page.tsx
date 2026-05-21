@@ -117,6 +117,22 @@ export default function CheckoutPage() {
 
   const stationIdParam = params.get('stationId');
   const initSize       = parseInt(params.get('size') || '0');
+  const quickOrderAmount = params.get('amount') ? parseFloat(params.get('amount')!) : null;
+  const isQuickOrder   = params.get('source') === 'quick' || params.get('isQuickOrder') === 'true';
+  const skipCheckout   = params.get('skipCheckout') === 'true';
+  const fromReview     = params.get('fromReview') === 'true';
+  const cartItemsParam = params.get('cartItems');
+  const scheduleParam  = params.get('schedule') as 'asap' | 'scheduled' | null;
+  const pickupLatParam = params.get('pickupLat');
+  const pickupLngParam = params.get('pickupLng');
+  const pickupLabelParam = params.get('pickupLabel');
+  const deliveryLatParam = params.get('deliveryLat');
+  const deliveryLngParam = params.get('deliveryLng');
+  const deliveryLabelParam = params.get('deliveryLabel');
+  const pickupCityParam = params.get('pickupCity');
+  const deliveryCityParam = params.get('deliveryCity');
+  const deliveryStreetParam = params.get('deliveryStreet');
+  const pickupStreetParam = params.get('pickupStreet');
 
   const [selectedStation, setSelectedStation] = useState<StationT | null>(null);
   const effectiveStationId = stationIdParam ?? selectedStation?.id ?? null;
@@ -128,13 +144,29 @@ export default function CheckoutPage() {
     staleTime: 60000,
   });
 
-  // Fetch live delivery fee from pricing config
+  // Fetch live pricing config
   const { data: pricingData } = useQuery({
     queryKey: ['pricing'],
     queryFn: () => api.get('/api/v1/stations/pricing').then((r) => r.data.pricing),
     staleTime: 300000,
   });
-  const DELIVERY_FEE: number = pricingData?.deliveryFeeFlat ?? 15;
+
+  // Estimate delivery fee for bottom bar (user → station)
+  const estimatedDeliveryFee = (() => {
+    if (!pricingData || !pickupLoc || !stationData) return pricingData?.baseFee ?? 5;
+    const baseFee    = pricingData.baseFee        ?? 5;
+    const perKm      = pricingData.pricePerKm     ?? 2;
+    const freeKm     = pricingData.freeKm         ?? 2;
+    const maxFee     = pricingData.maxDeliveryFee ?? 50;
+    const R = 6371;
+    const dLat = ((stationData.lat - pickupLoc.lat) * Math.PI) / 180;
+    const dLng = ((stationData.lng - pickupLoc.lng) * Math.PI) / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos((pickupLoc.lat*Math.PI)/180)*Math.cos((stationData.lat*Math.PI)/180)*Math.sin(dLng/2)**2;
+    const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const billable = Math.max(0, distKm - freeKm);
+    return +Math.min(maxFee, Math.max(baseFee, baseFee + billable * perKm)).toFixed(2);
+  })();
+  const DELIVERY_FEE = estimatedDeliveryFee;
 
   const availableSizes: number[] = stationData?.cylinderListings
     ?.filter((l: any) => l.fillPrice > 0)
@@ -142,23 +174,71 @@ export default function CheckoutPage() {
     ?.sort((a: number, b: number) => a - b) ?? [];
 
   // Cart as array of line items — supports same size at different prices
-  const [lines, setLines] = useState<LineItem[]>(
-    initSize ? [{ id: uid(), size: initSize, quantity: 1, price: '' }] : []
-  );
+  const [lines, setLines] = useState<LineItem[]>([]);
 
-  // Pre-fill price for initSize once station data loads
+  // Initialize lines from either cartItemsParam (editing) or initSize (new quick order)
   useEffect(() => {
-    if (!initSize || !stationData) return;
-    setLines((prev) => prev.map((l) =>
-      l.size === initSize && l.price === ''
-        ? { ...l, price: String(stationData.cylinderListings?.find((c: any) => c.size === initSize)?.fillPrice ?? '') }
-        : l
-    ));
-  }, [stationData]);
+    console.log('DEBUG: Checkout mount - cartItemsParam:', cartItemsParam, 'initSize:', initSize);
+    
+    // Priority 1: Try loading from editOrderCart sessionStorage (editing from review)
+    try {
+      const sessionData = sessionStorage.getItem('editOrderCart');
+      if (sessionData) {
+        const items = JSON.parse(sessionData);
+        console.log('DEBUG: Loading cartItems from editOrderCart sessionStorage:', items);
+        const loadedLines = items.map((item: any) => ({
+          id: uid(),
+          size: item.size,
+          quantity: item.quantity,
+          price: String(item.unitPrice),
+        }));
+        console.log('DEBUG: Loaded lines from sessionStorage:', loadedLines);
+        setLines(loadedLines);
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to parse editOrderCart from sessionStorage:', e);
+    }
+    
+    // Priority 2: If editing from review, load cart items from URL params (legacy)
+    if (cartItemsParam) {
+      try {
+        const items = JSON.parse(cartItemsParam);
+        console.log('DEBUG: Loading cartItems from URL params:', items);
+        const loadedLines = items.map((item: any) => ({
+          id: uid(),
+          size: item.size,
+          quantity: item.quantity,
+          price: String(item.unitPrice),
+        }));
+        console.log('DEBUG: Loaded lines from URL params:', loadedLines);
+        setLines(loadedLines);
+      } catch (e) {
+        console.error('Failed to parse cart items from URL:', e);
+      }
+      return;
+    }
+    
+    // Priority 3: For new quick order with initSize
+    if (!initSize || !stationData) {
+      console.log('DEBUG: Waiting for stationData or initSize not set');
+      return;
+    }
+    
+    console.log('DEBUG: Initializing new quick order with initSize:', initSize, 'quickOrderAmount:', quickOrderAmount);
+    const listing = stationData.cylinderListings?.find((c: any) => c.size === initSize);
+    const price = quickOrderAmount ?? listing?.fillPrice ?? '';
+    
+    console.log('DEBUG: Setting lines with initSize, price:', price);
+    setLines([{ id: uid(), size: initSize, quantity: 1, price: String(price) }]);
+  }, [cartItemsParam, stationData, initSize]);
+
+  // Remove the old useEffect for pre-fill and cart items loading
 
   function addLine(size: number) {
     const minPrice = stationData?.cylinderListings?.find((l: any) => l.size === size)?.fillPrice ?? 0;
-    setLines((prev) => [...prev, { id: uid(), size, quantity: 1, price: String(minPrice) }]);
+    const price = isQuickOrder && quickOrderAmount ? quickOrderAmount : minPrice;
+    setLines((prev) => [...prev, { id: uid(), size, quantity: 1, price: String(price) }]);
   }
 
   function removeLine(id: string) {
@@ -173,15 +253,15 @@ export default function CheckoutPage() {
     return MIN_CYLINDER_PRICE;
   }
 
-  function getMaxPrice(size: number) {
-    return stationData?.cylinderListings?.find((l: any) => l.size === size)?.fillPrice ?? Infinity;
+  function getMaxPrice(_size: number) {
+    // Don't validate against available sizes - users can enter any amount
+    return Infinity;
   }
 
   const cartItems = lines.map((l) => {
-    const minPrice = getMinPrice(l.size);
-    const maxPrice = getMaxPrice(l.size);
-    const entered = parseFloat(l.price) || minPrice;
-    const price = Math.min(maxPrice, Math.max(minPrice, entered));
+    const entered = parseFloat(l.price) || MIN_CYLINDER_PRICE;
+    // Just ensure price is at least the minimum, no max limit
+    const price = Math.max(MIN_CYLINDER_PRICE, entered);
     return { id: l.id, size: l.size, quantity: l.quantity, unitPrice: price, subtotal: price * l.quantity, customPrice: price };
   });
 
@@ -189,37 +269,166 @@ export default function CheckoutPage() {
   const subtotal = cartItems.reduce((a, b) => a + b.subtotal, 0);
   const total    = subtotal + DELIVERY_FEE;
 
+  // Validate only that price is at least the minimum (20 GHS)
   const hasPriceError = cartItems.some((item) => {
     const entered = parseFloat(lines.find(l => l.id === item.id)?.price || '0');
-    return lines.find(l => l.id === item.id)?.price !== '' && (entered < getMinPrice(item.size) || entered > getMaxPrice(item.size));
+    return lines.find(l => l.id === item.id)?.price !== '' && entered < MIN_CYLINDER_PRICE;
   });
 
   // Schedule
-  const [schedule, setSchedule]         = useState<'asap' | 'scheduled'>('asap');
+  const [schedule, setSchedule]         = useState<'asap' | 'scheduled'>(scheduleParam ?? 'asap');
   const [scheduledDate, setScheduledDate] = useState('');
 
   // Pickup + delivery locations
   const [pickupLoc, setPickupLoc]       = useState<PickedLocation | null>(null);
   const [deliveryLoc, setDeliveryLoc]   = useState<PickedLocation | null>(null);
-  const [sameAsPickup, setSameAsPickup] = useState(false);
+  const [sameAsPickup, setSameAsPickup] = useState(isQuickOrder || cartItemsParam ? true : false);
   const [showPickupPicker, setShowPickupPicker]   = useState(false);
   const [showDeliveryPicker, setShowDeliveryPicker] = useState(false);
 
-  // Auto-seed pickup from saved GPS on mount
+  // Auto-seed pickup from saved GPS on mount, or from params if editing
   useEffect(() => {
-    const lat   = localStorage.getItem('gasgo_lat');
-    const lng   = localStorage.getItem('gasgo_lng');
-    const label = localStorage.getItem('gasgo_location_label');
-    if (lat && lng) {
+    if (pickupLatParam && pickupLngParam) {
+      // Coming from review edit
       setPickupLoc({
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
-        street: label || 'Current location',
-        city: '',
-        formatted: label || 'Current location',
+        lat: parseFloat(pickupLatParam),
+        lng: parseFloat(pickupLngParam),
+        street: pickupStreetParam || pickupLabelParam || 'Current location',
+        city: pickupCityParam || '',
+        formatted: pickupLabelParam || 'Current location',
+      });
+    } else {
+      // First time, use saved location
+      const lat   = localStorage.getItem('gasgo_lat');
+      const lng   = localStorage.getItem('gasgo_lng');
+      const label = localStorage.getItem('gasgo_location_label');
+      const fullAddress = localStorage.getItem('gasgo_location_address') || label;
+      if (lat && lng) {
+        setPickupLoc({
+          lat: parseFloat(lat),
+          lng: parseFloat(lng),
+          street: fullAddress || 'Current location',
+          city: '',
+          formatted: label || 'Current location',
+        });
+      }
+    }
+  }, []);
+
+  // Auto-seed delivery location if coming from review
+  useEffect(() => {
+    if (deliveryLatParam && deliveryLngParam) {
+      setDeliveryLoc({
+        lat: parseFloat(deliveryLatParam),
+        lng: parseFloat(deliveryLngParam),
+        street: deliveryStreetParam || deliveryLabelParam || 'Current location',
+        city: deliveryCityParam || '',
+        formatted: deliveryLabelParam || 'Current location',
       });
     }
   }, []);
+
+  // When editing from review, dynamically update size based on entered amount
+  useEffect(() => {
+    if (!fromReview || !stationData || lines.length === 0) return;
+    
+    const enteredAmount = parseFloat(lines[0].price);
+    if (isNaN(enteredAmount)) return;
+    
+    // Find best matching size using ceiling method
+    const available = stationData.cylinderListings.filter((l: any) => l.isAvailable && l.fillPrice > 0);
+    const sorted = available.sort((a: any, b: any) => a.fillPrice - b.fillPrice);
+    
+    let matchedSize = lines[0].size; // Default to current size
+    
+    // Find first size >= entered amount, or use highest if none match
+    for (const listing of sorted) {
+      if (listing.fillPrice >= enteredAmount) {
+        matchedSize = listing.size;
+        break;
+      }
+    }
+    
+    // If no match found, use highest available size
+    if (matchedSize === lines[0].size && sorted.length > 0) {
+      const highestMatch = sorted.find((l: any) => l.fillPrice >= enteredAmount);
+      if (!highestMatch && sorted.length > 0) {
+        matchedSize = sorted[sorted.length - 1].size;
+      }
+    }
+    
+    // Update the size if it changed
+    if (matchedSize !== lines[0].size) {
+      console.log('DEBUG: Edit mode - updating size from', lines[0].size, 'to', matchedSize, 'for amount', enteredAmount);
+      updateLine(lines[0].id, 'quantity', lines[0].quantity); // Dummy update to trigger re-render
+      setLines(prev => prev.map(l => l.id === prev[0]?.id ? { ...l, size: matchedSize } : l));
+    }
+  }, [fromReview, stationData, lines[0]?.price]);
+
+  // For quick order, auto-proceed when everything is ready (but not if editing from review)
+  useEffect(() => {
+    console.log('Auto-proceed effect running:', { skipCheckout, cartItemsParam, stationIdParam, hasStationData: !!stationData, pickupLoc: !!pickupLoc, linesLength: lines.length });
+    
+    // Don't proceed if we're editing from review OR if we don't have skipCheckout flag
+    if (!skipCheckout || cartItemsParam) {
+      console.log('Skipping auto-proceed: skipCheckout=', skipCheckout, 'cartItemsParam=', !!cartItemsParam);
+      return;
+    }
+    
+    // Wait until we have all required data
+    if (!stationIdParam || !stationData || !pickupLoc || lines.length === 0) {
+      console.log('Waiting for data: stationIdParam=', !!stationIdParam, 'stationData=', !!stationData, 'pickupLoc=', !!pickupLoc, 'lines=', lines.length);
+      return;
+    }
+    
+    console.log('Proceeding to review with lines:', lines);
+    
+    // Auto-proceed to review
+    const effectiveDelivery = pickupLoc; // Same as pickup for quick order
+    
+    const stationName = stationData.name ?? '';
+    const stationAddr = stationData.address ?? '';
+
+    // Calculate current cart totals
+    const currentCartItems = lines.map((l) => {
+      const minPrice = MIN_CYLINDER_PRICE;
+      const maxPrice = getMaxPrice(l.size);
+      const entered = parseFloat(l.price) || minPrice;
+      const price = Math.min(maxPrice, Math.max(minPrice, entered));
+      return { size: l.size, quantity: l.quantity, unitPrice: price, subtotal: price * l.quantity, customPrice: price };
+    });
+    
+    console.log('Auto-proceed: currentCartItems:', currentCartItems);
+
+    const currentSubtotal = currentCartItems.reduce((a, b) => a + b.subtotal, 0);
+    const currentTotal = currentSubtotal + DELIVERY_FEE;
+    
+    // Store cart items in sessionStorage to avoid URL length limits
+    sessionStorage.setItem('quickOrderCart', JSON.stringify(currentCartItems));
+
+    const q = new URLSearchParams({
+      stationId:      stationIdParam,
+      stationName,
+      stationAddress: stationAddr,
+      stationLat:     String(stationData.lat ?? ''),
+      stationLng:     String(stationData.lng ?? ''),
+      serviceType:    'refill',
+      schedule: 'asap',
+      pickupStreet:   pickupLoc.street,
+      pickupCity:     pickupLoc.city,
+      pickupLat:      String(pickupLoc.lat),
+      pickupLng:      String(pickupLoc.lng),
+      pickupLabel:    pickupLoc.formatted,
+      deliveryStreet: effectiveDelivery.street,
+      deliveryCity:   effectiveDelivery.city,
+      deliveryLat:    String(effectiveDelivery.lat),
+      deliveryLng:    String(effectiveDelivery.lng),
+      deliveryLabel:  effectiveDelivery.formatted,
+      subtotal:       String(currentSubtotal),
+      isQuickOrder:   'true',
+    });
+    router.push(`/user/checkout/review?${q.toString()}`);
+  }, [skipCheckout, cartItemsParam, stationIdParam, stationData, pickupLoc, lines, DELIVERY_FEE, pricingData, router]);
 
   // Photo
   const [photo, setPhoto]   = useState<string | null>(null);
@@ -237,7 +446,7 @@ export default function CheckoutPage() {
   function handleContinue() {
     if (!effectiveStationId)  { toast.error('Please select a station'); return; }
     if (totalQty === 0)        { toast.error('Select at least one cylinder'); return; }
-    if (hasPriceError)         { toast.error('One or more prices are outside the allowed range (₵20 – full fill cost)'); return; }
+    if (hasPriceError)         { toast.error('Price must be at least ₵20'); return; }
     if (!pickupLoc)            { toast.error('Please set your pickup location'); return; }
     const effectiveDelivery = sameAsPickup ? pickupLoc : deliveryLoc;
     if (!effectiveDelivery)    { toast.error('Please set your delivery location'); return; }
@@ -248,12 +457,33 @@ export default function CheckoutPage() {
     const stationName = stationData?.name ?? selectedStation?.name ?? '';
     const stationAddr = stationData?.address ?? selectedStation?.address ?? '';
 
+    console.log('DEBUG: handleContinue (regular checkout)', {
+      cartItems,
+      stationId: effectiveStationId,
+      stationName,
+      pickupLoc,
+      deliveryLoc,
+      subtotal,
+      deliveryFee: DELIVERY_FEE,
+    });
+
+    // Store cartItems in sessionStorage instead of URL params to avoid length issues
+    sessionStorage.setItem('checkoutCart', JSON.stringify(cartItems));
+    
+    // If editing from review, clear old cart keys to prevent confusion
+    if (fromReview) {
+      sessionStorage.removeItem('quickOrderCart');
+      sessionStorage.removeItem('editOrderCart');
+      console.log('DEBUG: Cleared old sessionStorage keys (fromReview=true)');
+    }
+
     const q = new URLSearchParams({
       stationId:      effectiveStationId,
       stationName,
       stationAddress: stationAddr,
+      stationLat:     String(stationData?.lat ?? ''),
+      stationLng:     String(stationData?.lng ?? ''),
       serviceType:    'refill',
-      cartItems:      JSON.stringify(cartItems),
       schedule,
       ...(scheduledDate ? { scheduledDate } : {}),
       pickupStreet:   pickupLoc.street,
@@ -267,8 +497,6 @@ export default function CheckoutPage() {
       deliveryLng:    String(effectiveDelivery.lng),
       deliveryLabel:  effectiveDelivery.formatted,
       subtotal:       String(subtotal),
-      deliveryFee:    String(DELIVERY_FEE),
-      total:          String(total),
     });
     router.push(`/user/checkout/review?${q.toString()}`);
   }
@@ -323,12 +551,43 @@ export default function CheckoutPage() {
           </div>
         )}
 
+        {/* ── Quick edit mode (when editing from review) ── */}
+        {fromReview && (isQuickOrder || cartItems.length > 0) && (
+          <div className="bg-[var(--bg-card)] border border-brand-500/30 rounded-2xl p-4">
+            <p className="text-sm font-bold text-[var(--text-primary)] mb-3">Edit Amount</p>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-[var(--text-muted)] block mb-1.5">Enter amount in cedis (GHS)</label>
+                <input
+                  type="number"
+                  value={lines[0]?.price ?? ''}
+                  onChange={(e) => {
+                    if (lines.length > 0) {
+                      updateLine(lines[0].id, 'price', e.target.value);
+                    }
+                  }}
+                  placeholder="e.g., 91"
+                  className="w-full px-3 py-2.5 bg-[var(--bg-card2)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-brand-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-[var(--text-muted)] block mb-1.5">Estimated size</label>
+                <div className="px-3 py-2.5 bg-brand-500/10 border border-brand-500/30 rounded-xl text-[var(--text-primary)] font-bold">
+                  {lines[0]?.size ?? '—'}kg
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-[var(--text-muted)] mt-2">Enter any amount — size is auto-detected</p>
+          </div>
+        )}
+
         {/* ── Cylinder Details header ── */}
         <div className="px-0">
           <p className="text-sm font-bold text-[var(--text-primary)] mb-1">
-            {stationIdParam ? '1.' : '2.'} Cylinder Details
+            {stationIdParam && !fromReview ? '1.' : !fromReview ? '2.' : ''} {fromReview ? 'Change' : ''} Cylinder Details
           </p>
-          <p className="text-xs text-[var(--text-muted)] mb-3">Tap a size to add it to your order</p>
+          {!fromReview && <p className="text-xs text-[var(--text-muted)] mb-3">Tap a size to add it to your order</p>}
+        </div>
 
           {!effectiveStationId && (
             <p className="text-sm text-[var(--text-muted)] py-4 text-center">Select a station above to see available cylinders.</p>
@@ -341,10 +600,9 @@ export default function CheckoutPage() {
           {effectiveStationId && stationData && availableSizes.length === 0 && (
             <p className="text-sm text-[var(--text-muted)] py-4 text-center">No cylinders currently available at this station.</p>
           )}
-        </div>
 
         {/* ── Size catalogue — lives outside padded wrapper so it can scroll freely ── */}
-        {effectiveStationId && stationData && availableSizes.length > 0 && (
+        {!fromReview && effectiveStationId && stationData && availableSizes.length > 0 && (
           <div className="relative">
             <div className="flex gap-2.5 overflow-x-auto pb-2 pt-3 px-4">
               {availableSizes.map((size) => {
@@ -371,7 +629,7 @@ export default function CheckoutPage() {
                     <span className={cn('text-lg font-black leading-none', count > 0 ? 'text-white' : 'text-brand-500')}>{size}</span>
                     <span className={cn('text-[10px] font-bold', count > 0 ? 'text-white/70' : 'text-brand-400')}>kg</span>
                   </div>
-                  <p className="text-sm font-black text-[var(--text-primary)]">₵{price}</p>
+                  {!isQuickOrder && <p className="text-sm font-black text-[var(--text-primary)]">₵{price}</p>}
                   <span className={cn(
                     'text-[9px] font-bold px-2 py-0.5 rounded-full w-full text-center truncate',
                     count > 0 ? 'bg-brand-500 text-white' : 'bg-[var(--bg-card2)] text-[var(--text-muted)]'
@@ -388,7 +646,7 @@ export default function CheckoutPage() {
         )}
 
         {/* ── Added line items ── */}
-        {lines.length > 0 && (
+        {!fromReview && lines.length > 0 && (
           <div className="space-y-2.5">
             <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Your Order</p>
             {lines.map((line) => {

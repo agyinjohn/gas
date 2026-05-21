@@ -16,6 +16,7 @@ import { CONSTANTS } from '../config/constants';
 import { Payout } from '../models/Payout';
 import { LoyaltyTransaction, LOYALTY_EARN_RATE, LOYALTY_REDEEM_RATE, LOYALTY_MIN_REDEEM } from '../models/LoyaltyTransaction';
 import { Notification } from '../models/Notification';
+import { calcDeliveryFee } from '../services/geoService';
 
 // Notification templates per status
 const NOTIF: Record<string, { title: string; body: (o: any) => string; type: string }> = {
@@ -47,6 +48,103 @@ function ve(req: Request, res: Response): boolean {
   const errors = validationResult(req);
   if (!errors.isEmpty()) { res.status(400).json({ success: false, errors: errors.array() }); return true; }
   return false;
+}
+
+// ─── Shared delivery completion logic ────────────────────────────────────────
+
+async function handleDeliveryCompletion(order: any, triggeredById: string, triggeredByRole: string) {
+  const { Rider } = await import('../models/Rider');
+
+  // ── Rider: free up + stats ──────────────────────────────────────────────
+  const remainingActive = await Order.countDocuments({
+    riderId: order.riderId,
+    status: { $in: ['accepted', 'at_station', 'en_route'] },
+    _id: { $ne: order._id },
+  });
+  const riderDoc = await Rider.findById(order.riderId).select('vehicleType bankAccount');
+  const capacity = CONSTANTS.VEHICLE_ORDER_LIMITS[riderDoc?.vehicleType ?? 'motorbike'] ?? 3;
+  const newRiderStatus = remainingActive === 0 ? 'available' : remainingActive < capacity ? 'available' : 'busy';
+  await Rider.findByIdAndUpdate(
+    order.riderId,
+    { status: newRiderStatus, ...(remainingActive === 0 ? { currentOrderId: null } : {}), $inc: { totalTrips: 1, totalEarnings: order.riderEarning ?? order.deliveryFee } },
+    { new: true }
+  );
+
+  // ── Rider payout: deferred to next day, commission tracked ──────────────
+  const riderGross = +order.deliveryFee.toFixed(2);
+  const riderCommPct = order.riderCommissionPct ?? 10;
+  const riderCommAmt = +((riderGross * riderCommPct) / 100).toFixed(2);
+  const riderNet = +(riderGross - riderCommAmt).toFixed(2);
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(8, 0, 0, 0); // 8 AM next day
+
+  await Payout.create({
+    recipientType: 'rider',
+    recipientId: order.riderId,
+    orderId: order._id,
+    grossAmountGHS: riderGross,
+    commissionPct: riderCommPct,
+    commissionAmountGHS: riderCommAmt,
+    amountGHS: riderNet,
+    status: 'pending',
+    scheduledFor: tomorrow,
+  });
+
+  // ── Station payout: immediate transfer via Paystack ─────────────────────
+  const stationPayoutRecord = await Payout.create({
+    recipientType: 'station',
+    recipientId: order.stationId,
+    orderId: order._id,
+    amountGHS: order.stationPayout,
+    status: 'pending',
+  });
+
+  // Only transfer immediately for card/momo payments
+  if (order.paymentMethod !== 'cash') {
+    const station = await Station.findById(order.stationId).select('bankAccount');
+    if (station?.bankAccount?.recipientCode) {
+      try {
+        const ref = generatePaymentReference(stationPayoutRecord._id.toString());
+        const result = await transferToBeneficiary({
+          amountGHS: order.stationPayout,
+          recipientCode: station.bankAccount.recipientCode,
+          reason: `GetGas station payout — Order ${order._id.toString().slice(-6).toUpperCase()}`,
+          reference: ref,
+        });
+        stationPayoutRecord.status = 'processing';
+        stationPayoutRecord.paystackTransferCode = result.transferCode;
+        stationPayoutRecord.paystackReference = ref;
+        await stationPayoutRecord.save();
+      } catch (err) {
+        console.error('[Payout] Station transfer failed:', err);
+      }
+    }
+  }
+
+  // ── Station stats ───────────────────────────────────────────────────────
+  await Station.findByIdAndUpdate(order.stationId, { $inc: { totalOrders: 1 } });
+
+  // ── Loyalty points ──────────────────────────────────────────────────────
+  const amountPaid = +(order.totalAmount - (order.loyaltyDiscount ?? 0)).toFixed(2);
+  const pointsEarned = Math.floor(amountPaid * LOYALTY_EARN_RATE);
+  if (pointsEarned > 0) {
+    const user = await User.findById(order.userId);
+    if (user) {
+      user.loyaltyPoints = (user.loyaltyPoints ?? 0) + pointsEarned;
+      await user.save();
+      await LoyaltyTransaction.create({
+        userId: order.userId,
+        orderId: order._id,
+        type: 'earn',
+        points: pointsEarned,
+        balanceAfter: user.loyaltyPoints,
+        description: `Earned ${pointsEarned} points for order #${order._id.toString().slice(-6).toUpperCase()}`,
+      });
+      await Order.findByIdAndUpdate(order._id, { loyaltyPointsEarned: pointsEarned });
+    }
+  }
 }
 
 // ─── Create Order ─────────────────────────────────────────────────────────────
@@ -98,7 +196,7 @@ router.post(
   [
     body('stationId').isMongoId(),
     body('cylinders').isArray({ min: 1 }).withMessage('At least one cylinder required'),
-    body('cylinders.*.size').isIn([3, 4, 5, 6, 9, 11, 12, 14, 15, 18, 19, 20, 30, 47, 48]),
+    body('cylinders.*.size').optional().isInt({ min: 1 }),
     body('cylinders.*.quantity').isInt({ min: 1, max: 20 }),
     body('cylinders.*.customPrice').optional().isFloat({ min: 0 }),
     body('orderType').isIn(['delivery', 'exchange']),
@@ -150,18 +248,20 @@ router.post(
     }
 
     // ── Validate each cylinder line item against station stock ──────────────────
+    // Note: If customPrice is provided, user can pay any amount - don't validate it against size
     for (const item of cylinders as { size: number; quantity: number; customPrice?: number }[]) {
+      // Skip validation if customPrice is provided (user is paying custom amount)
+      if (item.customPrice !== undefined) {
+        console.log(`DEBUG: Custom price order - size: ${item.size}kg, amount: GHS ${item.customPrice}, skipping validation`);
+        continue;
+      }
+      
+      // For standard (non-custom) orders, validate size exists at station
       const listing = station.cylinderListings.find((l) => l.size === item.size);
       if (!listing || listing.fillPrice <= 0) {
         return res.status(400).json({
           success: false,
           message: `${item.size}kg cylinder is not configured at this station`,
-        });
-      }
-      if (item.customPrice !== undefined && item.customPrice < listing.fillPrice) {
-        return res.status(400).json({
-          success: false,
-          message: `Custom price for ${item.size}kg (GHS ${item.customPrice}) is below the minimum of GHS ${listing.fillPrice}`,
         });
       }
     }
@@ -182,9 +282,30 @@ router.post(
     let cylinderSubtotal = 0;
 
     for (const item of cylinders as { size: number; quantity: number; customPrice?: number }[]) {
-      const listing = station.cylinderListings.find((l) => l.size === item.size)!;
+      // If customPrice is provided, user is paying a custom amount - use it directly
+      if (item.customPrice !== undefined) {
+        let unitPrice = item.customPrice;
+        
+        // Apply surge to custom price
+        unitPrice = +(unitPrice * surgeMultiplier).toFixed(2);
+        
+        const subtotal = +(unitPrice * item.quantity).toFixed(2);
+        cylinderSubtotal = +(cylinderSubtotal + subtotal).toFixed(2);
+        cylinderLineItems.push({ size: item.size, quantity: item.quantity, unitPrice, subtotal });
+        continue;
+      }
+      
+      // For standard pricing, look up the listing
+      const listing = station.cylinderListings.find((l) => l.size === item.size);
+      if (!listing || listing.fillPrice <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: `${item.size}kg cylinder is not configured at this station`,
+        });
+      }
+      
       const basePrice = orderType === 'exchange' ? listing.exchangePrice : listing.fillPrice;
-      let unitPrice = item.customPrice !== undefined ? item.customPrice : basePrice;
+      let unitPrice = basePrice;
 
       // Apply surge
       unitPrice = +(unitPrice * surgeMultiplier).toFixed(2);
@@ -205,16 +326,27 @@ router.post(
       cylinderLineItems.push({ size: item.size, quantity: item.quantity, unitPrice, subtotal });
     }
 
-    // ── Delivery fee scaled by total cylinder count ──────────────────────────
-    const baseFee = +(pricingConfig?.deliveryFeeFlat ?? 5).toFixed(2);
-    const totalQty = (cylinders as any[]).reduce((a: number, b: any) => a + b.quantity, 0);
-    const feeMultiplier = totalQty === 1 ? 1 : totalQty === 2 ? 1.5 : 2.0;
-    const deliveryFee = +(baseFee * feeMultiplier).toFixed(2);
+    // ── Delivery fee: distance-based (user → station) ──────────────────────
+    const deliveryFee = calcDeliveryFee(
+      deliveryAddress.lat, deliveryAddress.lng,
+      station.lat, station.lng,
+      {
+        baseFee:        pricingConfig?.baseFee        ?? 5,
+        pricePerKm:     pricingConfig?.pricePerKm     ?? 2,
+        freeKm:         pricingConfig?.freeKm         ?? 2,
+        maxDeliveryFee: pricingConfig?.maxDeliveryFee ?? 50,
+      }
+    );
 
+    const totalQty = (cylinders as any[]).reduce((a: number, b: any) => a + b.quantity, 0);
     const totalAmount = +(cylinderSubtotal + deliveryFee).toFixed(2);
     const commissionPct = station.commissionPct;
     const commissionAmount = +((cylinderSubtotal * commissionPct) / 100).toFixed(2);
     const stationPayout = +(cylinderSubtotal - commissionAmount).toFixed(2);
+    // Rider earns the delivery fee minus platform commission on it
+    const riderCommissionPct = pricingConfig?.riderCommissionPct ?? 10;
+    const riderCommissionAmount = +((deliveryFee * riderCommissionPct) / 100).toFixed(2);
+    const riderEarning = +(deliveryFee - riderCommissionAmount).toFixed(2);
 
     // ── Loyalty redemption ───────────────────────────────────────────────
     let loyaltyDiscount = 0;
@@ -246,6 +378,9 @@ router.post(
       commissionPct,
       commissionAmount,
       stationPayout,
+      riderEarning,
+      riderCommissionPct,
+      riderCommissionAmount,
       deliveryAddress,
       pickupAddress: pickupAddress || deliveryAddress,
       paymentMethod,
@@ -412,29 +547,35 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.get('/:id', [param('id').isMongoId()], async (req: AuthRequest, res: Response) => {
   if (ve(req, res)) return;
 
-  const order = await Order.findById(req.params.id)
-    .populate('stationId', 'name address lat lng')
-    .populate('riderId', 'name phone profilePhoto ratingAvg vehicleType vehiclePlate location')
-    .populate('userId', 'name phone');
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate('stationId', 'name address lat lng')
+      .populate('riderId', 'name phone profilePhoto ratingAvg vehicleType vehiclePlate location')
+      .populate('userId', 'name phone');
 
-  if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-  // Ownership check — use _id when field is populated
-  const { role, id } = req.user!;
-  const userIdStr    = (order.userId as any)?._id?.toString() ?? order.userId.toString();
-  const riderIdStr   = (order.riderId as any)?._id?.toString() ?? order.riderId?.toString();
-  const stationIdStr = (order.stationId as any)?._id?.toString() ?? order.stationId.toString();
+    const { role, id } = req.user!;
 
-  const ownedByUser    = role === 'user'    && userIdStr    === id;
-  const ownedByRider   = role === 'rider'   && riderIdStr   === id;
-  const ownedByStation = role === 'station' && stationIdStr === (req.user as any).stationId;
-  const isAdmin        = role === 'admin';
+    // Safe toString helpers — handle null/unpopulated fields
+    const userIdStr    = (order.userId as any)?._id?.toString()    ?? order.userId?.toString()    ?? '';
+    const riderIdStr   = (order.riderId as any)?._id?.toString()   ?? order.riderId?.toString()   ?? '';
+    const stationIdStr = (order.stationId as any)?._id?.toString() ?? order.stationId?.toString() ?? '';
 
-  if (!ownedByUser && !ownedByRider && !ownedByStation && !isAdmin) {
-    return res.status(403).json({ success: false, message: 'Forbidden' });
+    const ownedByUser    = role === 'user'    && userIdStr    === id;
+    const ownedByRider   = role === 'rider'   && riderIdStr   === id;
+    const ownedByStation = role === 'station' && stationIdStr === (req.user as any).stationId;
+    const isAdmin        = role === 'admin';
+
+    if (!ownedByUser && !ownedByRider && !ownedByStation && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    res.json({ success: true, order });
+  } catch (err) {
+    console.error('[GET /orders/:id]', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch order' });
   }
-
-  res.json({ success: true, order });
 });
 
 // ─── Status Transitions ───────────────────────────────────────────────────────
@@ -551,83 +692,8 @@ router.patch(
 
     if (status === 'delivered' && role === 'rider') {
       order.paymentStatus = 'released';
-
-      const { Rider } = await import('../models/Rider');
-      // Count remaining active orders after this one is delivered
-      const remainingActive = await Order.countDocuments({
-        riderId: id,
-        status: { $in: ['accepted', 'at_station', 'en_route'] },
-        _id: { $ne: order._id },
-      });
-      const riderDoc = await Rider.findById(id).select('vehicleType bankAccount');
-      const capacity = CONSTANTS.VEHICLE_ORDER_LIMITS[riderDoc?.vehicleType ?? 'motorbike'] ?? 3;
-      // If still has active orders, stay busy or available based on count
-      const newRiderStatus = remainingActive === 0 ? 'available' : remainingActive < capacity ? 'available' : 'busy';
-      const rider = await Rider.findByIdAndUpdate(
-        order.riderId,
-        { status: newRiderStatus, ...(remainingActive === 0 ? { currentOrderId: null } : {}), $inc: { totalTrips: 1, totalEarnings: order.deliveryFee } },
-        { new: true }
-      );
-      console.log(`[Order] Rider ${id} delivered — remaining active: ${remainingActive} — status: ${newRiderStatus}`);
-
-      // Rider payout record
-      const riderEarning = +order.deliveryFee.toFixed(2);
-      const riderPayout = await Payout.create({
-        recipientType: 'rider',
-        recipientId: order.riderId,
-        orderId: order._id,
-        amountGHS: riderEarning,
-        status: 'pending',
-      });
-
-      if (rider?.bankAccount?.recipientCode) {
-        try {
-          const ref = generatePaymentReference(riderPayout._id.toString());
-          const result = await transferToBeneficiary({
-            amountGHS: riderEarning,
-            recipientCode: rider.bankAccount.recipientCode,
-            reason: `GetGas rider payout — Order ${order._id.toString().slice(-6).toUpperCase()}`,
-            reference: ref,
-          });
-          riderPayout.status = 'processing';
-          riderPayout.paystackTransferCode = result.transferCode;
-          riderPayout.paystackReference = ref;
-          await riderPayout.save();
-        } catch (err) {
-          console.error('[Payout] Rider transfer failed:', err);
-        }
-      }
-
-      // Station payout record
-      await Payout.create({
-        recipientType: 'station',
-        recipientId: order.stationId,
-        orderId: order._id,
-        amountGHS: order.stationPayout,
-        status: 'pending',
-      });
-
-      await Station.findByIdAndUpdate(order.stationId, { $inc: { totalOrders: 1 } });
-
-      // Loyalty points
-      const amountPaid = +(order.totalAmount - (order.loyaltyDiscount ?? 0)).toFixed(2);
-      const pointsEarned = Math.floor(amountPaid * LOYALTY_EARN_RATE);
-      if (pointsEarned > 0) {
-        const user = await User.findById(order.userId);
-        if (user) {
-          user.loyaltyPoints = (user.loyaltyPoints ?? 0) + pointsEarned;
-          await user.save();
-          await LoyaltyTransaction.create({
-            userId: order.userId,
-            orderId: order._id,
-            type: 'earn',
-            points: pointsEarned,
-            balanceAfter: user.loyaltyPoints,
-            description: `Earned ${pointsEarned} points for order #${order._id.toString().slice(-6).toUpperCase()}`,
-          });
-          await Order.findByIdAndUpdate(order._id, { loyaltyPointsEarned: pointsEarned });
-        }
-      }
+      await order.save();
+      await handleDeliveryCompletion(order, id, role);
     }
 
     if (status === 'cancelled') {
@@ -794,90 +860,13 @@ router.post(
     });
     await order.save();
 
-    // Free up rider
     if (order.riderId) {
-      const { Rider } = await import('../models/Rider');
-      const remainingActive = await Order.countDocuments({
-        riderId: order.riderId,
-        status: { $in: ['accepted', 'at_station', 'en_route'] },
-        _id: { $ne: order._id },
-      });
-      const riderDoc = await Rider.findById(order.riderId).select('vehicleType');
-      const capacity = CONSTANTS.VEHICLE_ORDER_LIMITS[riderDoc?.vehicleType ?? 'motorbike'] ?? 3;
-      const newRiderStatus = remainingActive === 0 ? 'available' : remainingActive < capacity ? 'available' : 'busy';
-      const rider = await Rider.findByIdAndUpdate(
-        order.riderId,
-        { status: newRiderStatus, ...(remainingActive === 0 ? { currentOrderId: null } : {}), $inc: { totalTrips: 1, totalEarnings: order.deliveryFee } },
-        { new: true }
-      );
-
-      // Create rider payout record
-      const riderEarning = +order.deliveryFee.toFixed(2);
-      const riderPayout = await Payout.create({
-        recipientType: 'rider',
-        recipientId: order.riderId,
-        orderId: order._id,
-        amountGHS: riderEarning,
-        status: 'pending',
-      });
-
-      // Auto-transfer if rider has a registered bank account
-      if (rider?.bankAccount?.recipientCode) {
-        try {
-          const ref = generatePaymentReference(riderPayout._id.toString());
-          const result = await transferToBeneficiary({
-            amountGHS: riderEarning,
-            recipientCode: rider.bankAccount.recipientCode,
-            reason: `GetGas rider payout — Order ${order._id.toString().slice(-6).toUpperCase()}`,
-            reference: ref,
-          });
-          riderPayout.status = 'processing';
-          riderPayout.paystackTransferCode = result.transferCode;
-          riderPayout.paystackReference = ref;
-          await riderPayout.save();
-        } catch (err) {
-          console.error('[Payout] Rider transfer failed:', err);
-        }
-      }
-    }
-
-    // Create station payout record
-    await Payout.create({
-      recipientType: 'station',
-      recipientId: order.stationId,
-      orderId: order._id,
-      amountGHS: order.stationPayout,
-      status: 'pending',
-    });
-
-    // Update station stats
-    await Station.findByIdAndUpdate(order.stationId, { $inc: { totalOrders: 1 } });
-
-    // ── Earn loyalty points (1 point per GHS paid after discount) ────────────────
-    const amountPaid = +(order.totalAmount - (order.loyaltyDiscount ?? 0)).toFixed(2);
-    const pointsEarned = Math.floor(amountPaid * LOYALTY_EARN_RATE);
-    if (pointsEarned > 0) {
-      const user = await User.findById(order.userId);
-      if (user) {
-        user.loyaltyPoints = (user.loyaltyPoints ?? 0) + pointsEarned;
-        await user.save();
-        await LoyaltyTransaction.create({
-          userId: order.userId,
-          orderId: order._id,
-          type: 'earn',
-          points: pointsEarned,
-          balanceAfter: user.loyaltyPoints,
-          description: `Earned ${pointsEarned} points for order #${order._id.toString().slice(-6).toUpperCase()}`,
-        });
-        // Update order with points earned
-        await Order.findByIdAndUpdate(order._id, { loyaltyPointsEarned: pointsEarned });
-      }
+      await handleDeliveryCompletion(order, req.user!.id, 'user');
     }
 
     emitOrderStatus(order._id.toString(), 'delivered');
     await createUserNotification(order, 'delivered').catch(console.error);
 
-    // TODO: trigger Paystack payout to station
     res.json({ success: true, message: 'Delivery confirmed. Thank you!' });
   }
 );

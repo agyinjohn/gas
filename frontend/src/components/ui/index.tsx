@@ -100,6 +100,8 @@ export function Input({ label, error, hint, className, ...props }: InputProps) {
           'w-full rounded-xl border px-4 py-3 text-base transition-all',
           'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent',
           'placeholder:text-gray-400',
+          // Ensure readable text on both light and dark backgrounds
+          'text-gray-900 dark:text-white',
           error ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white',
           className
         )}
@@ -126,6 +128,7 @@ export function Select({ label, error, options, className, ...props }: SelectPro
       <select
         className={cn(
           'w-full rounded-xl border px-4 py-3 text-base bg-white transition-all',
+          'text-gray-900 dark:text-white',
           'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent',
           error ? 'border-red-400' : 'border-gray-200',
           className

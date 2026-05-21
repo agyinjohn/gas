@@ -30,6 +30,7 @@ export default function StationLayout({ children }: { children: React.ReactNode 
   const [open, setOpen]           = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const notifsRef  = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -151,7 +152,7 @@ export default function StationLayout({ children }: { children: React.ReactNode 
             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
 
-          <button onClick={() => { logout(); router.push('/staff/login'); }}
+          <button onClick={() => setShowLogoutConfirm(true)}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--text-muted)] hover:bg-red-500/10 hover:text-red-500 transition-all">
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -258,7 +259,7 @@ export default function StationLayout({ children }: { children: React.ReactNode 
                       {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                       {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
                     </button>
-                    <button onClick={() => { logout(); router.push('/staff/login'); }}
+                    <button onClick={() => { setShowProfile(false); setShowLogoutConfirm(true); }}
                       className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-red-500 hover:bg-red-500/10 transition-all">
                       <LogOut className="w-4 h-4" /> Sign Out
                     </button>
@@ -274,6 +275,33 @@ export default function StationLayout({ children }: { children: React.ReactNode 
           {children}
         </main>
       </div>
+
+      {/* ── Logout confirmation ── */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[var(--bg-card)] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center">
+                <LogOut className="w-7 h-7 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-[var(--text-primary)]">Sign out?</h3>
+                <p className="text-sm text-[var(--text-muted)] mt-1">You will need to sign in again to manage your station.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 h-11 rounded-xl border border-[var(--border)] bg-[var(--bg-card2)] text-sm font-semibold text-[var(--text-primary)] transition-all">
+                Cancel
+              </button>
+              <button onClick={() => { setShowLogoutConfirm(false); logout(); router.push('/'); }}
+                className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-all">
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

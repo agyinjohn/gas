@@ -1,10 +1,14 @@
 import 'express-async-errors';
+import dotenv from 'dotenv';
+
+// Load environment variables FIRST before importing anything that uses them
+dotenv.config();
+
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import { Server as SocketServer } from 'socket.io';
 
 import { connectDB } from './config/database';
@@ -16,7 +20,7 @@ import { swaggerSpec } from './config/swagger';
 import swaggerUi from 'swagger-ui-express';
 
 // Routes
-import authRoutes from './routes/auth';
+import authRoutes, { passport } from './routes/auth';
 import userRoutes from './routes/users';
 import stationRoutes from './routes/stations';
 import riderRoutes from './routes/riders';
@@ -24,8 +28,6 @@ import orderRoutes from './routes/orders';
 import adminRoutes from './routes/admin';
 import paymentRoutes from './routes/payments';
 import notificationRoutes from './routes/notifications';
-
-dotenv.config();
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -67,6 +69,7 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(rateLimiter);
+app.use(passport.initialize());
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use(`${API}/auth`,          authRoutes);

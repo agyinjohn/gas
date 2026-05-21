@@ -4,7 +4,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Bike, ClipboardList, Store, MapPin, Star,
-  AlertTriangle, Map, CheckCircle2, Phone, Flame,
+  AlertTriangle, Map, CheckCircle2, Phone, Flame, X,
 } from 'lucide-react';
 import { ordersApi, paymentsApi } from '@/lib/api';
 import { useOrderTracking } from '@/hooks/useSocket';
@@ -27,7 +27,7 @@ const STATUS_ORDER = ['pending', 'accepted', 'at_station', 'en_route', 'delivere
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   pending:    { label: 'Order Placed',   color: 'text-amber-500',  bg: 'bg-amber-500/10'  },
   accepted:   { label: 'Rider Assigned', color: 'text-blue-500',   bg: 'bg-blue-500/10'   },
-  at_station: { label: 'Being Prepared', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  at_station: { label: 'Rider at Station', color: 'text-purple-500', bg: 'bg-purple-500/10' },
   en_route:   { label: 'On the Way',     color: 'text-brand-500',  bg: 'bg-brand-500/10'  },
   delivered:  { label: 'Delivered',      color: 'text-green-500',  bg: 'bg-green-500/10'  },
   cancelled:  { label: 'Cancelled',      color: 'text-red-500',    bg: 'bg-red-500/10'    },
@@ -68,17 +68,22 @@ export default function OrderDetailsPage() {
   const isPaymentCallback = searchParams.get('payment') === 'callback';
   const originTab = (searchParams.get('tab') as 'active' | 'past' | null) ?? 'active';
 
-  const [showOTPSheet,     setShowOTPSheet]     = useState(false);
-  const [showRatingSheet,  setShowRatingSheet]  = useState(false);
-  const [showIssueSheet,   setShowIssueSheet]   = useState(false);
-  const [otp,              setOtp]              = useState('');
-  const [rating,           setRating]           = useState(5);
-  const [ratingComment,    setRatingComment]    = useState('');
-  const [issueCategory,    setIssueCategory]    = useState('not_delivered');
-  const [issueDescription, setIssueDescription] = useState('');
-  const [otpLoading,       setOtpLoading]       = useState(false);
-  const [ratingLoading,    setRatingLoading]    = useState(false);
-  const [issueLoading,     setIssueLoading]     = useState(false);
+  const [showOTPSheet,      setShowOTPSheet]      = useState(false);
+  const [showRatingDialog,  setShowRatingDialog]  = useState(false);
+  const [showIssueSheet,    setShowIssueSheet]    = useState(false);
+  const [showCancelDialog,  setShowCancelDialog]  = useState(false);
+  const [cancelReason,      setCancelReason]      = useState('');
+  const [cancelOther,       setCancelOther]       = useState('');
+  const [cancelLoading,     setCancelLoading]     = useState(false);
+  const [otp,               setOtp]               = useState('');
+  const [rating,            setRating]            = useState(5);
+  const [ratingComment,     setRatingComment]     = useState('');
+  const [reportText,        setReportText]        = useState('');
+  const [issueCategory,     setIssueCategory]     = useState('not_delivered');
+  const [issueDescription,  setIssueDescription]  = useState('');
+  const [otpLoading,        setOtpLoading]        = useState(false);
+  const [ratingLoading,     setRatingLoading]     = useState(false);
+  const [issueLoading,      setIssueLoading]      = useState(false);
 
   const { data: order, refetch, error } = useQuery({
     queryKey: ['order', id],
@@ -101,7 +106,7 @@ export default function OrderDetailsPage() {
   const handleStatusChange = useCallback((status: string) => {
     queryClient.invalidateQueries({ queryKey: ['order', id] });
     if (status === 'en_route')  setShowOTPSheet(true);
-    if (status === 'delivered') setShowRatingSheet(true);
+    if (status === 'delivered') setShowRatingDialog(true);
   }, [id, queryClient]);
 
   useOrderTracking(id, handleStatusChange, () => {});
@@ -112,7 +117,7 @@ export default function OrderDetailsPage() {
     try {
       await ordersApi.confirmDelivery(id, otp);
       setShowOTPSheet(false);
-      setShowRatingSheet(true);
+      setShowRatingDialog(true);
       toast.success('Delivery confirmed!');
       refetch();
     } catch (err: any) {
@@ -137,11 +142,30 @@ export default function OrderDetailsPage() {
     setRatingLoading(true);
     try {
       await ordersApi.rate(id, rating, ratingComment);
-      setShowRatingSheet(false);
+      if (reportText.trim().length >= 10) {
+        await ordersApi.reportIssue(id, 'other', reportText.trim()).catch(() => {});
+      }
+      setShowRatingDialog(false);
       toast.success('Thank you for your feedback!');
       refetch();
     } catch { toast.error('Failed to submit rating'); }
     finally { setRatingLoading(false); }
+  }
+
+  async function handleCancelOrder() {
+    const reason = cancelReason === 'Other' ? cancelOther.trim() : cancelReason;
+    if (!reason) { toast.error('Please select a reason'); return; }
+    if (cancelReason === 'Other' && reason.length < 5) { toast.error('Please describe your reason'); return; }
+    setCancelLoading(true);
+    try {
+      await ordersApi.updateStatus(id, 'cancelled', reason);
+      setShowCancelDialog(false);
+      toast.success('Order cancelled');
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      refetch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to cancel order');
+    } finally { setCancelLoading(false); }
   }
 
   if (authLoading || (!order && !error)) {
@@ -407,17 +431,27 @@ export default function OrderDetailsPage() {
       {order.status !== 'cancelled' && (
         <div className="fixed bottom-0 inset-x-0 bg-[var(--bg-card)] border-t border-[var(--border)] px-4 pt-3 pb-6 z-20">
           <div className="max-w-lg mx-auto flex gap-2">
+            {/* Cancel — only while pending (rider not yet picked up) */}
+            {order.status === 'pending' && (
+              <button
+                onClick={() => setShowCancelDialog(true)}
+                className="flex-1 h-11 bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-semibold text-red-500 flex items-center justify-center gap-1.5"
+              >
+                <X className="w-3.5 h-3.5 shrink-0" />
+                Cancel Order
+              </button>
+            )}
             <button
               onClick={() => setShowIssueSheet(true)}
-              disabled={!!(order as any).issue?.reportedAt}
+              disabled={!!(order as any).issue?.reportedAt || originTab === 'past'}
               className="flex-1 h-11 bg-[var(--bg-card2)] border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">{(order as any).issue?.reportedAt ? 'Reported' : 'Report'}</span>
             </button>
             <button
-              onClick={() => order.status === 'delivered' && setShowRatingSheet(true)}
-              disabled={order.status !== 'delivered' || !!order.riderRating}
+              onClick={() => order.status === 'delivered' && !order.riderRating && originTab !== 'past' && setShowRatingDialog(true)}
+              disabled={order.status !== 'delivered' || !!order.riderRating || originTab === 'past'}
               className="flex-1 h-11 bg-[var(--bg-card2)] border border-[var(--border)] rounded-xl text-xs font-semibold text-[var(--text-primary)] flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <Star className="w-3.5 h-3.5 shrink-0" />
@@ -429,6 +463,65 @@ export default function OrderDetailsPage() {
             >
               My Orders
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel Order Dialog ── */}
+      {showCancelDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[var(--bg-card)] rounded-3xl shadow-2xl border border-[var(--border)] overflow-hidden">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <div>
+                <h2 className="text-base font-black text-[var(--text-primary)]">Cancel order?</h2>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">Tell us why you're cancelling</p>
+              </div>
+              <button onClick={() => setShowCancelDialog(false)}
+                className="w-8 h-8 rounded-full bg-[var(--bg-card2)] flex items-center justify-center shrink-0">
+                <X className="w-4 h-4 text-[var(--text-muted)]" />
+              </button>
+            </div>
+            <div className="px-5 pb-5 space-y-3">
+              {[
+                'I ordered by mistake',
+                'I found a better price elsewhere',
+                'Taking too long to find a rider',
+                'I no longer need the gas',
+                'Other',
+              ].map((reason) => (
+                <button key={reason} onClick={() => setCancelReason(reason)}
+                  className={cn(
+                    'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-all',
+                    cancelReason === reason
+                      ? 'border-red-500 bg-red-500/10 text-red-500'
+                      : 'border-[var(--border)] text-[var(--text-primary)]'
+                  )}>
+                  <span>{reason}</span>
+                  {cancelReason === reason && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                </button>
+              ))}
+              {cancelReason === 'Other' && (
+                <textarea
+                  value={cancelOther}
+                  onChange={(e) => setCancelOther(e.target.value)}
+                  placeholder="Please describe your reason…"
+                  rows={2}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card2)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                />
+              )}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowCancelDialog(false)}
+                  className="flex-1 h-11 rounded-xl border border-[var(--border)] text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-card2)] transition-all">
+                  Keep Order
+                </button>
+                <button onClick={handleCancelOrder} disabled={cancelLoading || !cancelReason}
+                  className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-all disabled:opacity-60 flex items-center justify-center">
+                  {cancelLoading
+                    ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : 'Yes, Cancel'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -477,31 +570,102 @@ export default function OrderDetailsPage() {
         </button>
       </BottomSheet>
 
-      {/* ── Rating Sheet ── */}
-      <BottomSheet open={showRatingSheet} onClose={() => setShowRatingSheet(false)} title="Rate Your Rider">
-        <p className="text-sm text-[var(--text-muted)] mb-4">How was your experience?</p>
-        <div className="flex justify-center gap-3 mb-5">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button key={star} onClick={() => setRating(star)}>
-              <Star className={cn('w-9 h-9 transition-colors',
-                star <= rating ? 'text-amber-400 fill-current' : 'text-[var(--border)]')} />
-            </button>
-          ))}
+      {/* ── Rating Dialog (center popup) ── */}
+      {showRatingDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[var(--bg-card)] rounded-3xl shadow-2xl border border-[var(--border)] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <div>
+                <h2 className="text-base font-black text-[var(--text-primary)]">Rate your rider</h2>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">How was your delivery experience?</p>
+              </div>
+              <button
+                onClick={() => setShowRatingDialog(false)}
+                className="w-8 h-8 rounded-full bg-[var(--bg-card2)] flex items-center justify-center shrink-0"
+              >
+                <X className="w-4 h-4 text-[var(--text-muted)]" />
+              </button>
+            </div>
+
+            <div className="px-5 pb-5 space-y-4">
+              {/* Rider info */}
+              {rider && (
+                <div className="flex items-center gap-3 bg-[var(--bg-card2)] rounded-2xl px-3 py-2.5">
+                  <div className="w-9 h-9 rounded-full bg-brand-500/20 flex items-center justify-center shrink-0">
+                    {rider.profilePhoto
+                      ? <img src={rider.profilePhoto} alt="Rider" className="w-full h-full object-cover rounded-full" />
+                      : <span className="text-brand-500 font-black text-sm">{rider.name?.charAt(0)}</span>
+                    }
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[var(--text-primary)] truncate">{rider.name}</p>
+                    <p className="text-xs text-[var(--text-muted)] capitalize">{rider.vehicleType}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Stars */}
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button key={star} onClick={() => setRating(star)} className="transition-transform active:scale-90">
+                    <Star className={cn('w-10 h-10 transition-colors',
+                      star <= rating ? 'text-amber-400 fill-current' : 'text-[var(--border)]')} />
+                  </button>
+                ))}
+              </div>
+
+              {/* Rating label */}
+              <p className="text-center text-sm font-semibold text-[var(--text-muted)]">
+                {rating === 1 ? 'Very Poor' : rating === 2 ? 'Poor' : rating === 3 ? 'Okay' : rating === 4 ? 'Good' : 'Excellent!'}
+              </p>
+
+              {/* Comment */}
+              <textarea
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+                placeholder="Leave a comment… (optional)"
+                rows={2}
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card2)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+              />
+
+              {/* Divider */}
+              <div className="border-t border-[var(--border)]" />
+
+              {/* Report section */}
+              <div>
+                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2">Any issues to report? <span className="normal-case font-normal">(optional)</span></p>
+                <textarea
+                  value={reportText}
+                  onChange={(e) => setReportText(e.target.value)}
+                  placeholder="Describe any problem with this delivery…"
+                  rows={2}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card2)] px-3 py-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowRatingDialog(false)}
+                  className="flex-1 h-11 rounded-xl border border-[var(--border)] text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-card2)] transition-all"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={handleSubmitRating}
+                  disabled={ratingLoading}
+                  className="flex-1 h-11 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold transition-all disabled:opacity-60 flex items-center justify-center"
+                >
+                  {ratingLoading
+                    ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : 'Submit'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        <textarea value={ratingComment} onChange={(e) => setRatingComment(e.target.value)}
-          placeholder="Any comments? (optional)" rows={3}
-          className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card2)] px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4 resize-none" />
-        <button onClick={handleSubmitRating} disabled={ratingLoading}
-          className="w-full h-12 bg-brand-500 text-white rounded-xl font-bold text-sm disabled:opacity-60 flex items-center justify-center">
-          {ratingLoading
-            ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            : 'Submit Rating'}
-        </button>
-        <button className="w-full text-center text-sm text-[var(--text-muted)] mt-3"
-          onClick={() => setShowRatingSheet(false)}>
-          Skip
-        </button>
-      </BottomSheet>
+      )}
     </div>
   );
 }

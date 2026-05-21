@@ -46,9 +46,10 @@ export interface IStation extends Document {
   totalOrders: number;
   cylinderListings: ICylinderListing[];
   bankAccount?: {
-    provider: string;                 // mobile money provider or bank name
+    provider: string;
     accountNumber: string;
     accountName: string;
+    recipientCode?: string;   // Paystack transfer recipient code
   };
   outOfStock: boolean;
   fcmToken?: string;

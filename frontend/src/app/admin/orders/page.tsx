@@ -60,17 +60,17 @@ export default function AdminOrdersPage() {
 
         {/* Status Filters */}
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {['', 'pending', 'accepted', 'en_route', 'delivered', 'cancelled'].map((status) => (
+          {['', 'pending', 'accepted', 'at_station', 'en_route', 'delivered', 'cancelled'].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
                 statusFilter === status
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? status === 'cancelled' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white'
+                  : status === 'cancelled' ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {status === '' ? 'All' : status.replace('_', ' ')}
+              {status === '' ? 'All' : status.replace(/_/g, ' ')}
             </button>
           ))}
         </div>
@@ -153,6 +153,14 @@ function OrderCard({
         <p>Ordered: {formatRelativeTime(order.createdAt)}</p>
         {order.scheduledFor && (
           <p>Scheduled: {new Date(order.scheduledFor).toLocaleString()}</p>
+        )}
+        {order.status === 'cancelled' && order.cancellationReason && (
+          <div className="mt-2 p-2.5 bg-red-50 border border-red-100 rounded-lg">
+            <p className="font-semibold text-red-700 mb-0.5">
+              Cancelled by {order.cancelledBy || 'user'}
+            </p>
+            <p className="text-red-600">Reason: {order.cancellationReason}</p>
+          </div>
         )}
       </div>
 

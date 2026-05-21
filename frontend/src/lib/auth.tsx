@@ -16,6 +16,7 @@ interface AuthContextValue {
   token: string | null;
   login: (token: string, user: AuthUser) => void;
   logout: () => void;
+  updateUser: (patch: Partial<AuthUser>) => void;
   isLoading: boolean;
 }
 
@@ -104,11 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const isRoot         = pathname === '/';
     const isRiderRegister = pathname === '/rider/register';
-    const isRiderLogin   = pathname === '/rider/login';
-    const isAdminLogin   = pathname === '/admin/login';
-    const isStationLogin = pathname === '/station/login';
-    const isStaffLogin   = pathname === '/staff/login';
-    const isPublic       = isRoot || isRiderRegister || isRiderLogin || isAdminLogin || isStationLogin || isStaffLogin;
+    const isSetPassword  = pathname === '/set-password';
+    const isRegister     = pathname === '/register';
+    const isForgotPw     = pathname === '/forgot-password';
+    const isPublic       = isRoot || isRiderRegister || isSetPassword || isRegister || isForgotPw;
 
     if (!user) {
       if (!isPublic) router.replace('/');
@@ -132,6 +132,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
   };
 
+  const updateUser = (patch: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...patch };
+      localStorage.setItem('gasgo_user', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const logout = () => {
     clearStorage();
     setToken(null);
@@ -147,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateUser, isLoading }}>
       {isLoading ? (
         <div className="min-h-screen flex items-center justify-center bg-white">
           <div className="flex flex-col items-center gap-3">

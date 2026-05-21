@@ -2,21 +2,21 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, ChevronDown, Bell, Flame,
-  Plus, Navigation, AlertCircle, Loader2, Star, Gift, Map,
-  Sun, Moon, SlidersHorizontal, Truck, ChevronRight,
+  Navigation, AlertCircle, Loader2, Star, Gift, Map,
+  Sun, Moon, SlidersHorizontal, Truck, ChevronRight, X, Phone,
 } from 'lucide-react';
-import { stationsApi, ordersApi, notificationsApi } from '@/lib/api';
+import { stationsApi, ordersApi, notificationsApi, authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
 import { cn, calcDeliveryFee } from '@/lib/utils';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { PickedLocation } from '@/components/LocationPicker';
+import toast from 'react-hot-toast';
+import WhatsAppFloatingButton from '@/components/WhatsAppFloatingButton';
 
 const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
-
-const QUICK_SIZES = [3, 6, 12];
 
 interface Listing {
   size: number;
@@ -35,6 +35,7 @@ interface Station {
   distanceKm: number;
   ratingAvg: number;
   outOfStock: boolean;
+  isOpenNow: boolean;
   cylinderListings: Listing[];
 }
 
@@ -45,21 +46,22 @@ function StationCard({ station }: { station: Station }) {
     ? Math.min(...station.cylinderListings.filter((l) => l.fillPrice > 0).map((l) => l.fillPrice))
     : null;
   const deliveryFee = calcDeliveryFee(station.distanceKm);
+  const unavailable = station.outOfStock || !station.isOpenNow;
 
   return (
     <Link href={`/user/stations/${station.id}`}>
       <div className={cn(
         'bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-4 h-full transition-all active:scale-[0.98]',
-        station.outOfStock && 'opacity-60'
+        unavailable && 'opacity-60'
       )}>
 
         {/* Top row: icon + name/address + chevron */}
         <div className="flex items-start gap-3">
           <div className={cn(
             'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-            station.outOfStock ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
+            unavailable ? 'bg-[var(--bg-card2)]' : 'bg-brand-500/15'
           )}>
-            <Flame className={cn('w-5 h-5', station.outOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
+            <Flame className={cn('w-5 h-5', unavailable ? 'text-[var(--text-muted)]' : 'text-brand-500')} />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-[var(--text-primary)] text-sm leading-snug truncate">
@@ -87,8 +89,12 @@ function StationCard({ station }: { station: Station }) {
             </span>
           </div>
 
-          {/* Right: stock status */}
-          {station.outOfStock ? (
+          {/* Right: status badge */}
+          {!station.isOpenNow ? (
+            <span className="text-[10px] font-bold text-gray-500 bg-gray-500/10 px-2 py-0.5 rounded-full">
+              Closed today
+            </span>
+          ) : station.outOfStock ? (
             <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
               Out of stock
             </span>
@@ -105,7 +111,7 @@ function StationCard({ station }: { station: Station }) {
             <p className="text-[10px] text-[var(--text-muted)] mb-0.5">Gas from</p>
             <p className={cn(
               'text-sm font-bold',
-              station.outOfStock ? 'text-[var(--text-muted)]' : 'text-brand-500'
+              unavailable ? 'text-[var(--text-muted)]' : 'text-brand-500'
             )}>
               {minPrice ? `GHS ${minPrice}` : '—'}
             </p>
@@ -147,12 +153,119 @@ function StationSkeleton() {
   );
 }
 
+// ─── Add Phone Modal (Google sign-in users) ──────────────────────────────────
+// No OTP needed — users are already verified via Google OAuth
+
+function AddPhoneModal({ onDone }: { onDone: () => void }) {
+  const { login, user } = useAuth();
+  const [phone, setPhone]       = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+
+  async function handleAddPhone(e: React.FormEvent) {
+    e.preventDefault();
+    const digits = phone.replace(/\D/g, '');
+    
+    if (digits.length < 9) {
+      setError('Enter a valid phone number');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      // Backend will normalize the phone format
+      const res = await authApi.addPhone(phone, '');
+      const { token, user: updatedUser } = res.data;
+      login(token, updatedUser);
+      toast.success('Phone number added!');
+      onDone();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to add phone number');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div className="w-full max-w-sm bg-[var(--bg-card)] rounded-3xl p-6 space-y-5 shadow-2xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-lg font-black text-[var(--text-primary)]">Add your phone number</h2>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">Required to place orders and receive updates</p>
+          </div>
+          <button onClick={onDone} className="w-8 h-8 rounded-full bg-[var(--bg-card2)] flex items-center justify-center shrink-0">
+            <X className="w-4 h-4 text-[var(--text-muted)]" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+            <p className="text-xs text-red-500">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleAddPhone} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase mb-2">Phone number</label>
+            <div className="flex">
+              <div className="flex items-center gap-1.5 px-3 h-12 bg-[var(--bg-card2)] border border-r-0 border-[var(--border)] rounded-l-xl text-sm text-[var(--text-muted)] font-medium shrink-0">
+                <span>🇬🇭</span><span>+233</span>
+              </div>
+              <input 
+                type="tel" 
+                inputMode="numeric" 
+                placeholder="123456789"
+                value={phone}
+                onChange={(e) => { 
+                  setPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); 
+                  setError(''); 
+                }}
+                autoFocus
+                className="flex-1 h-12 rounded-r-xl border border-[var(--border)] text-sm text-[var(--text-primary)] bg-[var(--bg-card2)] px-4 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Format: 0123456789, 233123456789, or +233123456789</p>
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={loading || phone.replace(/\D/g, '').length < 9}
+            className="w-full h-12 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 transition-all"
+          >
+            {loading ? (
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <><Phone className="w-4 h-4" /> Add Phone Number</>
+            )}
+          </button>
+
+          <button 
+            type="button" 
+            onClick={onDone}
+            className="w-full h-10 rounded-lg border border-[var(--border)] text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-card2)] transition-all"
+          >
+            Skip for now
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function UserHomePage() {
   const { user } = useAuth();
   const { theme, toggle } = useTheme();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [showAddPhone, setShowAddPhone] = useState(searchParams.get('addPhone') === '1');
+  const [quickOrderAmount, setQuickOrderAmount] = useState('');
+  const [quickOrderLoading, setQuickOrderLoading] = useState(false);
 
   const [coords, setCoords]               = useState<{ lat: number; lng: number } | null>(null);
   const [locationState, setLocationState] = useState<'detecting' | 'granted' | 'denied' | 'manual'>('detecting');
@@ -186,11 +299,12 @@ export default function UserHomePage() {
       ({ coords: c }) => {
         setCoords({ lat: c.latitude, lng: c.longitude });
         setLocationState('granted');
-        reverseGeocode(c.latitude, c.longitude, (label) => {
+        reverseGeocode(c.latitude, c.longitude, (label, fullAddress) => {
           setLocationLabel(label);
           localStorage.setItem('gasgo_lat', String(c.latitude));
           localStorage.setItem('gasgo_lng', String(c.longitude));
           localStorage.setItem('gasgo_location_label', label);
+          localStorage.setItem('gasgo_location_address', fullAddress);
           localStorage.setItem('gasgo_location_mode', 'granted');
         });
       },
@@ -205,11 +319,12 @@ export default function UserHomePage() {
       ({ coords: c }) => {
         setCoords({ lat: c.latitude, lng: c.longitude });
         setLocationState('granted');
-        reverseGeocode(c.latitude, c.longitude, (label) => {
+        reverseGeocode(c.latitude, c.longitude, (label, fullAddress) => {
           setLocationLabel(label);
           localStorage.setItem('gasgo_lat', String(c.latitude));
           localStorage.setItem('gasgo_lng', String(c.longitude));
           localStorage.setItem('gasgo_location_label', label);
+          localStorage.setItem('gasgo_location_address', fullAddress);
           localStorage.setItem('gasgo_location_mode', 'granted');
         });
       },
@@ -218,9 +333,9 @@ export default function UserHomePage() {
     );
   }
 
-  function reverseGeocode(lat: number, lng: number, cb: (label: string) => void) {
+  function reverseGeocode(lat: number, lng: number, cb: (label: string, fullAddress: string) => void) {
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
-    if (!key) { cb('Current location'); return; }
+    if (!key) { cb('Current location', ''); return; }
     fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}&result_type=sublocality|locality`)
       .then((r) => r.json())
       .then((data) => {
@@ -229,12 +344,12 @@ export default function UserHomePage() {
           const comp = result.address_components?.find((ac: any) =>
             ac.types.includes('sublocality') || ac.types.includes('neighborhood')
           ) ?? result.address_components?.find((ac: any) => ac.types.includes('locality'));
-          cb(comp?.long_name ?? result.formatted_address.split(',')[0]);
+          cb(comp?.long_name ?? result.formatted_address.split(',')[0], result.formatted_address ?? '');
         } else {
-          cb('Current location');
+          cb('Current location', '');
         }
       })
-      .catch(() => cb('Current location'));
+      .catch(() => cb('Current location', ''));
   }
 
   function handleLocationConfirm(loc: PickedLocation) {
@@ -246,6 +361,7 @@ export default function UserHomePage() {
     localStorage.setItem('gasgo_lat', String(loc.lat));
     localStorage.setItem('gasgo_lng', String(loc.lng));
     localStorage.setItem('gasgo_location_label', loc.formatted.split(',')[0]);
+    localStorage.setItem('gasgo_location_address', loc.formatted);
     localStorage.setItem('gasgo_location_mode', 'manual');
   }
 
@@ -279,12 +395,141 @@ export default function UserHomePage() {
   const STATUS_LABELS: Record<string, string> = {
     pending:    'Order Placed',
     accepted:   'Accepted',
-    at_station: 'Being Prepared',
+    at_station: 'Rider at Station',
     en_route:   'Out for Delivery',
   };
 
+  // Quick Order Handlers
+  async function handleQuickOrderFind() {
+    const amountVal = parseFloat(quickOrderAmount);
+    if (!amountVal || amountVal < 1) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+
+    if (!coords) {
+      toast.error('Could not get your location');
+      return;
+    }
+
+    setQuickOrderLoading(true);
+    try {
+      const { data } = await stationsApi.getNearby(coords.lat, coords.lng, 25);
+      const stationsList = data.stations.map((s: any) => ({
+        ...s,
+        id: s._id?.toString() ?? s.id,
+      }));
+
+      if (stationsList.length === 0) {
+        toast.error('No stations found nearby');
+        setQuickOrderLoading(false);
+        return;
+      }
+
+      // Find first station with ANY gas (not out of stock completely)
+      let foundStation = null;
+      let foundCylinder = null;
+
+      for (const s of stationsList) {
+        if (s.outOfStock) { console.log(`[QuickOrder] Skipped "${s.name}" (${s.distanceKm}km): outOfStock`); continue; }
+        if (s.isOpenNow === false) { console.log(`[QuickOrder] Skipped "${s.name}" (${s.distanceKm}km): closed today`); continue; }
+
+        const available = s.cylinderListings.filter((l: any) => l.isAvailable && l.fillPrice > 0);
+        if (available.length === 0) { console.log(`[QuickOrder] Skipped "${s.name}" (${s.distanceKm}km): no available listings`, s.cylinderListings); continue; }
+        
+        // Find closest cylinder size to the amount (first one >= amount, or closest to it)
+        const sorted = available.sort((a: any, b: any) => a.fillPrice - b.fillPrice);
+        
+        let selectedCylinder = null;
+        // Try to find exact match or slightly above
+        for (const listing of sorted) {
+          if (listing.fillPrice >= amountVal) {
+            selectedCylinder = listing;
+            break;
+          }
+        }
+        
+        // If no exact match, pick the highest priced one available
+        if (!selectedCylinder) {
+          selectedCylinder = sorted[sorted.length - 1];
+        }
+
+        foundStation = s;
+        foundCylinder = { size: selectedCylinder.size, price: selectedCylinder.fillPrice };
+        console.log(`[QuickOrder] Selected "${s.name}" (${s.distanceKm}km)`);
+        break;
+      }
+
+      if (!foundStation || !foundCylinder) {
+        const msg = 'No gas available at nearby stations';
+        toast.error(msg);
+        setQuickOrderLoading(false);
+        return;
+      }
+
+      // Clear any old session data to ensure fresh quick order
+      sessionStorage.removeItem('quickOrderCart');
+      sessionStorage.removeItem('checkoutCart');
+      sessionStorage.removeItem('editOrderCart');
+
+      // Create cart items for sessionStorage - use USER'S entered amount with matched size
+      const matchedSize = foundCylinder.size;
+      const userAmount = parseFloat(amountVal.toString());
+      
+      const cartItems = [{
+        size: matchedSize,  // Use the matched size from ceiling method (for display only)
+        quantity: 1,
+        unitPrice: userAmount,  // Use the amount the USER entered
+        subtotal: userAmount,
+        customPrice: userAmount,  // Send custom price to backend (user's actual amount)
+      }];
+      console.log('DEBUG: Quick order - matched size:', matchedSize, 'user amount:', userAmount, 'cartItems:', cartItems);
+      sessionStorage.setItem('quickOrderCart', JSON.stringify(cartItems));
+
+      // Get station location label
+      const stationLocationLabel = foundStation.name || 'Station';
+      
+      // User's location for delivery/pickup (same location for quick order)
+      const fullAddress = localStorage.getItem('gasgo_location_address') || localStorage.getItem('gasgo_location_label') || 'Current location';
+
+      // Navigate directly to review page with all prefilled data
+      const q = new URLSearchParams({
+        stationId: foundStation.id,
+        stationName: foundStation.name || 'Station',
+        stationAddress: foundStation.address || '',
+        stationLat: String(foundStation.lat ?? ''),
+        stationLng: String(foundStation.lng ?? ''),
+        schedule: 'asap',
+        pickupStreet: fullAddress,
+        pickupCity: '',
+        pickupLat: String(coords.lat),
+        pickupLng: String(coords.lng),
+        pickupLabel: 'Current location',
+        deliveryStreet: fullAddress,
+        deliveryCity: '',
+        deliveryLat: String(coords.lat),
+        deliveryLng: String(coords.lng),
+        deliveryLabel: 'Current location',
+        isQuickOrder: 'true',
+        source: 'quick',
+      });
+      
+      router.push(`/user/checkout/review?${q.toString()}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Error finding station');
+      setQuickOrderLoading(false);
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-[var(--bg)]">
+
+      {showAddPhone && (
+        <AddPhoneModal onDone={() => {
+          setShowAddPhone(false);
+          router.replace('/user');
+        }} />
+      )}
 
       {showPicker && (
         <LocationPicker
@@ -379,42 +624,48 @@ export default function UserHomePage() {
         )}
 
         {/* ── Quick Order ── */}
-        <div>
-          <h2 className="text-base font-bold text-[var(--text-primary)] mb-3">Quick Order</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-
-            {/* New Gas Refill card */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 flex flex-col items-center gap-3">
-              <div className="w-12 h-12 rounded-full border-2 border-[var(--border)] flex items-center justify-center">
-                <Plus className="w-6 h-6 text-[var(--text-primary)]" />
+        <div className="space-y-4">
+          <h2 className="text-base font-bold text-[var(--text-primary)]">Quick Order</h2>
+          
+          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-[var(--text-primary)] mb-2">
+                How much do you want to fill?
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-[var(--text-muted)]">
+                  ₵
+                </span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="50"
+                  value={quickOrderAmount}
+                  onChange={(e) => setQuickOrderAmount(e.target.value)}
+                  disabled={quickOrderLoading}
+                  className={cn(
+                    'w-full h-12 pl-8 pr-4 rounded-xl border bg-[var(--bg-card2)] text-[var(--text-primary)] text-lg font-bold',
+                    'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent',
+                    'border-[var(--border)] disabled:opacity-50'
+                  )}
+                />
               </div>
-              <p className="text-sm font-semibold text-[var(--text-primary)] text-center">New Gas Refill</p>
-              <button
-                onClick={() => router.push('/user/checkout?source=quick')}
-                className="w-full bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold py-2 rounded-xl transition-colors"
-              >
-                Place an Order
-              </button>
             </div>
 
-            {/* Size cards */}
-            {QUICK_SIZES.map((size) => (
-              <div
-                key={size}
-                className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4 flex flex-col items-center gap-3"
-              >
-                <div className="w-12 h-12 rounded-xl bg-[var(--bg-card2)] flex items-center justify-center">
-                  <Flame className="w-6 h-6 text-[var(--text-muted)]" />
-                </div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">{size}kg Refill</p>
-                <button
-                  onClick={() => router.push(`/user/checkout?source=quick&size=${size}`)}
-                  className="w-full bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold py-2 rounded-xl transition-colors"
-                >
-                  Order
-                </button>
-              </div>
-            ))}
+            <button
+              onClick={handleQuickOrderFind}
+              disabled={quickOrderLoading || !quickOrderAmount}
+              className="w-full h-12 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {quickOrderLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Placing...
+                </>
+              ) : (
+                'Place Order'
+              )}
+            </button>
           </div>
         </div>
 
@@ -510,6 +761,8 @@ export default function UserHomePage() {
 
       </div>
       </div>
+      
+      <WhatsAppFloatingButton presetMessage="Hi! I need help with my order." />
     </div>
   );
 }

@@ -1,10 +1,12 @@
 'use client';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, ClipboardList, MapPin, User, LogOut, Sun, Moon, Flame } from 'lucide-react';
+import { Home, ClipboardList, MapPin, User, LogOut, Sun, Moon, Flame, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
 import { cn } from '@/lib/utils';
+import CompleteProfileModal from '@/components/CompleteProfileModal';
 
 const NAV = [
   { href: '/user',         icon: Home,          label: 'Home'    },
@@ -28,6 +30,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
   const { theme, toggle } = useTheme();
 
   const hideNav = HIDE_NAV_PATTERNS.some((p) => p.test(pathname));
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   return (
     <div className="min-h-screen bg-[var(--bg)] flex">
@@ -89,7 +92,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
           <button
-            onClick={logout}
+            onClick={() => setShowLogoutConfirm(true)}
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--text-muted)] hover:bg-red-500/10 hover:text-red-500 transition-all w-full"
           >
             <LogOut className="w-5 h-5" />
@@ -100,10 +103,40 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
 
       {/* ── Main content ── */}
       <main className="flex-1 lg:ml-64 flex flex-col min-h-screen overflow-x-hidden">
+        <CompleteProfileModal />
         <div className="flex-1">
           {children}
         </div>
       </main>
+
+      {/* ── Logout confirmation ── */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[var(--bg-card)] rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center">
+                <AlertTriangle className="w-7 h-7 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-[var(--text-primary)]">Sign out?</h3>
+                <p className="text-sm text-[var(--text-muted)] mt-1">You will need to sign in again to place orders or track deliveries.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 h-11 rounded-xl border border-[var(--border)] bg-[var(--bg-card2)] text-sm font-semibold text-[var(--text-primary)] transition-all hover:bg-[var(--border)]">
+                Cancel
+              </button>
+              <button
+                onClick={() => { setShowLogoutConfirm(false); logout(); }}
+                className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-all">
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Mobile bottom nav ── */}
       {!hideNav && (

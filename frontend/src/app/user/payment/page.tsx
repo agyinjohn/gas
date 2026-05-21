@@ -17,13 +17,52 @@ export default function PaymentPage() {
   const pickupCity    = params.get('pickupCity') ?? '';
   const pickupLat     = parseFloat(params.get('pickupLat') ?? '0');
   const pickupLng     = parseFloat(params.get('pickupLng') ?? '0');
+  const pickupLabel   = params.get('pickupLabel') ?? '';
   const deliveryStreet = params.get('deliveryStreet') ?? '';
   const deliveryCity   = params.get('deliveryCity') ?? '';
   const deliveryLat    = parseFloat(params.get('deliveryLat') ?? '0');
   const deliveryLng    = parseFloat(params.get('deliveryLng') ?? '0');
   const deliveryLabel  = params.get('deliveryLabel') ?? '';
+
+  // Resolve effective street — fall back to label if street is empty or 'Current location'
+  const effectivePickupStreet  = (pickupStreet && pickupStreet !== 'Current location') ? pickupStreet : pickupLabel;
+  const effectiveDeliveryStreet = (deliveryStreet && deliveryStreet !== 'Current location') ? deliveryStreet : deliveryLabel;
   const cartItemsRaw   = params.get('cartItems') ?? '[]';
-  const cartItems: Array<{ size: number; quantity: number; unitPrice: number; subtotal: number; customPrice?: number }> = JSON.parse(cartItemsRaw);
+  
+  // Load cartItems with priority: URL params → sessionStorage
+  let cartItems: Array<{ size: number; quantity: number; unitPrice: number; subtotal: number; customPrice?: number }> = [];
+  
+  try {
+    const urlItems = JSON.parse(cartItemsRaw);
+    if (Array.isArray(urlItems) && urlItems.length > 0) {
+      cartItems = urlItems;
+      console.log('DEBUG Payment: Loaded cartItems from URL params:', cartItems);
+    } else {
+      // Try sessionStorage as fallback
+      const sessionData = sessionStorage.getItem('quickOrderCart') || 
+                         sessionStorage.getItem('checkoutCart') || 
+                         sessionStorage.getItem('editOrderCart');
+      if (sessionData) {
+        cartItems = JSON.parse(sessionData);
+        console.log('DEBUG Payment: Loaded cartItems from sessionStorage:', cartItems);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse cartItems:', e);
+    // Try sessionStorage fallback
+    const sessionData = sessionStorage.getItem('quickOrderCart') || 
+                       sessionStorage.getItem('checkoutCart') || 
+                       sessionStorage.getItem('editOrderCart');
+    if (sessionData) {
+      try {
+        cartItems = JSON.parse(sessionData);
+        console.log('DEBUG Payment: Loaded cartItems from sessionStorage (parse error):', cartItems);
+      } catch (e2) {
+        console.error('Failed to parse sessionStorage data:', e2);
+      }
+    }
+  }
+  
   const total          = parseFloat(params.get('total') ?? '0');
   const summaryLabel   = cartItems.map((c) => `${c.size}kg ×${c.quantity}`).join(', ');
 
@@ -33,23 +72,27 @@ export default function PaymentPage() {
   async function handleConfirm() {
     setLoading(true);
     try {
+      const cylinders = cartItems.map(({ size, quantity, customPrice }) => ({
+        size,
+        quantity,
+        ...(customPrice !== undefined ? { customPrice } : {}),
+      }));
+      
+      console.log('DEBUG Payment: Creating order with cylinders:', cylinders);
+      
       const { data } = await ordersApi.create({
         stationId,
-        cylinders: cartItems.map(({ size, quantity, customPrice }) => ({
-          size,
-          quantity,
-          ...(customPrice !== undefined ? { customPrice } : {}),
-        })),
+        cylinders,
         orderType: 'delivery',
         deliveryAddress: {
-          street: deliveryStreet,
-          city: deliveryCity || deliveryStreet || deliveryLabel,
+          street: effectiveDeliveryStreet,
+          city: deliveryCity || effectiveDeliveryStreet,
           lat: deliveryLat,
           lng: deliveryLng,
         },
         pickupAddress: {
-          street: pickupStreet,
-          city: pickupCity || pickupStreet,
+          street: effectivePickupStreet,
+          city: pickupCity || effectivePickupStreet,
           lat: pickupLat,
           lng: pickupLng,
         },
