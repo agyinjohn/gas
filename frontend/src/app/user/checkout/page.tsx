@@ -151,6 +151,25 @@ export default function CheckoutPage() {
     staleTime: 300000,
   });
 
+  const availableSizes: number[] = stationData?.cylinderListings
+    ?.filter((l: any) => l.fillPrice > 0)
+    ?.map((l: any) => l.size)
+    ?.sort((a: number, b: number) => a - b) ?? [];
+
+  // Cart as array of line items — supports same size at different prices
+  const [lines, setLines] = useState<LineItem[]>([]);
+
+  // Schedule
+  const [schedule, setSchedule]         = useState<'asap' | 'scheduled'>(scheduleParam ?? 'asap');
+  const [scheduledDate, setScheduledDate] = useState('');
+
+  // Pickup + delivery locations
+  const [pickupLoc, setPickupLoc]       = useState<PickedLocation | null>(null);
+  const [deliveryLoc, setDeliveryLoc]   = useState<PickedLocation | null>(null);
+  const [sameAsPickup, setSameAsPickup] = useState(isQuickOrder || cartItemsParam ? true : false);
+  const [showPickupPicker, setShowPickupPicker]   = useState(false);
+  const [showDeliveryPicker, setShowDeliveryPicker] = useState(false);
+
   // Estimate delivery fee for bottom bar (user → station)
   const estimatedDeliveryFee = (() => {
     if (!pricingData || !pickupLoc || !stationData) return pricingData?.baseFee ?? 5;
@@ -167,14 +186,6 @@ export default function CheckoutPage() {
     return +Math.min(maxFee, Math.max(baseFee, baseFee + billable * perKm)).toFixed(2);
   })();
   const DELIVERY_FEE = estimatedDeliveryFee;
-
-  const availableSizes: number[] = stationData?.cylinderListings
-    ?.filter((l: any) => l.fillPrice > 0)
-    ?.map((l: any) => l.size)
-    ?.sort((a: number, b: number) => a - b) ?? [];
-
-  // Cart as array of line items — supports same size at different prices
-  const [lines, setLines] = useState<LineItem[]>([]);
 
   // Initialize lines from either cartItemsParam (editing) or initSize (new quick order)
   useEffect(() => {
@@ -274,17 +285,6 @@ export default function CheckoutPage() {
     const entered = parseFloat(lines.find(l => l.id === item.id)?.price || '0');
     return lines.find(l => l.id === item.id)?.price !== '' && entered < MIN_CYLINDER_PRICE;
   });
-
-  // Schedule
-  const [schedule, setSchedule]         = useState<'asap' | 'scheduled'>(scheduleParam ?? 'asap');
-  const [scheduledDate, setScheduledDate] = useState('');
-
-  // Pickup + delivery locations
-  const [pickupLoc, setPickupLoc]       = useState<PickedLocation | null>(null);
-  const [deliveryLoc, setDeliveryLoc]   = useState<PickedLocation | null>(null);
-  const [sameAsPickup, setSameAsPickup] = useState(isQuickOrder || cartItemsParam ? true : false);
-  const [showPickupPicker, setShowPickupPicker]   = useState(false);
-  const [showDeliveryPicker, setShowDeliveryPicker] = useState(false);
 
   // Auto-seed pickup from saved GPS on mount, or from params if editing
   useEffect(() => {
