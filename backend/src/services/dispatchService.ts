@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Order } from '../models/Order';
 import { Rider } from '../models/Rider';
+import { Zone } from '../models/Zone';
 import { Admin } from '../models/Admin';
 import { CONSTANTS } from '../config/constants';
 import { getNearbyRiders } from './geoService';
@@ -105,10 +106,24 @@ async function _dispatchOrder(orderId: string): Promise<void> {
     kycStatus: 'approved',
     status: { $in: ['available', 'busy'] },
     isActive: true,
-  }).select('_id name status vehicleType location phone').lean();
+  }).select('_id name status vehicleType location phone assignedZone').lean();
+
+  // Find which zone the station falls in (if any)
+  const zones = await Zone.find({ isActive: true }).lean();
+  const { haversineDistanceKm } = await import('./geoService');
+  const stationZone = zones.find(
+    (z) => haversineDistanceKm(station.lat, station.lng, z.centerLat, z.centerLng) <= z.radiusKm
+  );
 
   const distanceMap = new Map(nearbyEligible.map((r) => [r.riderId, r.distanceKm]));
-  riderDocs.sort((a, b) => (distanceMap.get(a._id.toString()) ?? 999) - (distanceMap.get(b._id.toString()) ?? 999));
+
+  // Sort: zone-matched riders first, then by distance
+  riderDocs.sort((a, b) => {
+    const aInZone = stationZone && a.assignedZone?.toString() === stationZone._id.toString() ? 0 : 1;
+    const bInZone = stationZone && b.assignedZone?.toString() === stationZone._id.toString() ? 0 : 1;
+    if (aInZone !== bInZone) return aInZone - bInZone;
+    return (distanceMap.get(a._id.toString()) ?? 999) - (distanceMap.get(b._id.toString()) ?? 999);
+  });
 
   // Pick first rider who is: online via socket AND under vehicle capacity
   // Falls back to offline riders (SMS-only) if no online rider found

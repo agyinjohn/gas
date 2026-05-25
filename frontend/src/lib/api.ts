@@ -197,4 +197,9 @@ export const adminApi = {
   getSystemConfig: () => api.get('/api/v1/admin/system-config'),
   updateSystemConfig: (data: object) => api.patch('/api/v1/admin/system-config', data),
   getUsers: (params?: object) => api.get('/api/v1/admin/users', { params }),
+  getZones: () => api.get('/api/v1/admin/zones'),
+  createZone: (data: object) => api.post('/api/v1/admin/zones', data),
+  updateZone: (id: string, data: object) => api.patch(`/api/v1/admin/zones/${id}`, data),
+  deleteZone: (id: string) => api.delete(`/api/v1/admin/zones/${id}`),
+  assignRiderZone: (riderId: string, zoneId: string | null) => api.patch(`/api/v1/admin/riders/${riderId}/zone`, { zoneId }),
 };

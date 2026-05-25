@@ -3,6 +3,7 @@ import { body, param, query, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import { Station } from '../models/Station';
 import { Rider } from '../models/Rider';
+import { Zone } from '../models/Zone';
 import { Order } from '../models/Order';
 import { User } from '../models/User';
 import { PricingConfig } from '../models/PricingConfig';
@@ -894,5 +895,75 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
 
   res.json({ success: true, users, pagination: { page: parseInt(page), total } });
 });
+
+// ─── Zone Management ─────────────────────────────────────────────────────────
+
+router.get('/zones', async (_req: AuthRequest, res: Response) => {
+  const zones = await Zone.find().sort({ city: 1, name: 1 });
+  const riderCounts = await Rider.aggregate([
+    { $group: { _id: '$assignedZone', count: { $sum: 1 } } },
+  ]);
+  const countMap = new Map(riderCounts.map((r) => [r._id, r.count]));
+  res.json({ success: true, zones: zones.map((z) => ({ ...z.toObject(), riderCount: countMap.get(z._id.toString()) ?? 0 })) });
+});
+
+router.post(
+  '/zones',
+  [
+    body('name').trim().notEmpty(),
+    body('city').trim().notEmpty(),
+    body('centerLat').isFloat({ min: -90, max: 90 }),
+    body('centerLng').isFloat({ min: -180, max: 180 }),
+    body('radiusKm').isFloat({ min: 0.5, max: 100 }),
+    body('color').optional().isString(),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    if (ve(req, res)) return;
+    const zone = await Zone.create(req.body);
+    res.status(201).json({ success: true, zone });
+  }
+);
+
+router.patch(
+  '/zones/:id',
+  [
+    param('id').isMongoId(),
+    body('name').optional().trim().notEmpty(),
+    body('city').optional().trim().notEmpty(),
+    body('centerLat').optional().isFloat({ min: -90, max: 90 }),
+    body('centerLng').optional().isFloat({ min: -180, max: 180 }),
+    body('radiusKm').optional().isFloat({ min: 0.5, max: 100 }),
+    body('color').optional().isString(),
+    body('isActive').optional().isBoolean(),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    if (ve(req, res)) return;
+    const zone = await Zone.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!zone) return res.status(404).json({ success: false, message: 'Zone not found' });
+    res.json({ success: true, zone });
+  }
+);
+
+router.delete('/zones/:id', [param('id').isMongoId()], async (req: AuthRequest, res: Response) => {
+  if (ve(req, res)) return;
+  await Zone.findByIdAndDelete(req.params.id);
+  // Unassign all riders in this zone
+  await Rider.updateMany({ assignedZone: req.params.id }, { $unset: { assignedZone: '' } });
+  res.json({ success: true });
+});
+
+// Assign / unassign a rider to a zone
+router.patch(
+  '/riders/:id/zone',
+  [param('id').isMongoId(), body('zoneId').optional({ nullable: true })],
+  async (req: AuthRequest, res: Response) => {
+    if (ve(req, res)) return;
+    const { zoneId } = req.body;
+    const update = zoneId ? { assignedZone: zoneId } : { $unset: { assignedZone: '' } };
+    const rider = await Rider.findByIdAndUpdate(req.params.id, update, { new: true }).select('-passwordHash');
+    if (!rider) return res.status(404).json({ success: false, message: 'Rider not found' });
+    res.json({ success: true, rider });
+  }
+);
 
 export default router;
