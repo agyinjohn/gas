@@ -442,8 +442,11 @@ router.patch(
  *         description: Paginated riders
  */
 router.get('/riders', async (req: AuthRequest, res: Response) => {
-  const { kycStatus, page = '1', limit = '20' } = req.query as Record<string, string>;
-  const filter = kycStatus ? { kycStatus } : {};
+  const { kycStatus, page = '1', limit = '20', zoneId } = req.query as Record<string, string>;
+  const filter: Record<string, any> = {};
+  if (kycStatus) filter.kycStatus = kycStatus;
+  if (zoneId === 'unassigned') filter.assignedZone = { $exists: false };
+  else if (zoneId) filter.assignedZone = zoneId;
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
   const [riders, total] = await Promise.all([

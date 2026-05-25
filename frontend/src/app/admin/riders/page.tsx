@@ -40,15 +40,17 @@ export default function AdminRidersPage() {
   const queryClient = useQueryClient();
   const [kycFilter, setKycFilter] = useState('');
   const [search, setSearch]       = useState('');
+  const [zoneFilter, setZoneFilter] = useState('');
   const [selected, setSelected]   = useState<any>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'riders', kycFilter, search],
+    queryKey: ['admin', 'riders', kycFilter, search, zoneFilter],
     queryFn: () => adminApi.getRiders({
       kycStatus: kycFilter || undefined,
       search: search || undefined,
+      zoneId: zoneFilter || undefined,
     }).then((r) => r.data),
   });
 
@@ -142,6 +144,18 @@ export default function AdminRidersPage() {
             className="w-full h-10 pl-9 pr-4 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
           />
         </div>
+        {/* Zone filter */}
+        <select
+          value={zoneFilter}
+          onChange={(e) => setZoneFilter(e.target.value)}
+          className="h-10 px-3 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 min-w-[160px]"
+        >
+          <option value="">All Zones</option>
+          <option value="unassigned">Unassigned</option>
+          {zones.map((z: any) => (
+            <option key={z._id} value={z._id}>{z.name} ({z.city})</option>
+          ))}
+        </select>
         <div className="flex gap-1.5 bg-white border border-gray-200 rounded-xl p-1">
           {FILTERS.map(({ label, value }) => (
             <button
