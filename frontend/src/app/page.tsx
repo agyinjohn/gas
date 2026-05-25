@@ -189,9 +189,6 @@ export default function LoginPage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">
                   Password
                 </label>
-                <Link href="/forgot-password" className="text-xs text-brand-500 font-semibold hover:underline">
-                  Forgot password?
-                </Link>
               </div>
               <div className="relative">
                 <input
@@ -210,6 +207,11 @@ export default function LoginPage() {
                 </button>
               </div>
               {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
+              <div className="flex justify-end">
+                <Link href="/forgot-password" className="text-xs text-brand-500 font-semibold hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <button type="submit" disabled={loading}
