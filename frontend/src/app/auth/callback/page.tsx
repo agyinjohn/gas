@@ -26,11 +26,16 @@ export default function AuthCallbackPage() {
       return;
     }
 
-    // Store auth — phone is placeholder for Google users until they add it
-    login(token, { id: userId, name, phone: '', role: 'user' });
+    // Decode phone from JWT payload (base64 middle segment) — no secret needed client-side
+    let phone = '';
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      phone = payload.phone ?? '';
+    } catch {}
+
+    login(token, { id: userId, name, phone, role: 'user' });
 
     if (needsPhone) {
-      // Google user without phone — go to add-phone flow
       router.replace('/user?addPhone=1');
     } else {
       router.replace('/user');

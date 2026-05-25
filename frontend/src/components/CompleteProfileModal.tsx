@@ -10,7 +10,7 @@ export default function CompleteProfileModal() {
   const { user, updateUser, login } = useAuth();
 
   const missingName  = !user?.name?.trim() || /^user\s+\S+$/i.test(user.name.trim());
-  const missingPhone = !user?.phone || user.phone.startsWith('google_');
+  const missingPhone = !user?.phone || user.phone.startsWith('google_') || user.phone === '';
 
   const [name, setName]   = useState(user?.name ?? '');
   const [phone, setPhone] = useState('');

@@ -402,7 +402,7 @@ router.get('/google/callback',
   (req: Request, res: Response) => {
     const user = req.user as any;
     const token = signToken({ id: user._id, role: 'user', phone: user.phone });
-    const needsPhone = user.phone?.startsWith('google_');
+    const needsPhone = !user.phone || user.phone.startsWith('google_') || user.phone === '';
 
     // Redirect to frontend with token
     const params = new URLSearchParams({
