@@ -10,6 +10,7 @@ import { Rider } from '../models/Rider';
 import { Admin } from '../models/Admin';
 import { LoyaltyTransaction } from '../models/LoyaltyTransaction';
 import { createOTP, verifyOTP } from '../services/otpService';
+import { AuthRequest } from '../middleware/authenticate';
 import { sendSMS, SMS_TEMPLATES } from '../services/notificationService';
 
 const REFERRAL_REWARD_POINTS = 200;
@@ -399,7 +400,7 @@ router.get('/google',
  */
 router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: `${process.env.FRONTEND_URL}/?error=google_auth_failed` }),
-  (req: Request, res: Response) => {
+  (req: AuthRequest, res: Response) => {
     const user = req.user as any;
     const token = signToken({ id: user._id, role: 'user', phone: user.phone });
     const needsPhone = !user.phone || user.phone.startsWith('google_') || user.phone === '';
