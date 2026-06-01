@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "GetGas Rider",
+    "slug": "getgas-rider",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "getgas-rider",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#E87722",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.getgas.rider",
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "fetch"],
+        "NSLocationWhenInUseUsageDescription": "GetGas needs your location to navigate to customers and stations.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "GetGas tracks your location while you are online to dispatch orders and show customers your position."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E87722"
+      },
+      "package": "com.getgas.rider",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "platforms": ["ios", "android"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

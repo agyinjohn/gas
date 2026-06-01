@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand: #E87722;
+    --brand-dark: #D06010;
+    --bg: #F5F5F5;
+    --bg-card: #FFFFFF;
+    --bg-card2: #F0F0F0;
+    --border: #E5E5E5;
+    --text-primary: #1A1A1A;
+    --text-secondary: #6B6B6B;
+    --text-muted: #9A9A9A;
+  }
+
+  .dark {
+    --bg: #1A1A1A;
+    --bg-card: #2A2A2A;
+    --bg-card2: #333333;
+    --border: #3A3A3A;
+    --text-primary: #FFFFFF;
+    --text-secondary: #CCCCCC;
+    --text-muted: #9A9A9A;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text-primary);
+    transition: background-color 0.2s, color 0.2s;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-500 text-white font-semibold rounded-2xl px-6 py-3
+           hover:bg-brand-600 active:scale-[0.98] transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-white dark:bg-dark-card text-gray-800 dark:text-white font-semibold rounded-2xl px-6 py-3
+           border border-gray-200 dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-card2
+           active:scale-[0.98] transition-all duration-150;
+  }
+
+  .card {
+    @apply bg-white dark:bg-dark-card rounded-2xl shadow-sm border border-gray-100 dark:border-dark-border p-4;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-gray-200 dark:border-dark-border
+           bg-white dark:bg-dark-card2 text-gray-900 dark:text-white
+           px-4 py-3 text-base
+           focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
+           placeholder:text-gray-400 dark:placeholder:text-dark-muted transition-all;
+  }
+}
+
+/* scrollbar hide utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Order status colors */
+.status-pending    { @apply bg-yellow-50 text-yellow-700; }
+.status-accepted   { @apply bg-blue-50 text-blue-700; }
+.status-at_station { @apply bg-purple-50 text-purple-700; }
+.status-en_route   { @apply bg-orange-50 text-orange-700; }
+.status-delivered  { @apply bg-green-50 text-green-700; }
+.status-cancelled  { @apply bg-red-50 text-red-700; }
