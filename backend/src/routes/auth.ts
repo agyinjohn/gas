@@ -386,33 +386,61 @@ router.post('/user/add-phone',
 
 // ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
 
+const DEFAULT_FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+function isAllowedOAuthRedirect(url: string): boolean {
+  if (url.startsWith('getgas://')) return true;
+  if (url.startsWith('exp://') && url.includes('auth/callback')) return true;
+  if (url.startsWith(DEFAULT_FRONTEND)) return true;
+  return false;
+}
+
+function resolveOAuthRedirect(state?: string): string {
+  const fallback = `${DEFAULT_FRONTEND}/auth/callback`;
+  if (!state) return fallback;
+  try {
+    const parsed = JSON.parse(Buffer.from(state, 'base64url').toString('utf8')) as { redirect?: string };
+    if (parsed.redirect && isAllowedOAuthRedirect(parsed.redirect)) return parsed.redirect;
+  } catch {
+    /* ignore invalid state */
+  }
+  return fallback;
+}
+
 /**
  * Initiate Google OAuth
- * GET /api/v1/auth/google
+ * GET /api/v1/auth/google?redirect=<encoded callback URL for mobile/web>
  */
-router.get('/google',
-  passport.authenticate('google', { scope: ['profile', 'email'], session: false })
-);
+router.get('/google', (req: Request, res: Response, next) => {
+  const redirectParam = typeof req.query.redirect === 'string' ? req.query.redirect : undefined;
+  const options: passport.AuthenticateOptions = { scope: ['profile', 'email'], session: false };
+  if (redirectParam && isAllowedOAuthRedirect(redirectParam)) {
+    options.state = Buffer.from(JSON.stringify({ redirect: redirectParam })).toString('base64url');
+  }
+  passport.authenticate('google', options)(req, res, next);
+});
 
 /**
  * Google OAuth callback
  * GET /api/v1/auth/google/callback
  */
 router.get('/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: `${process.env.FRONTEND_URL}/?error=google_auth_failed` }),
+  passport.authenticate('google', { session: false, failureRedirect: `${DEFAULT_FRONTEND}/?error=google_auth_failed` }),
   (req: AuthRequest, res: Response) => {
     const user = req.user as any;
     const token = signToken({ id: user._id, role: 'user', phone: user.phone });
     const needsPhone = !user.phone || user.phone.startsWith('google_') || user.phone === '';
 
-    // Redirect to frontend with token
     const params = new URLSearchParams({
       token,
       userId: user._id.toString(),
       name: user.name,
       needsPhone: needsPhone ? '1' : '0',
     });
-    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?${params.toString()}`);
+
+    const target = resolveOAuthRedirect(typeof req.query.state === 'string' ? req.query.state : undefined);
+    const joiner = target.includes('?') ? '&' : '?';
+    res.redirect(`${target}${joiner}${params.toString()}`);
   }
 );
 

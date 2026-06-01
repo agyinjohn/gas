@@ -1,102 +1,140 @@
-# GetGas — On-Demand LPG Delivery Platform
+# GetGas — Monorepo
 
-Full-stack monorepo: **Next.js 14** (App Router) frontend + **Node.js/Express** backend + **MongoDB** database.
+On-demand LPG delivery: **Next.js web** + **Flutter native apps** + **Express API** + **MongoDB**.
 
-## Project Structure
+Customer and rider experiences are available on **web and native** (iOS/Android). Station and admin remain **web-only**.
+
+> **Mobile:** New apps under [`mobile/`](mobile/FLUTTER.md) (Flutter). Legacy Expo in `apps/customer-mobile` and `apps/rider-mobile` will be retired after Flutter Phase 1.
+
+## Structure
 
 ```
-GetGas/
-├── backend/          # Express API server
-│   └── src/
-│       ├── config/   # DB, env, constants
-│       ├── models/   # Mongoose schemas
-│       ├── routes/   # Express route handlers
-│       ├── services/ # Business logic
-│       ├── middleware/
-│       └── utils/
-└── frontend/         # Next.js 14 App Router
-    └── src/
-        ├── app/
-        │   ├── user/       # Customer-facing pages
-        │   ├── rider/      # Rider PWA pages
-        │   ├── station/    # Station dashboard
-        │   ├── admin/      # Admin dashboard
-        │   └── api/        # Next.js API routes (proxy)
-        ├── components/
-        ├── hooks/
-        ├── lib/
-        └── types/
+gasgo-1/
+├── mobile/                  # Flutter — customer_app, rider_app, getgas_core, getgas_ui
+├── apps/
+│   ├── web/                 # Next.js — user, rider, station, admin (all web routes)
+│   ├── customer-mobile/     # Legacy Expo (being replaced)
+│   └── rider-mobile/        # Legacy Expo (being replaced)
+├── packages/
+│   ├── types/               # Shared TypeScript types
+│   ├── config/              # Constants, storage keys, auth routes
+│   ├── domain/              # Business logic (fees, loyalty, labels)
+│   └── api-client/          # Axios API client (web)
+├── backend/                 # Express API
+└── frontend/                # ⚠️ Legacy copy — use apps/web instead
 ```
 
-## Quick Start
+## Quick start
 
 ### Prerequisites
-- Node.js 18+
-- MongoDB 6+ (local or Atlas)
-- npm or pnpm
 
-### 1. Backend
+- Node.js 18+
+- MongoDB
+- For mobile: [Expo Go](https://expo.dev/go) on a device, or Android/iOS simulator
+
+### 1. Install (from repo root)
+
+```bash
+npm install
+```
+
+This builds shared packages automatically (`postinstall`).
+
+### 2. Backend
 
 ```bash
 cd backend
-cp .env.example .env        # fill in your values
-npm install
-npm run dev                 # runs on :4000
+cp .env.example .env
+npm run dev          # :4000
 ```
 
-### 2. Frontend
+### 3. Web (customer, rider, station, admin)
 
 ```bash
-cd frontend
-cp .env.example .env.local  # fill in your values
-npm install
-npm run dev                 # runs on :3000
+npm run dev:web      # :3000 — from root
+# or
+cd apps/web && cp .env.example .env.local && npm run dev
 ```
 
-## Environment Variables
+Web routes unchanged:
 
-### Backend `.env`
-| Variable | Description |
-|---|---|
-| `MONGODB_URI` | MongoDB connection string |
-| `JWT_SECRET` | Secret for signing JWTs |
-| `PAYSTACK_SECRET_KEY` | Paystack API key |
-| `FCM_SERVER_KEY` | Firebase Cloud Messaging |
-| `MNOTIFY_API_KEY` | mNotify SMS provider (Ghana) |
-| `PORT` | Server port (default 4000) |
+| Actor   | URL        |
+|---------|------------|
+| Customer | `/user`   |
+| Rider    | `/rider`  |
+| Station  | `/station`|
+| Admin    | `/admin`  |
 
-### Frontend `.env.local`
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | Backend API base URL |
-| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | Google Maps API key |
-| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack public key |
+### 4. Customer mobile app
 
-## Actor Interfaces
+```bash
+cd apps/customer-mobile
+cp .env.example .env
+npm run start
+# Press i (iOS) or a (Android) in Expo CLI
+```
 
-| Actor | URL | Description |
-|---|---|---|
-| User | `/user` | Browse stations, order gas, track delivery |
-| Rider | `/rider` | Accept orders, navigate, confirm OTP |
-| Station | `/station` | Manage prices, inventory, order queue |
-| Admin | `/admin` | Approve entities, platform metrics |
+Set `EXPO_PUBLIC_API_URL` to your machine IP when testing on a physical device (not `localhost`).
 
-## Tech Stack
+### 5. Rider mobile app
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 14, TypeScript, Tailwind CSS |
-| Backend | Node.js, Express, TypeScript |
-| Database | MongoDB, Mongoose |
-| Real-time | Socket.IO (WebSocket) |
-| Auth | JWT + OTP via SMS |
-| Payments | Paystack (mobile money + card) |
-| Notifications | Firebase Cloud Messaging + mNotify SMS |
-| Maps | Google Maps API |
-| Caching | Redis (optional, for geo queries) |
+```bash
+cd apps/rider-mobile
+cp .env.example .env
+npm run start
+```
 
-## Phased Delivery
+## Shared packages
 
-- **Phase 1 (MVP):** User app + Station dashboard + Rider app basic flow
-- **Phase 2:** Admin dashboard + analytics + surge pricing + payouts
-- **Phase 3:** Referrals + scheduled deliveries + loyalty + multi-city
+All clients import the same API and domain logic:
+
+- **Web:** `@getgas/api-client` via `apps/web/src/lib/api.ts`
+- **Mobile:** `@getgas/mobile-core` (SecureStore + same API modules)
+
+Change API behavior once in `packages/api-client` — web and mobile pick it up after rebuild.
+
+## Mobile roadmap
+
+| Phase | Scope |
+|-------|--------|
+| **0** ✅ | Monorepo, shared packages, Expo scaffolds, login shells |
+| 1 | Full auth (OTP, Google), session polish |
+| 2–4 | Customer parity with `/user` |
+| 5–6 | Rider parity with `/rider` |
+| 7–8 | Offline, push, store release |
+
+See conversation plan for full phase breakdown.
+
+## Mobile apps
+
+See **[MOBILE.md](./MOBILE.md)** for full instructions on running the native customer and rider apps (Expo, iOS/Android).
+
+Quick start:
+
+```bash
+npm run dev:customer   # GetGas customer app
+npm run dev:rider      # GetGas rider app
+```
+
+Web `/user` and `/rider` remain available for users who don't install the apps.
+
+## Docker
+
+```bash
+docker compose up
+```
+
+Web image builds from `apps/web/`.
+
+## EAS (App Store / Play Store)
+
+When ready for device builds:
+
+```bash
+cd apps/customer-mobile
+npx eas login
+npx eas build:configure
+npx eas build --platform all --profile preview
+```
+
+Replace placeholder `projectId` in each `app.json` after `eas init`.

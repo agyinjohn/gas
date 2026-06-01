@@ -1,0 +1,24 @@
+{
+  "name": "GetGas — On-Demand Gas Delivery",
+  "short_name": "GetGas",
+  "description": "Get LPG cylinders delivered to your door in minutes",
+  "start_url": "/user",
+  "display": "standalone",
+  "background_color": "#1A1A1A",
+  "theme_color": "#E87722",
+  "orientation": "portrait",
+  "icons": [],
+  "categories": ["utilities", "shopping"],
+  "shortcuts": [
+    {
+      "name": "Order Gas",
+      "url": "/user",
+      "description": "Browse stations and order gas"
+    },
+    {
+      "name": "My Orders",
+      "url": "/user/orders",
+      "description": "Track your current orders"
+    }
+  ]
+}

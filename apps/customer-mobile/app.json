@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "GetGas",
+    "slug": "getgas-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "getgas",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#E87722",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.getgas.customer"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E87722"
+      },
+      "package": "com.getgas.customer"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "platforms": ["ios", "android"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

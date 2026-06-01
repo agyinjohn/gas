@@ -1,0 +1,14 @@
+name: getgas_core
+description: GetGas shared Dart — config, domain logic, API client, auth models.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  dio: ^5.8.0+1
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0

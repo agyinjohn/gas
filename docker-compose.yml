@@ -42,7 +42,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/web
       dockerfile: Dockerfile
     container_name: GetGas-frontend
     ports:
@@ -51,7 +51,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:4000
       - NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
     env_file:
-      - ./frontend/.env.local
+      - ./apps/web/.env.local
     depends_on:
       - backend
     restart: unless-stopped
