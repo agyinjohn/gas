@@ -3,7 +3,6 @@ import 'package:getgas_core/getgas_core.dart';
 
 import '../../theme/getgas_colors.dart';
 
-/// Nearby station card — mirrors web `StationCard` in `/user`.
 class StationCard extends StatelessWidget {
   const StationCard({
     super.key,
@@ -20,14 +19,14 @@ class StationCard extends StatelessWidget {
     final deliveryFee = calcDeliveryFee(station.distanceKm);
     final unavailable = station.unavailable;
 
-    return Material(
-      color: GetGasColors.bgCard,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
+    return Opacity(
+      opacity: unavailable ? 0.55 : 1,
+      child: Material(
+        color: GetGasColors.bgCard,
         borderRadius: BorderRadius.circular(16),
-        child: Opacity(
-          opacity: unavailable ? 0.6 : 1,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
@@ -37,22 +36,25 @@ class StationCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // ── Row 1: icon + name/address + chevron ──
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 46,
+                      height: 46,
                       decoration: BoxDecoration(
                         color: unavailable
                             ? GetGasColors.bgCard2
-                            : GetGasColors.brand.withValues(alpha: 0.15),
+                            : GetGasColors.brand.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        Icons.local_fire_department,
-                        size: 20,
-                        color: unavailable ? GetGasColors.textMuted : GetGasColors.brand,
+                        Icons.local_fire_department_rounded,
+                        size: 24,
+                        color: unavailable
+                            ? GetGasColors.textMuted
+                            : GetGasColors.brand,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -65,89 +67,103 @@ class StationCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                               color: GetGasColors.text,
+                              height: 1.2,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Text(
                             station.address,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: GetGasColors.textMuted,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, size: 16, color: GetGasColors.textMuted),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: GetGasColors.textMuted,
+                    ),
                   ],
                 ),
-                const Divider(height: 25, color: GetGasColors.border),
+
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: GetGasColors.border),
+                const SizedBox(height: 12),
+
+                // ── Row 2: distance + rating + status badge ──
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, size: 12, color: GetGasColors.textMuted),
+                    const Icon(Icons.location_on_outlined, size: 15, color: GetGasColors.textMuted),
                     const SizedBox(width: 4),
                     Text(
                       '${station.distanceKm} km',
-                      style: const TextStyle(fontSize: 12, color: GetGasColors.textMuted),
+                      style: const TextStyle(fontSize: 13, color: GetGasColors.textMuted, fontWeight: FontWeight.w500),
                     ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.star, size: 12, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 14),
+                    const Icon(Icons.star_rounded, size: 15, color: Color(0xFFF59E0B)),
                     const SizedBox(width: 4),
                     Text(
                       station.ratingAvg.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFFF59E0B),
-                      ),
+                      style: const TextStyle(fontSize: 13, color: Color(0xFFF59E0B), fontWeight: FontWeight.w600),
                     ),
                     const Spacer(),
                     _StatusBadge(station: station),
                   ],
                 ),
-                const Divider(height: 25, color: GetGasColors.border),
+
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: GetGasColors.border),
+                const SizedBox(height: 12),
+
+                // ── Row 3: price + delivery ──
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Gas from',
-                          style: TextStyle(fontSize: 10, color: GetGasColors.textMuted),
-                        ),
-                        Text(
-                          minPrice != null ? 'GHS $minPrice' : '—',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: unavailable ? GetGasColors.textMuted : GetGasColors.brand,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Gas from',
+                            style: TextStyle(fontSize: 11, color: GetGasColors.textMuted),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          Text(
+                            minPrice != null ? 'GHS $minPrice' : '—',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: unavailable ? GetGasColors.textMuted : GetGasColors.brand,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         const Text(
                           'Delivery',
-                          style: TextStyle(fontSize: 10, color: GetGasColors.textMuted),
+                          style: TextStyle(fontSize: 11, color: GetGasColors.textMuted),
                         ),
+                        const SizedBox(height: 2),
                         Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.local_shipping_outlined, size: 12, color: GetGasColors.textMuted),
+                            const Icon(Icons.local_shipping_outlined, size: 14, color: GetGasColors.textMuted),
                             const SizedBox(width: 4),
                             Text(
                               'GHS $deliveryFee',
                               style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
                                 color: GetGasColors.text,
                               ),
                             ),
@@ -174,21 +190,24 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!station.isOpenNow) {
-      return _badge('Closed today', const Color(0xFF6B7280), const Color(0x1A6B7280));
+      return _badge('Closed today', const Color(0xFF6B7280), const Color(0xFFF3F4F6));
     }
     if (station.outOfStock) {
-      return _badge('Out of stock', GetGasColors.error, GetGasColors.error.withValues(alpha: 0.1));
+      return _badge('Out of stock', GetGasColors.error, GetGasColors.errorBg);
     }
-    return _badge('Available', const Color(0xFF16A34A), const Color(0x1A22C55E));
+    return _badge('Available', const Color(0xFF16A34A), const Color(0xFFDCFCE7));
   }
 
   Widget _badge(String text, Color fg, Color bg) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg),
       ),
     );
   }

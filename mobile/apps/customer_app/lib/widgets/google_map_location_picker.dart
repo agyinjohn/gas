@@ -571,7 +571,22 @@ class _GoogleTrackMapViewState extends State<GoogleTrackMapView> {
       return Container(
         color: GetGasColors.bgCard2,
         alignment: Alignment.center,
-        child: const Text('Maps key not configured', style: TextStyle(color: GetGasColors.textMuted)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.map_outlined, size: 40, color: GetGasColors.textMuted),
+            const SizedBox(height: 12),
+            const Text(
+              'Map unavailable',
+              style: TextStyle(fontWeight: FontWeight.w600, color: GetGasColors.text),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Run: dart run tool/sync_env.dart',
+              style: TextStyle(fontSize: 12, color: GetGasColors.textMuted),
+            ),
+          ],
+        ),
       );
     }
 
@@ -619,7 +634,6 @@ class _GoogleTrackMapViewState extends State<GoogleTrackMapView> {
           polylines: polylines,
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
-          style: googleMapDarkStyle,
           onMapCreated: (c) {
             _controller = c;
             _loadTimer?.cancel();

@@ -1,0 +1,8 @@
+# android/key.properties
+# Copy to android/key.properties (gitignored) and fill in real values.
+# For CI, these are injected from GitHub Secrets — see .github/workflows/rider-release.yml
+
+storeFile=release.jks
+storePassword=<keystore-password>
+keyAlias=<key-alias>
+keyPassword=<key-password>

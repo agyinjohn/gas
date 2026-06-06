@@ -15,6 +15,29 @@ function getStationId(): string {
   } catch { return ''; }
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  pending:    'PENDING',
+  accepted:   'ACCEPTED',
+  at_station: 'AT STATION',
+  en_route:   'EN ROUTE',
+  delivered:  'DELIVERED',
+  cancelled:  'CANCELLED',
+};
+
+function safeStatusLabel(status: string): string {
+  return STATUS_LABEL[status] ?? 'UNKNOWN';
+}
+
+const PAYMENT_LABEL: Record<string, string> = {
+  mobile_money: 'Mobile Money',
+  card:         'Card',
+  cash:         'Cash',
+};
+
+function safePaymentLabel(method: string | undefined): string {
+  return PAYMENT_LABEL[method ?? ''] ?? 'Cash';
+}
+
 const STATUS_STYLE: Record<string, string> = {
   pending:    'bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400',
   accepted:   'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
@@ -206,11 +229,11 @@ export default function StationOrdersPage() {
                         {formatCurrency(order.totalAmount)}
                       </td>
                       <td className="px-4 py-3 text-xs text-[var(--text-muted)] capitalize whitespace-nowrap">
-                        {order.paymentMethod?.replace('_', ' ') || 'cash'}
+                        {safePaymentLabel(order.paymentMethod)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={cn('text-[10px] font-bold px-2 py-1 rounded-lg', STATUS_STYLE[order.status])}>
-                          {order.status.replace('_', ' ').toUpperCase()}
+                          {safeStatusLabel(order.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-[var(--text-primary)] whitespace-nowrap">
@@ -258,7 +281,7 @@ export default function StationOrdersPage() {
                     </p>
                   </div>
                   <span className={cn('text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap', STATUS_STYLE[order.status])}>
-                    {order.status.replace('_', ' ').toUpperCase()}
+                    {safeStatusLabel(order.status)}
                   </span>
                 </div>
 
@@ -290,7 +313,7 @@ export default function StationOrdersPage() {
                   <div className="bg-[var(--bg-card2)] rounded-lg p-2">
                     <p className="text-[10px] text-[var(--text-muted)] font-semibold">Payment</p>
                     <p className="text-xs font-bold text-[var(--text-primary)] mt-1 capitalize truncate">
-                      {order.paymentMethod?.replace('_', ' ') || 'Cash'}
+                      {safePaymentLabel(order.paymentMethod)}
                     </p>
                   </div>
                   <div className="bg-[var(--bg-card2)] rounded-lg p-2">
@@ -388,7 +411,7 @@ export default function StationOrdersPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className={cn('text-[10px] font-bold px-2 py-1 rounded-lg', STATUS_STYLE[selected.status])}>
-                  {selected.status.replace('_', ' ').toUpperCase()}
+                  {safeStatusLabel(selected.status)}
                 </span>
                 <button onClick={() => setSelected(null)}
                   className="w-8 h-8 rounded-full bg-[var(--bg-card2)] flex items-center justify-center hover:bg-[var(--border)] transition-all">
@@ -471,7 +494,7 @@ export default function StationOrdersPage() {
                 <div className="bg-[var(--bg-card2)] rounded-xl p-3">
                   <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-widest mb-1">Payment</p>
                   <p className="text-sm font-bold text-[var(--text-primary)] capitalize">
-                    {selected.paymentMethod?.replace('_', ' ') || 'Cash'}
+                    {safePaymentLabel(selected.paymentMethod)}
                   </p>
                   <p className="text-[11px] text-[var(--text-muted)] capitalize">{selected.paymentStatus}</p>
                 </div>

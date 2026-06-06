@@ -6,7 +6,7 @@ import { Admin } from '../models/Admin';
 import { CONSTANTS } from '../config/constants';
 import { getNearbyRiders } from './geoService';
 import { emitOrderToRider, emitOrderToStation, io } from './realtimeService';
-import { sendSMS } from './notificationService';
+import { sendSMS, sendPushNotification } from './notificationService';
 
 // Max hard declines before escalating — timeouts don't count toward this
 const MAX_DECLINES = 5;
@@ -106,7 +106,7 @@ async function _dispatchOrder(orderId: string): Promise<void> {
     kycStatus: 'approved',
     status: { $in: ['available', 'busy'] },
     isActive: true,
-  }).select('_id name status vehicleType location phone assignedZone').lean();
+  }).select('_id name status vehicleType location phone fcmToken assignedZone').lean();
 
   // Find which zone the station falls in (if any)
   const zones = await Zone.find({ isActive: true }).lean();
@@ -174,8 +174,21 @@ async function _dispatchOrder(orderId: string): Promise<void> {
   // Always emit socket event (rider may reconnect within timeout window)
   emitOrderToRider(rider._id.toString(), orderSummary);
 
-  // Always send SMS — primary notification channel
+  // Always send FCM push + SMS — primary notification channels
   const sizes = order.cylinders.map((c) => `${c.quantity}x${c.size}kg`).join(', ');
+
+  if (rider.fcmToken) {
+    await sendPushNotification(rider.fcmToken, {
+      title: '🛵 New Delivery Order!',
+      body: `${sizes} — GH₵${order.deliveryFee}. Tap to accept.`,
+      data: {
+        orderId:  order._id.toString(),
+        type:     'new_order',
+        earning:  String(order.deliveryFee),
+      },
+    });
+  }
+
   try {
     await sendSMS(
       rider.phone,

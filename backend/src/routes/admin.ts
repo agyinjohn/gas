@@ -8,6 +8,7 @@ import { Order } from '../models/Order';
 import { User } from '../models/User';
 import { PricingConfig } from '../models/PricingConfig';
 import { SystemConfig } from '../models/SystemConfig';
+import { Payout } from '../models/Payout';
 import { authenticate, AuthRequest } from '../middleware/authenticate';
 import { requireRole } from '../middleware/requireRole';
 import { initiateRefund } from '../services/paymentService';
@@ -897,6 +898,46 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
   ]);
 
   res.json({ success: true, users, pagination: { page: parseInt(page), total } });
+});
+
+// ─── Payments Ledger ─────────────────────────────────────────────────────────
+
+router.get('/payments', async (req: AuthRequest, res: Response) => {
+  const { page = '1', limit = '20', type, status } = req.query as Record<string, string>;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  if (type === 'payout') {
+    const filter: Record<string, any> = {};
+    if (status) filter.status = status;
+    const [records, total] = await Promise.all([
+      Payout.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('orderId', 'totalAmount paymentMethod')
+        .lean(),
+      Payout.countDocuments(filter),
+    ]);
+    return res.json({ success: true, records, pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / parseInt(limit)) } });
+  }
+
+  // Default: order payment records
+  const filter: Record<string, any> = {};
+  if (status) filter.paymentStatus = status;
+
+  const [records, total] = await Promise.all([
+    Order.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .select('_id totalAmount paymentMethod paymentProvider paymentStatus paystackReference createdAt userId stationId cylinders orderType')
+      .populate('userId', 'name phone')
+      .populate('stationId', 'name')
+      .lean(),
+    Order.countDocuments(filter),
+  ]);
+
+  res.json({ success: true, records, pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / parseInt(limit)) } });
 });
 
 // ─── Zone Management ─────────────────────────────────────────────────────────

@@ -18,9 +18,9 @@ const REFERRAL_REWARD_POINTS = 200;
 // ─── Google OAuth config ──────────────────────────────────────────────────────
 // PLACEHOLDER: Replace with your actual Google OAuth credentials from
 // https://console.cloud.google.com → APIs & Services → Credentials
-const GOOGLE_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID     || '';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_CALLBACK_URL  = process.env.GOOGLE_CALLBACK_URL  || 'http://localhost:4000/api/v1/auth/google/callback';
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:4000/api/v1/auth/google/callback';
 
 passport.use(new GoogleStrategy(
   { clientID: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, callbackURL: GOOGLE_CALLBACK_URL },
@@ -355,7 +355,7 @@ router.post('/user/add-phone',
     if (digits.length < 9) {
       return res.status(400).json({ success: false, message: 'Phone must be at least 9 digits' });
     }
-    
+
     // Normalize to +233 format
     if (digits.startsWith('233') && digits.length === 12) {
       phone = '+' + digits;
@@ -449,8 +449,8 @@ router.get('/google/callback',
 // Rider Register
 router.post('/rider/register',
   [body('name').trim().notEmpty(), body('phone').trim().isMobilePhone('any'),
-   body('password').isLength({ min: 6 }), body('nationalId').trim().notEmpty(),
-   body('vehicleType').isIn(['motorbike', 'tricycle', 'van']), body('vehiclePlate').trim().notEmpty()],
+  body('password').isLength({ min: 6 }), body('nationalId').trim().notEmpty(),
+  body('vehicleType').isIn(['motorbike', 'tricycle', 'van']), body('vehiclePlate').trim().notEmpty()],
   async (req: Request, res: Response) => {
     if (ve(req, res)) return;
     const { name, password, nationalId, vehicleType, vehiclePlate } = req.body;
@@ -537,8 +537,8 @@ router.post('/admin/login',
 // Station Register
 router.post('/station/register',
   [body('name').trim().notEmpty(), body('phone').trim().isMobilePhone('any'),
-   body('stationName').trim().notEmpty(), body('address').trim().notEmpty(),
-   body('city').trim().notEmpty(), body('lat').isFloat({ min: -90, max: 90 }), body('lng').isFloat({ min: -180, max: 180 })],
+  body('stationName').trim().notEmpty(), body('address').trim().notEmpty(),
+  body('city').trim().notEmpty(), body('lat').isFloat({ min: -90, max: 90 }), body('lng').isFloat({ min: -180, max: 180 })],
   async (req: Request, res: Response) => {
     if (ve(req, res)) return;
     const { name, phone, stationName, address, city, lat, lng } = req.body;

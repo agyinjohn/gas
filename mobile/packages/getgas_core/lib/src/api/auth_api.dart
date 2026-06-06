@@ -91,6 +91,27 @@ class AuthApi {
     );
   }
 
+  Future<void> riderRegister({
+    required String name,
+    required String phone,
+    required String password,
+    required String nationalId,
+    required String vehicleType,
+    required String vehiclePlate,
+  }) async {
+    await _client.postJson(
+      '$_prefix/rider/register',
+      body: {
+        'name': name,
+        'phone': phone,
+        'password': password,
+        'nationalId': nationalId,
+        'vehicleType': vehicleType,
+        'vehiclePlate': vehiclePlate,
+      },
+    );
+  }
+
   Future<LoginResult> addPhone(String phone, {String otp = ''}) async {
     final data = await _client.postJson(
       '$_prefix/user/add-phone',

@@ -17,9 +17,9 @@ if (localPropertiesFile.exists()) {
 
 fun readMapsKeyFromEnvFiles(): String {
     val candidates = listOf(
-        rootProject.file("../../../../../frontend/.env.local"),
-        rootProject.file("../../../../../apps/web/.env.local"),
-        rootProject.file("../../../../../backend/.env"),
+        rootProject.file("../../../../frontend/.env.local"),
+        rootProject.file("../../../../apps/web/.env.local"),
+        rootProject.file("../../../../backend/.env"),
     )
     for (file in candidates) {
         if (!file.exists()) continue
@@ -43,6 +43,12 @@ val googleMapsApiKey = localProperties.getProperty("GOOGLE_MAPS_API_KEY")
     ?.takeIf { it.isNotEmpty() }
     ?: readMapsKeyFromEnvFiles()
 
+val keyPropertiesFile = rootProject.file("key.properties")
+val keyProperties = Properties()
+if (keyPropertiesFile.exists()) {
+    keyPropertiesFile.inputStream().use { keyProperties.load(it) }
+}
+
 android {
     namespace = "com.getgas.getgas_customer"
     compileSdk = flutter.compileSdkVersion
@@ -65,11 +71,26 @@ android {
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
+    signingConfigs {
+        if (keyPropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keyProperties["storeFile"] as String)
+                storePassword = keyProperties["storePassword"] as String
+                keyAlias = keyProperties["keyAlias"] as String
+                keyPassword = keyProperties["keyPassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keyPropertiesFile.exists())
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

@@ -11,4 +11,8 @@ class PaymentsApi {
   Future<Map<String, dynamic>> verify(String reference) async {
     return _client.getJson('$_prefix/verify/$reference');
   }
+
+  Future<Map<String, dynamic>> retry(String orderId) async {
+    return _client.postJson('$_prefix/retry/$orderId');
+  }
 }

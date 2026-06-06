@@ -21,7 +21,8 @@ class AppConfig {
   }
 
   static const apiPrefix = '/api/v1';
-  static const defaultApiUrl = 'http://localhost:4000';
+  // Fallback only — always set API_URL via config/production.json at build time.
+  static const defaultApiUrl = 'https://gas-1-io3c.onrender.com';
 
   static String? _runtimeGoogleMapsApiKey;
 

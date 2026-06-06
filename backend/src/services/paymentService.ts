@@ -112,16 +112,24 @@ export async function initiateRefund(reference: string, amountGHS?: number): Pro
   await axios.post(`${PAYSTACK_BASE}/refund`, payload, { headers: paystackHeaders() });
 }
 
+// Paystack Ghana mobile money bank codes
+const GHANA_MOMO_BANK_CODES: Record<string, string> = {
+  mtn: 'MTN',
+  vod: 'VOD',
+  tgo: 'ATL', // Airtel/Tigo
+  airtel: 'ATL',
+};
+
 /**
  * Create a Paystack transfer recipient (bank or mobile money).
  * Returns a recipient_code used for transfers.
  */
 export async function createTransferRecipient(params: {
-  type: 'mobile_money' | 'ghipss';  // ghipss = Ghana bank
+  type: 'mobile_money' | 'ghipss';
   name: string;
   accountNumber: string;
-  bankCode?: string;                 // required for bank transfers
-  mobileProvider?: 'mtn' | 'vod' | 'tgo';
+  bankCode?: string;
+  mobileProvider?: string;
   currency?: string;
 }): Promise<string> {
   const payload: Record<string, unknown> = {
@@ -130,8 +138,13 @@ export async function createTransferRecipient(params: {
     account_number: params.accountNumber,
     currency: params.currency || 'GHS',
   };
-  if (params.bankCode) payload.bank_code = params.bankCode;
-  if (params.mobileProvider) payload.bank_code = params.mobileProvider;
+
+  if (params.type === 'mobile_money' && params.mobileProvider) {
+    // Paystack Ghana requires uppercase provider codes e.g. "MTN", "VOD", "ATL"
+    payload.bank_code = GHANA_MOMO_BANK_CODES[params.mobileProvider.toLowerCase()] ?? params.mobileProvider.toUpperCase();
+  } else if (params.bankCode) {
+    payload.bank_code = params.bankCode;
+  }
 
   const { data } = await axios.post(`${PAYSTACK_BASE}/transferrecipient`, payload, {
     headers: paystackHeaders(),

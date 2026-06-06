@@ -19,6 +19,13 @@ class OrderCylinder {
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'size': size,
+        'quantity': quantity,
+        'unitPrice': unitPrice,
+        'subtotal': subtotal,
+      };
 }
 
 class OrderAddress {
@@ -45,6 +52,13 @@ class OrderAddress {
       lng: (json['lng'] as num?)?.toDouble() ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'street': street,
+        'city': city,
+        'lat': lat,
+        'lng': lng,
+      };
 }
 
 class OrderRider {
@@ -68,6 +82,12 @@ class OrderRider {
           : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'phone': phone,
+        if (location != null) 'location': {'lat': location!.lat, 'lng': location!.lng},
+      };
 }
 
 class RiderLocation {
@@ -107,4 +127,10 @@ class OrderStation {
     }
     return OrderStation(id: json?.toString() ?? '', name: '', address: '');
   }
+
+  Map<String, dynamic> toJson() => {
+        '_id': id,
+        'name': name,
+        'address': address,
+      };
 }

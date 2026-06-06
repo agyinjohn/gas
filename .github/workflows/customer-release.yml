@@ -1,0 +1,53 @@
+name: Customer — Build & Submit to Play Store
+
+on:
+  push:
+    tags:
+      - 'customer-v*'       # e.g. git tag customer-v1.0.1 && git push --tags
+  workflow_dispatch:
+
+jobs:
+  build-and-submit:
+    name: EAS Build + Submit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile/apps/customer_app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write Android keystore
+        run: |
+          echo "${{ secrets.CUSTOMER_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.jks
+          cat > android/key.properties <<EOF
+          storeFile=release.jks
+          storePassword=${{ secrets.CUSTOMER_KEY_STORE_PASSWORD }}
+          keyAlias=${{ secrets.CUSTOMER_KEY_ALIAS }}
+          keyPassword=${{ secrets.CUSTOMER_KEY_PASSWORD }}
+          EOF
+
+      - name: Flutter pub get (shared packages)
+        working-directory: mobile
+        run: |
+          cd packages/getgas_core && flutter pub get
+          cd ../getgas_ui && flutter pub get
+
+      - name: Build & submit
+        run: eas build --platform android --profile production --auto-submit --non-interactive
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}

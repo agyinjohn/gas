@@ -119,18 +119,20 @@ router.patch(
       'location.lng': lng,
       'location.updatedAt': new Date(),
     });
-    console.log(`[Location] Rider ${riderId} updated location: (${lat}, ${lng})`);
+    console.log(`[Location:REST] Rider ${riderId} → lat=${lat}, lng=${lng}`);
 
     // Broadcast to the active order's socket room
     const activeOrder = await Order.findOne(
       { riderId, status: { $in: ['accepted', 'at_station', 'en_route'] } },
       '_id'
     );
-    console.log(`[Location] Active order for rider ${riderId}: ${activeOrder?._id ?? 'none'}`);
     if (activeOrder) {
+      console.log(`[Location:REST] Broadcasting to order:${activeOrder._id}`);
       io.to(`order:${activeOrder._id}`).emit('rider:location:update', {
         lat, lng, updatedAt: new Date(),
       });
+    } else {
+      console.log(`[Location:REST] Rider ${riderId} has no active order — location saved to DB only`);
     }
 
     res.json({ success: true });

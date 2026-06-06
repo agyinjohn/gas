@@ -6,7 +6,7 @@ import {
   ArrowLeft, Bike, ClipboardList, Store, MapPin, Star,
   AlertTriangle, Map, CheckCircle2, Phone, Flame, X,
 } from 'lucide-react';
-import { ordersApi, paymentsApi } from '@/lib/api';
+import { ordersApi, api } from '@/lib/api';
 import { useOrderTracking } from '@/hooks/useSocket';
 import { useAuth } from '@/lib/auth';
 import { Order } from '@/types';
@@ -25,12 +25,13 @@ const TIMELINE = [
 const STATUS_ORDER = ['pending', 'accepted', 'at_station', 'en_route', 'delivered'];
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending:    { label: 'Order Placed',   color: 'text-amber-500',  bg: 'bg-amber-500/10'  },
-  accepted:   { label: 'Rider Assigned', color: 'text-blue-500',   bg: 'bg-blue-500/10'   },
-  at_station: { label: 'Rider at Station', color: 'text-purple-500', bg: 'bg-purple-500/10' },
-  en_route:   { label: 'On the Way',     color: 'text-brand-500',  bg: 'bg-brand-500/10'  },
-  delivered:  { label: 'Delivered',      color: 'text-green-500',  bg: 'bg-green-500/10'  },
-  cancelled:  { label: 'Cancelled',      color: 'text-red-500',    bg: 'bg-red-500/10'    },
+  awaiting_payment: { label: 'Awaiting Payment', color: 'text-amber-500',  bg: 'bg-amber-500/10'  },
+  pending:    { label: 'Order Placed',      color: 'text-amber-500',  bg: 'bg-amber-500/10'  },
+  accepted:   { label: 'Rider Assigned',    color: 'text-blue-500',   bg: 'bg-blue-500/10'   },
+  at_station: { label: 'Rider at Station',  color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  en_route:   { label: 'On the Way',        color: 'text-brand-500',  bg: 'bg-brand-500/10'  },
+  delivered:  { label: 'Delivered',         color: 'text-green-500',  bg: 'bg-green-500/10'  },
+  cancelled:  { label: 'Cancelled',         color: 'text-red-500',    bg: 'bg-red-500/10'    },
 };
 
 const PAYMENT_LABEL: Record<string, string> = {
@@ -68,6 +69,7 @@ export default function OrderDetailsPage() {
   const isPaymentCallback = searchParams.get('payment') === 'callback';
   const originTab = (searchParams.get('tab') as 'active' | 'past' | null) ?? 'active';
 
+  const [payLoading,        setPayLoading]        = useState(false);
   const [showOTPSheet,      setShowOTPSheet]      = useState(false);
   const [showRatingDialog,  setShowRatingDialog]  = useState(false);
   const [showIssueSheet,    setShowIssueSheet]    = useState(false);
@@ -95,13 +97,19 @@ export default function OrderDetailsPage() {
     refetchInterval: 30000,
   });
 
-  // When Paystack redirects back, verify the payment and update order status
-  useEffect(() => {
-    if (!isPaymentCallback || !order?.paystackReference) return;
-    paymentsApi.verify(order.paystackReference)
-      .then(() => refetch())
-      .catch(console.error);
-  }, [isPaymentCallback, order?.paystackReference]);
+  async function handleCompletePayment() {
+    if (!order) return;
+    setPayLoading(true);
+    try {
+      const { data } = await api.post(`/api/v1/payments/retry/${order._id}`);
+      if (data.payment?.authorizationUrl) {
+        window.location.href = data.payment.authorizationUrl;
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not initiate payment');
+      setPayLoading(false);
+    }
+  }
 
   const handleStatusChange = useCallback((status: string) => {
     queryClient.invalidateQueries({ queryKey: ['order', id] });
@@ -243,7 +251,7 @@ export default function OrderDetailsPage() {
 
       <div className="px-4 py-4 space-y-3 max-w-lg mx-auto">
 
-        {/* Payment success */}
+        {/* Payment success banner */}
         {isPaymentCallback && (
           <SectionCard>
             <div className="flex items-center gap-3 p-3">
@@ -381,9 +389,12 @@ export default function OrderDetailsPage() {
               <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
                 Receipt
               </p>
-              <span className="text-[11px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
-                {PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}
-              </span>
+              {order.status === 'awaiting_payment'
+                ? <span className="text-[11px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">Unpaid</span>
+                : <span className="text-[11px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
+                    {PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}
+                  </span>
+              }
             </div>
             <div className="divide-y divide-[var(--border)]">
               {order.cylinders?.map((c: any, i: number) => (
@@ -428,10 +439,31 @@ export default function OrderDetailsPage() {
       </div>
 
       {/* ── Bottom bar ── */}
-      {order.status !== 'cancelled' && (
+      {order.status === 'awaiting_payment' ? (
         <div className="fixed bottom-0 inset-x-0 bg-[var(--bg-card)] border-t border-[var(--border)] px-4 pt-3 pb-6 z-20">
           <div className="max-w-lg mx-auto flex gap-2">
-            {/* Cancel — only while pending (rider not yet picked up) */}
+            <button
+              onClick={() => setShowCancelDialog(true)}
+              className="flex-1 h-12 bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-semibold text-red-500 flex items-center justify-center gap-1.5"
+            >
+              <X className="w-3.5 h-3.5 shrink-0" />
+              Cancel
+            </button>
+            <button
+              onClick={handleCompletePayment}
+              disabled={payLoading}
+              className="flex-[2] h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+            >
+              {payLoading
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : 'Complete Payment'
+              }
+            </button>
+          </div>
+        </div>
+      ) : order.status !== 'cancelled' && (
+        <div className="fixed bottom-0 inset-x-0 bg-[var(--bg-card)] border-t border-[var(--border)] px-4 pt-3 pb-6 z-20">
+          <div className="max-w-lg mx-auto flex gap-2">
             {order.status === 'pending' && (
               <button
                 onClick={() => setShowCancelDialog(true)}

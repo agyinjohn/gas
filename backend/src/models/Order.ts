@@ -47,7 +47,7 @@ export interface IOrder extends Document {
   loyaltyDiscount: number;         // GHS discount applied from points
 
   // Status
-  status: 'scheduled' | 'pending' | 'accepted' | 'at_station' | 'en_route' | 'delivered' | 'cancelled';
+  status: 'awaiting_payment' | 'scheduled' | 'pending' | 'accepted' | 'at_station' | 'en_route' | 'delivered' | 'cancelled';
   statusHistory: IStatusEvent[];
 
   // Delivery
@@ -165,7 +165,7 @@ const OrderSchema = new Schema<IOrder>(
 
     status: {
       type: String,
-      enum: ['scheduled', 'pending', 'accepted', 'at_station', 'en_route', 'delivered', 'cancelled'],
+      enum: ['awaiting_payment', 'scheduled', 'pending', 'accepted', 'at_station', 'en_route', 'delivered', 'cancelled'],
       default: 'pending',
       index: true,
     },

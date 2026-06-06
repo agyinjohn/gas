@@ -153,10 +153,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }
+        if (!mounted) return;
+        // Go to callback polling screen — do NOT show success until webhook confirms
+        context.go('/payment/callback?orderId=$orderId');
+        return;
       }
 
       if (!mounted) return;
 
+      // Cash order — go straight to success
       final q = {
         'orderId': orderId,
         'orderNumber': orderNumber,

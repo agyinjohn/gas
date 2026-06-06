@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:getgas_ui/getgas_ui.dart';
 import 'package:go_router/go_router.dart';
 
+import 'main.dart' show navigatorKey;
 import 'providers/auth_provider.dart';
+import 'providers/fcm_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/checkout_review_screen.dart';
 import 'screens/checkout_screen.dart';
@@ -16,6 +18,7 @@ import 'screens/loyalty_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/order_detail_screen.dart';
 import 'screens/order_success_screen.dart';
+import 'screens/payment_callback_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/payment_screen.dart';
 import 'screens/privacy_screen.dart';
@@ -33,6 +36,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider);
 
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: '/login',
     refreshListenable: _AuthListenable(ref),
     redirect: (context, state) {
@@ -79,6 +83,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => PaymentScreen(params: state.uri.queryParameters),
       ),
       GoRoute(
+        path: '/payment/callback',
+        builder: (context, state) => PaymentCallbackScreen(
+          orderId: state.uri.queryParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
         path: '/order-success',
         builder: (context, state) => OrderSuccessScreen(params: state.uri.queryParameters),
       ),
@@ -116,6 +126,7 @@ class GetGasCustomerApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    ref.watch(fcmTokenRegistrationProvider);
 
     return MaterialApp.router(
       title: 'GetGas',

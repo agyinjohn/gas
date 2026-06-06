@@ -1,5 +1,3 @@
-library getgas_core;
-
 export 'src/config/app_config.dart';
 export 'src/config/brand.dart';
 export 'src/config/storage_keys.dart';
@@ -27,3 +25,5 @@ export 'src/api/payments_api.dart';
 export 'src/api/api_exception.dart';
 export 'src/auth/auth_repository.dart';
 export 'src/auth/token_storage.dart';
+export 'src/models/rider.dart';
+export 'src/api/riders_api.dart';

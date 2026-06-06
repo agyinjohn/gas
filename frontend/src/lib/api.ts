@@ -192,6 +192,7 @@ export const adminApi = {
   refundOrder: (id: string) => api.post(`/api/v1/admin/orders/${id}/refund`),
   cancelOrder: (id: string, reason: string) =>
     api.patch(`/api/v1/admin/orders/${id}/cancel`, { reason }),
+  getPayments: (params?: object) => api.get('/api/v1/admin/payments', { params }),
   getPricing: () => api.get('/api/v1/admin/pricing'),
   updatePricing: (data: object) => api.patch('/api/v1/admin/pricing', data),
   getSystemConfig: () => api.get('/api/v1/admin/system-config'),

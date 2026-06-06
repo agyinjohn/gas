@@ -3,31 +3,36 @@ import 'package:getgas_core/getgas_core.dart';
 
 import '../../theme/getgas_colors.dart';
 
-/// Mobile header logo — icon stacked above wordmark (web `flex-col items-center gap-2`).
+/// Mobile header logo — app icon stacked above wordmark.
 class BrandLogo extends StatelessWidget {
-  const BrandLogo({super.key});
+  const BrandLogo({super.key, this.size = 72});
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: GetGasColors.brand,
-            borderRadius: BorderRadius.circular(12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(size * 0.22),
+          child: Image(
+            image: const AssetImage(
+              'lib/assets/app_icon.png',
+              package: 'getgas_ui',
+            ),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
           ),
-          child: const Icon(Icons.local_fire_department, color: Colors.white, size: 24),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
           Brand.name,
-          style: const TextStyle(
-            fontSize: 18,
+          style: TextStyle(
+            fontSize: size * 0.25,
             fontWeight: FontWeight.w900,
-            color: GetGasColors.text,
+            color: GetGasColors.brand,
             letterSpacing: -0.3,
           ),
         ),

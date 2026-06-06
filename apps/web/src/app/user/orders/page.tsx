@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 
-const ACTIVE_STATUSES = ['pending', 'accepted', 'at_station', 'en_route'];
+const ACTIVE_STATUSES = ['awaiting_payment', 'pending', 'accepted', 'at_station', 'en_route'];
 
 function OrderCard({ order, active, tab }: { order: Order; active: boolean; tab: 'active' | 'past' }) {
   const date = new Date(order.createdAt).toLocaleString('en-GH', {
@@ -22,6 +22,7 @@ function OrderCard({ order, active, tab }: { order: Order; active: boolean; tab:
   const statusColor = order.status === 'cancelled' ? 'text-red-500 bg-red-500/10' : 'text-green-500 bg-green-500/10';
   const statusLabel = order.status === 'cancelled' ? 'Cancelled' : 'Completed';
   const showStatus = !active && PAST_STATUSES.includes(order.status);
+  const awaitingPayment = order.status === 'awaiting_payment';
 
   return (
     <Link href={`/user/orders/${order._id}?tab=${tab}`} className="block">
@@ -62,7 +63,13 @@ function OrderCard({ order, active, tab }: { order: Order; active: boolean; tab:
           )}
         </div>
 
-        {active && (
+        {awaitingPayment && (
+          <div className="mt-3 flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+            <span className="flex-1 text-xs font-semibold text-amber-600">Payment not completed</span>
+            <span className="text-xs font-bold text-white bg-amber-500 px-2.5 py-1 rounded-lg">Pay Now →</span>
+          </div>
+        )}
+        {active && !awaitingPayment && (
           <div className="mt-4 w-full h-12 bg-brand-500 rounded-xl font-bold text-sm flex items-center justify-center text-white">
             View Order Details
           </div>

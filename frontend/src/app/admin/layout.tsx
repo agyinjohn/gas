@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard, Store, Users, TrendingUp, LogOut,
   Bell, Menu, X, ChevronRight, Flame, Settings,
-  DollarSign, Package, MapPin,
+  DollarSign, Package, MapPin, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -13,13 +13,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 
 const NAV = [
-  { href: '/admin',          icon: LayoutDashboard, label: 'Overview',  exact: true  },
-  { href: '/admin/stations', icon: Store,            label: 'Stations'               },
-  { href: '/admin/riders',   icon: Users,            label: 'Riders'                 },
-  { href: '/admin/zones',    icon: MapPin,           label: 'Zones'                  },
-  { href: '/admin/orders',   icon: Package,          label: 'Orders'                 },
-  { href: '/admin/pricing',  icon: DollarSign,       label: 'Pricing'                },
-  { href: '/admin/settings', icon: Settings,         label: 'Settings'               },
+  { href: '/admin',           icon: LayoutDashboard, label: 'Overview',  exact: true  },
+  { href: '/admin/stations',  icon: Store,            label: 'Stations'               },
+  { href: '/admin/riders',    icon: Users,            label: 'Riders'                 },
+  { href: '/admin/zones',     icon: MapPin,           label: 'Zones'                  },
+  { href: '/admin/orders',    icon: Package,          label: 'Orders'                 },
+  { href: '/admin/payments',  icon: CreditCard,       label: 'Payments'               },
+  { href: '/admin/pricing',   icon: DollarSign,       label: 'Pricing'                },
+  { href: '/admin/settings',  icon: Settings,         label: 'Settings'               },
 ];
 
 // ─── Notification Panel ───────────────────────────────────────────────────────

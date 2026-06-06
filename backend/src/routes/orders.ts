@@ -247,24 +247,9 @@ router.post(
       sizeMap.set(item.size, (sizeMap.get(item.size) ?? 0) + item.quantity);
     }
 
-    // ── Validate each cylinder line item against station stock ──────────────────
-    // Note: If customPrice is provided, user can pay any amount - don't validate it against size
-    for (const item of cylinders as { size: number; quantity: number; customPrice?: number }[]) {
-      // Skip validation if customPrice is provided (user is paying custom amount)
-      if (item.customPrice !== undefined) {
-        console.log(`DEBUG: Custom price order - size: ${item.size}kg, amount: GHS ${item.customPrice}, skipping validation`);
-        continue;
-      }
-      
-      // For standard (non-custom) orders, validate size exists at station
-      const listing = station.cylinderListings.find((l) => l.size === item.size);
-      if (!listing || listing.fillPrice <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: `${item.size}kg cylinder is not configured at this station`,
-        });
-      }
-    }
+    // ── Cylinder size is descriptive only — no hard rejection for unconfigured sizes ──────────
+    // Size is used for identification/labelling. If a station hasn't configured that exact size,
+    // fall back to the station's cheapest available listing or the customPrice provided.
 
     // ── Pricing: fetch config, apply surge + caps ──────────────────────────
     const pricingConfig = await PricingConfig.findOne().sort({ createdAt: -1 });
@@ -295,16 +280,14 @@ router.post(
         continue;
       }
       
-      // For standard pricing, look up the listing
-      const listing = station.cylinderListings.find((l) => l.size === item.size);
-      if (!listing || listing.fillPrice <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: `${item.size}kg cylinder is not configured at this station`,
-        });
-      }
-      
-      const basePrice = orderType === 'exchange' ? listing.exchangePrice : listing.fillPrice;
+      // Look up the listing by size — fall back to cheapest available if not found
+      const listing = station.cylinderListings.find((l) => l.size === item.size && l.fillPrice > 0)
+        ?? station.cylinderListings.filter((l) => l.fillPrice > 0).sort((a, b) => a.fillPrice - b.fillPrice)[0];
+
+      // If station has no listings at all, use customPrice or a zero price and continue
+      const basePrice = listing
+        ? (orderType === 'exchange' ? listing.exchangePrice : listing.fillPrice)
+        : 0;
       let unitPrice = basePrice;
 
       // Apply surge
@@ -392,9 +375,15 @@ router.post(
       loyaltyPointsRedeemed,
       isScheduled: !!scheduledFor,
       scheduledFor: scheduledFor || undefined,
-      status: scheduledFor ? 'scheduled' : 'pending',
+      // Online payments sit in awaiting_payment until webhook confirms capture.
+      // Cash orders go straight to pending and are dispatched immediately.
+      status: paymentMethod === 'cash'
+        ? (scheduledFor ? 'scheduled' : 'pending')
+        : 'awaiting_payment',
       statusHistory: [{
-        status: scheduledFor ? 'scheduled' : 'pending',
+        status: paymentMethod === 'cash'
+          ? (scheduledFor ? 'scheduled' : 'pending')
+          : 'awaiting_payment',
         triggeredBy: 'user',
         triggeredById: userId,
         timestamp: new Date(),
@@ -432,7 +421,7 @@ router.post(
         email: user?.email || `${user?.phone}@GetGas.app`,
         amountGHS: finalAmount,
         reference,
-        callbackUrl: `${process.env.FRONTEND_URL}/user/order-success?orderId=${order._id}&orderNumber=${order._id.toString().slice(-8).toUpperCase()}&method=${paymentMethod}&payment=callback`,
+        callbackUrl: `${process.env.FRONTEND_URL}/payment/callback?orderId=${order._id}`,
         metadata: { orderId: order._id.toString() },
         mobileNumber: paymentMethod === 'mobile_money' ? user?.phone : undefined,
         provider: paymentProvider,
@@ -440,15 +429,20 @@ router.post(
       order.paystackReference = reference;
       await order.save();
       paymentResponse = payment;
+      // Do NOT dispatch or notify here — webhook charge.success will do it.
+    } else {
+      // Cash order: dispatch and notify immediately
+      if (!scheduledFor) {
+        dispatchOrder(order._id.toString()).catch(console.error);
+      }
+      await createUserNotification(order, scheduledFor ? 'scheduled' : 'pending').catch(console.error);
+      // Send OTP via SMS immediately — rider will collect cash + verify OTP at pickup
+      const user = await User.findById(userId).select('phone');
+      if (user?.phone) {
+        sendSMS(user.phone, SMS_TEMPLATES.deliveryOtp(otpCode))
+          .catch(console.error);
+      }
     }
-
-    // Dispatch rider immediately — skip for scheduled orders
-    if (!scheduledFor) {
-      dispatchOrder(order._id.toString()).catch(console.error);
-    }
-
-    // Notify user
-    await createUserNotification(order, scheduledFor ? 'scheduled' : 'pending').catch(console.error);
 
     res.status(201).json({
       success: true,
@@ -571,7 +565,11 @@ router.get('/:id', [param('id').isMongoId()], async (req: AuthRequest, res: Resp
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
-    res.json({ success: true, order });
+    res.json({ success: true, order: {
+      ...order.toObject(),
+      // Only expose OTP to the order owner (customer needs to show it to rider)
+      otpCode: ownedByUser ? order.otpCode : undefined,
+    }});
   } catch (err) {
     console.error('[GET /orders/:id]', err);
     res.status(500).json({ success: false, message: 'Failed to fetch order' });
@@ -649,6 +647,7 @@ router.patch(
 
     // Validate transitions
     const TRANSITIONS: Record<string, string[]> = {
+      awaiting_payment: ['cancelled'],
       pending:    ['accepted', 'cancelled'],
       accepted:   ['at_station', 'cancelled'],
       at_station: ['en_route', 'cancelled'],
@@ -785,40 +784,18 @@ router.post(
   }
 );
 
-// ─── OTP Delivery Confirmation ────────────────────────────────────────────────
+// ─── OTP Confirmation (unified — cash pickup + online delivery) ───────────────
 
 /**
- * @swagger
- * /api/v1/orders/{id}/confirm-delivery:
- *   post:
- *     tags: [Orders]
- *     summary: User confirms delivery with 4-digit OTP
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [otp]
- *             properties:
- *               otp: { type: string, minLength: 4, maxLength: 4 }
- *     responses:
- *       200:
- *         description: Delivery confirmed, payouts triggered
- *       400:
- *         description: Invalid OTP or max attempts reached
- */
-/**
- * POST /api/v1/orders/:id/confirm-delivery
- * User submits OTP to confirm receipt.
+ * POST /api/v1/orders/:id/confirm-otp
+ *
+ * Cash:       accepted → at_station  (rider collected cash at customer door)
+ * Card/MoMo:  en_route → delivered   (customer confirms receipt)
+ *
+ * Called by the rider after the customer shows their OTP.
  */
 router.post(
-  '/:id/confirm-delivery',
+  '/:id/confirm-otp',
   [param('id').isMongoId(), body('otp').isLength({ min: 4, max: 4 }).isNumeric()],
   async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
@@ -826,13 +803,21 @@ router.post(
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-    // Only the order's user can confirm delivery
-    if (order.userId.toString() !== req.user!.id) {
+    if (req.user!.role !== 'rider' || order.riderId?.toString() !== req.user!.id) {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
-    if (order.status !== 'en_route') {
-      return res.status(400).json({ success: false, message: 'Order is not en route' });
+    const isCash         = order.paymentMethod === 'cash';
+    const requiredStatus = isCash ? 'accepted'   : 'en_route';
+    const nextStatus     = isCash ? 'at_station' : 'delivered';
+
+    if (order.status !== requiredStatus) {
+      return res.status(400).json({
+        success: false,
+        message: isCash
+          ? "Order must be 'accepted' to confirm pickup"
+          : 'Order must be en route to confirm delivery',
+      });
     }
 
     if (order.otpAttempts >= CONSTANTS.OTP_MAX_ATTEMPTS) {
@@ -848,26 +833,41 @@ router.post(
       });
     }
 
-    order.status = 'delivered';
+    order.status = nextStatus;
     order.otpVerifiedAt = new Date();
     order.otpAttempts += 1;
-    order.paymentStatus = 'released';
     order.statusHistory.push({
-      status: 'delivered',
-      triggeredBy: 'user',
+      status: nextStatus,
+      triggeredBy: 'rider',
       triggeredById: new mongoose.Types.ObjectId(req.user!.id),
       timestamp: new Date(),
+      note: isCash ? 'Cash collected and OTP verified at pickup' : 'OTP verified at delivery',
     });
-    await order.save();
 
-    if (order.riderId) {
-      await handleDeliveryCompletion(order, req.user!.id, 'user');
+    if (nextStatus === 'delivered') {
+      order.paymentStatus = 'released';
+      await order.save();
+      await handleDeliveryCompletion(order, req.user!.id, 'rider');
+    } else {
+      await order.save();
     }
 
-    emitOrderStatus(order._id.toString(), 'delivered');
-    await createUserNotification(order, 'delivered').catch(console.error);
+    emitOrderStatus(order._id.toString(), nextStatus);
+    await createUserNotification(order, nextStatus).catch(console.error);
 
-    res.json({ success: true, message: 'Delivery confirmed. Thank you!' });
+    const msgTemplate = ORDER_STATUS_MESSAGES[nextStatus];
+    if (msgTemplate) {
+      const user = await User.findById(order.userId).select('fcmToken');
+      if (user?.fcmToken) {
+        await sendPushNotification(user.fcmToken, { ...msgTemplate, data: { orderId: order._id.toString() } });
+      }
+    }
+
+    res.json({
+      success: true,
+      status: nextStatus,
+      message: isCash ? 'Pickup confirmed — head to the station' : 'Delivery confirmed!',
+    });
   }
 );
 

@@ -1,5 +1,9 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import redis from '../config/redis';
+import { Order } from '../models/Order';
+
+const RIDERS_GEO_KEY = 'riders:locations';
 
 let io: SocketServer;
 
@@ -45,26 +49,28 @@ export function initSocketIO(socketServer: SocketServer): void {
     });
 
     // Rider broadcasts their GPS position
-    socket.on('rider:location', async (payload: { orderId: string; lat: number; lng: number }) => {
-      const { orderId, lat, lng } = payload;
-      console.log(`[Rider:Location] orderId=${orderId} lat=${lat} lng=${lng}`);
+    socket.on('rider:location', async (payload: { riderId: string; lat: number; lng: number; source?: string }) => {
+      const { riderId, lat, lng, source = 'unknown' } = payload;
+      console.log(`[Location:${source}] riderId=${riderId} lat=${lat} lng=${lng}`);
 
-      // Persist to DB so the user page can seed from it on load
       try {
-        const order = await (await import('../models/Order')).Order.findById(orderId).select('riderId');
-        if (order?.riderId) {
-          const { Rider } = await import('../models/Rider');
-          await Rider.findByIdAndUpdate(order.riderId, {
-            location: { lat, lng, updatedAt: new Date() },
-          });
-        }
-      } catch (err) {
-        console.error('[Rider:Location] Failed to persist location:', err);
+        await redis.geoadd(RIDERS_GEO_KEY, lng, lat, riderId);
+      } catch (err: any) {
+        console.error(`[Redis] geoadd failed:`, err.message);
       }
 
-      const roomSize = io.sockets.adapter.rooms.get(`order:${orderId}`)?.size ?? 0;
-      console.log(`[Rider:Location] Broadcasting to order:${orderId} — ${roomSize} client(s) in room`);
-      io.to(`order:${orderId}`).emit('rider:location:update', { lat, lng, updatedAt: new Date() });
+      // Forward to customer only when the rider is en_route for their order
+      try {
+        const order = await Order.findOne(
+          { riderId, status: 'en_route' },
+          { _id: 1 }
+        ).lean();
+        if (order) {
+          io.to(`order:${order._id}`).emit('rider:location:update', { lat, lng });
+        }
+      } catch (err: any) {
+        console.error(`[Location] order lookup failed:`, err.message);
+      }
     });
 
     socket.on('disconnect', () => {

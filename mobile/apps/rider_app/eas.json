@@ -1,0 +1,61 @@
+{
+  "cli": {
+    "version": ">= 12.0.0"
+  },
+  "build": {
+    "development": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "env": {
+          "API_URL": "http://10.0.2.2:4000"
+        }
+      },
+      "ios": {
+        "simulator": true,
+        "env": {
+          "API_URL": "http://localhost:4000"
+        }
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "env": {
+          "API_URL": "https://gas-1-io3c.onrender.com"
+        }
+      },
+      "ios": {
+        "env": {
+          "API_URL": "https://gas-1-io3c.onrender.com"
+        }
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle",
+        "env": {
+          "API_URL": "https://gas-1-io3c.onrender.com"
+        }
+      },
+      "ios": {
+        "env": {
+          "API_URL": "https://gas-1-io3c.onrender.com"
+        }
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal"
+      },
+      "ios": {
+        "appleId": "<your-apple-id@example.com>",
+        "ascAppId": "<app-store-connect-app-id>",
+        "appleTeamId": "<APPLE_TEAM_ID>"
+      }
+    }
+  }
+}

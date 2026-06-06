@@ -22,7 +22,7 @@ class StationsApi {
         'lat': lat,
         'lng': lng,
         'radius': radius,
-        if (size != null) 'size': size,
+        'size': ?size,
       },
     );
     final list = data['stations'] as List<dynamic>? ?? [];

@@ -29,6 +29,8 @@ class AuthRepository {
 
   GetGasApiClient get client => _client;
 
+  AuthApi get authApi => _authApi;
+
   Future<AuthUser?> currentUser() => _storage.readUser();
 
   Future<String?> currentToken() async {

@@ -340,11 +340,18 @@ final _nearbyStationsProvider =
 });
 
 final _activeOrderProvider = FutureProvider<GasOrder?>((ref) async {
-  final orders = await ref.watch(ordersApiProvider).list();
-  for (final o in orders) {
-    if (o.isActive) return o;
-  }
-  return null;
+  const active = ['awaiting_payment', 'pending', 'accepted', 'at_station', 'en_route'];
+  final orders = await ref.watch(ordersApiProvider).list(
+    status: active.join(','),
+    limit: 50,
+  );
+  if (orders.isEmpty) return null;
+  orders.sort((a, b) {
+    final aDate = DateTime.tryParse(a.createdAt ?? '') ?? DateTime(0);
+    final bDate = DateTime.tryParse(b.createdAt ?? '') ?? DateTime(0);
+    return bDate.compareTo(aDate);
+  });
+  return orders.first;
 });
 
 final _unreadCountProvider = FutureProvider<int>((ref) {

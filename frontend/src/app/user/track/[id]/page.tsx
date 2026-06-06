@@ -24,18 +24,18 @@ const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!;
  *   delivered  → Delivered
  */
 const STEPS = [
-  { key: 'pending',    label: 'Order Placed',        Icon: ClipboardList },
-  { key: 'accepted',   label: 'Rider Dispatched',    Icon: Bike          },
-  { key: 'at_station', label: 'Picking Up',          Icon: Store         },
-  { key: 'en_route',   label: 'Return from Station', Icon: Navigation    },
-  { key: 'delivered',  label: 'Delivered',           Icon: CheckCircle2  },
+  { key: 'pending', label: 'Order Placed', Icon: ClipboardList },
+  { key: 'accepted', label: 'Rider Dispatched', Icon: Bike },
+  { key: 'at_station', label: 'Picking Up', Icon: Store },
+  { key: 'en_route', label: 'Return from Station', Icon: Navigation },
+  { key: 'delivered', label: 'Delivered', Icon: CheckCircle2 },
 ];
 const STATUS_ORDER = ['pending', 'accepted', 'at_station', 'en_route', 'delivered'];
 
 const PAYMENT_LABEL: Record<string, string> = {
   mobile_money: 'Paid via MoMO',
-  card:         'Paid via Card',
-  cash:         'Cash on Delivery',
+  card: 'Paid via Card',
+  cash: 'Cash on Delivery',
 };
 
 // ─── Marker SVGs ─────────────────────────────────────────────────────────────
@@ -58,11 +58,11 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
   deliveryLng?: number;
   className?: string;
 }) {
-  const mapDivRef    = useRef<HTMLDivElement>(null);
-  const mapRef       = useRef<google.maps.Map | null>(null);
-  const riderMarker  = useRef<google.maps.Marker | null>(null);
-  const rendererRef  = useRef<google.maps.DirectionsRenderer | null>(null);
-  const animRef      = useRef<number | null>(null);
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const riderMarker = useRef<google.maps.Marker | null>(null);
+  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const animRef = useRef<number | null>(null);
   const lastRouteRef = useRef<{ lat: number; lng: number } | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -90,7 +90,6 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
 
   const initMap = useCallback(() => {
     if (!mapDivRef.current || mapRef.current) return;
-    console.log('[TrackMap] initMap called, delivery:', { deliveryLat, deliveryLng });
     const center = deliveryLat && deliveryLng ? { lat: deliveryLat, lng: deliveryLng } : ACCRA;
     mapRef.current = new google.maps.Map(mapDivRef.current, {
       center, zoom: 15,
@@ -98,14 +97,14 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
       gestureHandling: 'greedy',
       clickableIcons: false,
       styles: [
-        { elementType: 'geometry',            stylers: [{ color: '#1e1e2e' }] },
-        { elementType: 'labels.text.stroke',  stylers: [{ color: '#1e1e2e' }] },
-        { elementType: 'labels.text.fill',    stylers: [{ color: '#6b7280' }] },
-        { featureType: 'road', elementType: 'geometry',          stylers: [{ color: '#2d2d3f' }] },
-        { featureType: 'road', elementType: 'labels.text.fill',  stylers: [{ color: '#9ca3af' }] },
-        { featureType: 'road.highway', elementType: 'geometry',  stylers: [{ color: '#374151' }] },
-        { featureType: 'water', elementType: 'geometry',         stylers: [{ color: '#111827' }] },
-        { featureType: 'poi',   stylers: [{ visibility: 'off' }] },
+        { elementType: 'geometry', stylers: [{ color: '#1e1e2e' }] },
+        { elementType: 'labels.text.stroke', stylers: [{ color: '#1e1e2e' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#6b7280' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d2d3f' }] },
+        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
+        { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#374151' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#111827' }] },
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
         { featureType: 'transit', stylers: [{ visibility: 'off' }] },
       ],
     });
@@ -133,7 +132,6 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
     });
 
     setReady(true);
-    console.log('[TrackMap] map ready');
   }, [deliveryLat, deliveryLng]); // eslint-disable-line
 
   // Load Google Maps script
@@ -154,7 +152,6 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
 
   // Update rider marker + route whenever live location changes OR map becomes ready
   useEffect(() => {
-    console.log('[TrackMap] location/ready effect', { riderLocation, ready, hasMap: !!mapRef.current, hasRenderer: !!rendererRef.current });
     if (!ready || !mapRef.current || !rendererRef.current || !riderLocation) return;
 
     // Animate rider marker
@@ -177,11 +174,9 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
         const dlat = riderLocation.lat - prev.lat;
         const dlng = riderLocation.lng - prev.lng;
         if (Math.sqrt(dlat * dlat + dlng * dlng) < 0.0003) {
-          console.log('[TrackMap] route throttled');
           return;
         }
       }
-      console.log('[TrackMap] Requesting directions', { origin: riderLocation, dest: { deliveryLat, deliveryLng } });
       new google.maps.DirectionsService().route(
         {
           origin: riderLocation,
@@ -189,7 +184,6 @@ function TrackMap({ riderLocation, deliveryLat, deliveryLng, className }: {
           travelMode: google.maps.TravelMode.DRIVING,
         },
         (result, status) => {
-          console.log('[TrackMap] DirectionsService response:', status, result ? 'has result' : 'no result');
           if (status === 'OK' && result && rendererRef.current) {
             lastRouteRef.current = riderLocation; // only throttle after success
             rendererRef.current.setDirections(result);
@@ -217,7 +211,7 @@ function TrackContent({ order, riderLocation }: {
   order: any;
   riderLocation: { lat: number; lng: number } | null;
 }) {
-  const rider      = typeof order.riderId === 'object' ? order.riderId : null;
+  const rider = typeof order.riderId === 'object' ? order.riderId : null;
   const currentIdx = STATUS_ORDER.indexOf(order.status);
 
   return (
@@ -226,9 +220,9 @@ function TrackContent({ order, riderLocation }: {
       <div className="flex items-start">
         {STEPS.map((step, i) => {
           const stepIdx = STATUS_ORDER.indexOf(step.key);
-          const done    = currentIdx >= stepIdx;
-          const active  = currentIdx === stepIdx;
-          const isLast  = i === STEPS.length - 1;
+          const done = currentIdx >= stepIdx;
+          const active = currentIdx === stepIdx;
+          const isLast = i === STEPS.length - 1;
           const { Icon } = step;
           return (
             <div key={step.key} className="flex items-center flex-1 min-w-0">
@@ -236,7 +230,7 @@ function TrackContent({ order, riderLocation }: {
                 <div className={cn(
                   'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all',
                   done && !active ? 'bg-green-500' :
-                  active          ? 'bg-brand-500' : 'bg-[var(--bg-card2)]'
+                    active ? 'bg-brand-500' : 'bg-[var(--bg-card2)]'
                 )}>
                   <Icon className={cn(
                     'w-4 h-4',
@@ -245,8 +239,8 @@ function TrackContent({ order, riderLocation }: {
                 </div>
                 <span className={cn(
                   'text-[9px] font-semibold text-center leading-tight px-0.5',
-                  active          ? 'text-brand-500' :
-                  done && !active ? 'text-green-500'  : 'text-[var(--text-muted)]'
+                  active ? 'text-brand-500' :
+                    done && !active ? 'text-green-500' : 'text-[var(--text-muted)]'
                 )}>
                   {step.label}
                 </span>
@@ -332,14 +326,14 @@ export default function TrackOrderPage() {
   const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(null);
   // Sheet height as % of screen (10% collapsed, 52% default)
   const [sheetPct, setSheetPct] = useState(52);
-  const dragStartY  = useRef<number | null>(null);
+  const dragStartY = useRef<number | null>(null);
   const dragStartPct = useRef(52);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', id],
-    queryFn:  () => ordersApi.getById(id).then((r) => r.data.order),
-    enabled:  !authLoading && !!id,
-    retry:    false,
+    queryFn: () => ordersApi.getById(id).then((r) => r.data.order),
+    enabled: !authLoading && !!id,
+    retry: false,
     refetchInterval: 15000,
   });
 
@@ -352,7 +346,6 @@ export default function TrackOrderPage() {
     if (!lat || !lng) return;
     // Skip stale Accra default coordinates
     if (Math.abs(lat - 5.6037) < 0.001 && Math.abs(lng - (-0.187)) < 0.001) return;
-    console.log('[Track] Seeding rider location from DB:', rider.location);
     setRiderLocation({ lat, lng });
   }, [order?.riderId]);
 
@@ -361,10 +354,8 @@ export default function TrackOrderPage() {
     if (!id) return;
     const socket = getSocket();
     socket.emit('join:order', id);
-    console.log('[Track] Joined order room:', id);
 
     const onLocation = (loc: { lat: number; lng: number }) => {
-      console.log('[Track] Socket → rider:location:update received:', loc);
       setRiderLocation(loc);
     };
     const onStatus = () => {
@@ -390,11 +381,11 @@ export default function TrackOrderPage() {
   }
 
   const statusLabel: Record<string, string> = {
-    pending:    'Order Placed',
-    accepted:   'Rider Dispatched',
+    pending: 'Order Placed',
+    accepted: 'Rider Dispatched',
     at_station: 'Picking Up',
-    en_route:   'Return from Station',
-    delivered:  'Delivered',
+    en_route: 'Return from Station',
+    delivered: 'Delivered',
   };
 
   return (

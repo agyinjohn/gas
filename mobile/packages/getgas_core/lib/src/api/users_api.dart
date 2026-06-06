@@ -12,19 +12,19 @@ class UsersApi {
   Future<UserProfile> getMe() async {
     final data = await _client.getJson('$_prefix/me');
     final userJson = data['user'] as Map<String, dynamic>? ?? data;
-    return UserProfile.fromJson(userJson as Map<String, dynamic>);
+    return UserProfile.fromJson(userJson);
   }
 
   Future<UserProfile> updateMe({String? name, String? email}) async {
     final data = await _client.patchJson(
       '$_prefix/me',
       body: {
-        if (name != null) 'name': name,
-        if (email != null) 'email': email,
+        'name': ?name,
+        'email': ?email,
       },
     );
     final userJson = data['user'] as Map<String, dynamic>? ?? data;
-    return UserProfile.fromJson(userJson as Map<String, dynamic>);
+    return UserProfile.fromJson(userJson);
   }
 
   Future<List<SavedAddress>> addAddress({
@@ -61,12 +61,12 @@ class UsersApi {
     final data = await _client.patchJson(
       '$_prefix/addresses/$id',
       body: {
-        if (label != null) 'label': label,
-        if (street != null) 'street': street,
-        if (city != null) 'city': city,
-        if (lat != null) 'lat': lat,
-        if (lng != null) 'lng': lng,
-        if (isDefault != null) 'isDefault': isDefault,
+        'label': ?label,
+        'street': ?street,
+        'city': ?city,
+        'lat': ?lat,
+        'lng': ?lng,
+        'isDefault': ?isDefault,
       },
     );
     return parseAddressesList(data['addresses']);
@@ -94,6 +94,10 @@ class UsersApi {
       pointsBalance: (data['pointsBalance'] as num?)?.toInt() ?? 0,
       shareUrl: data['shareUrl'] as String? ?? '',
     );
+  }
+
+  Future<void> registerFcmToken(String token) async {
+    await _client.patchJson('$_prefix/me', body: {'fcmToken': token});
   }
 }
 

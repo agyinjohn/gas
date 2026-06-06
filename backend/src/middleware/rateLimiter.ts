@@ -1,24 +1,32 @@
 import rateLimit from 'express-rate-limit';
+import { Request } from 'express';
 
-export const rateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+const byToken = (req: Request) => {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer ')) return auth.slice(7, 40);
+  return (
+    req.headers['x-forwarded-for']?.toString().split(',')[0].trim() ??
+    req.ip ??
+    'unknown'
+  );
+};
+
+// Auth / OTP — strict, prevents brute force
+export const authLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 min
+  max: 10,
+  keyGenerator: byToken,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many requests, please try again later.' },
-});
-
-// Stricter limiter for auth/OTP routes
-export const authLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 10,
   message: { success: false, message: 'Too many auth attempts, please try again in 10 minutes.' },
 });
 
-// Order placement — per user token (keyGenerator uses Authorization header)
+// Order placement — prevents spam orders
 export const orderLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000, // 1 min
   max: 10,
-  keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
+  keyGenerator: byToken,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { success: false, message: 'Too many order requests, please slow down.' },
 });

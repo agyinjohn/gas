@@ -1,4 +1,5 @@
 import axios from 'axios';
+import admin from '../config/firebase';
 
 interface PushPayload {
   title: string;
@@ -6,9 +7,20 @@ interface PushPayload {
   data?: Record<string, string>;
 }
 
-/** @deprecated FCM removed — use sendSMS instead */
-export async function sendPushNotification(_fcmToken: string, _payload: PushPayload): Promise<void> {
-  console.warn('[Notification] sendPushNotification called but FCM is disabled — use sendSMS');
+export async function sendPushNotification(fcmToken: string, payload: PushPayload): Promise<void> {
+  if (!admin.apps.length) return;
+  try {
+    await admin.messaging().send({
+      token: fcmToken,
+      notification: { title: payload.title, body: payload.body },
+      data: payload.data,
+      android: { priority: 'high', notification: { channelId: 'getgas_orders', sound: 'default' } },
+      apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+    });
+    console.log('[FCM] Push sent to', fcmToken.slice(0, 20) + '...');
+  } catch (err: any) {
+    console.error('[FCM] Push failed:', err.message);
+  }
 }
 
 /**
@@ -83,6 +95,9 @@ export const SMS_TEMPLATES = {
 
   orderCancelled: () =>
     `Your GetGas order has been cancelled. A refund will be processed within 24 hours if applicable.`,
+
+  deliveryOtp: (code: string) =>
+    `Hi! Your GetGas order is confirmed 🎉 Your rider is on the way. Share this code with them when they arrive: ${code}. Thank you for choosing GetGas!`,
 };
 
 export const ORDER_STATUS_MESSAGES: Record<string, { title: string; body: string }> = {

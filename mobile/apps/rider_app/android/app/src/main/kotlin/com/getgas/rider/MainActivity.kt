@@ -1,4 +1,4 @@
-package com.getgas.getgas_rider
+package com.getgas.rider
 
 import io.flutter.embedding.android.FlutterActivity
 

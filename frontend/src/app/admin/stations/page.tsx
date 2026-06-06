@@ -18,10 +18,10 @@ const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ss
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS: Record<string, { label: string; dot: string; badge: string }> = {
-  active:    { label: 'Active',    dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200'  },
-  pending:   { label: 'Pending',   dot: 'bg-amber-400',   badge: 'bg-amber-50 text-amber-700 border-amber-200'        },
-  suspended: { label: 'Suspended', dot: 'bg-orange-400',  badge: 'bg-orange-50 text-orange-700 border-orange-200'     },
-  banned:    { label: 'Banned',    dot: 'bg-red-500',     badge: 'bg-red-50 text-red-700 border-red-200'              },
+  active: { label: 'Active', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  pending: { label: 'Pending', dot: 'bg-amber-400', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+  suspended: { label: 'Suspended', dot: 'bg-orange-400', badge: 'bg-orange-50 text-orange-700 border-orange-200' },
+  banned: { label: 'Banned', dot: 'bg-red-500', badge: 'bg-red-50 text-red-700 border-red-200' },
 };
 
 // ─── Input helpers ────────────────────────────────────────────────────────────
@@ -57,11 +57,11 @@ function Input({ icon: Icon, ...props }: React.InputHTMLAttributes<HTMLInputElem
 export default function AdminStationsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
-  const [searchTerm, setSearchTerm]     = useState('');
-  const [showCreate, setShowCreate]     = useState(false);
-  const [showPicker, setShowPicker]     = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const [form, setForm] = useState({
-    ownerName: '', ownerPhone: '', ownerPassword: '',
+    ownerName: '', ownerPhone: '', ownerLoginPassword: '',
     stationName: '', address: '', city: '',
     lat: 0, lng: 0, commissionPct: 10,
   });
@@ -78,7 +78,7 @@ export default function AdminStationsPage() {
       toast.success(`"${res.data.station.name}" created`);
       queryClient.invalidateQueries({ queryKey: ['admin', 'stations'] });
       setShowCreate(false);
-      setForm({ ownerName: '', ownerPhone: '', ownerPassword: '', stationName: '', address: '', city: '', lat: 0, lng: 0, commissionPct: 10 });
+      setForm({ ownerName: '', ownerPhone: '', ownerLoginPassword: '', stationName: '', address: '', city: '', lat: 0, lng: 0, commissionPct: 10 });
     },
     onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to create station'),
   });
@@ -95,11 +95,11 @@ export default function AdminStationsPage() {
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!form.ownerName.trim())        e.ownerName    = 'Required';
-    if (!form.ownerPhone.trim())       e.ownerPhone   = 'Required';
-    if (form.ownerPassword.length < 6) e.ownerPassword = 'Min 6 characters';
-    if (!form.stationName.trim())      e.stationName  = 'Required';
-    if (!form.lat || !form.lng)        e.location     = 'Pick a location on the map';
+    if (!form.ownerName.trim()) e.ownerName = 'Required';
+    if (!form.ownerPhone.trim()) e.ownerPhone = 'Required';
+    if (form.ownerLoginPassword.length < 6) e.ownerLoginPassword = 'Min 6 characters';
+    if (!form.stationName.trim()) e.stationName = 'Required';
+    if (!form.lat || !form.lng) e.location = 'Pick a location on the map';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -114,15 +114,15 @@ export default function AdminStationsPage() {
   const stations = allStations.filter((s: any) =>
     searchTerm
       ? s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.city?.toLowerCase().includes(searchTerm.toLowerCase())
+      s.city?.toLowerCase().includes(searchTerm.toLowerCase())
       : true
   );
 
   // Summary counts
   const counts = {
-    all:       allStations.length,
-    active:    allStations.filter((s: any) => s.status === 'active').length,
-    pending:   allStations.filter((s: any) => s.status === 'pending').length,
+    all: allStations.length,
+    active: allStations.filter((s: any) => s.status === 'active').length,
+    pending: allStations.filter((s: any) => s.status === 'pending').length,
     suspended: allStations.filter((s: any) => s.status === 'suspended').length,
   };
 
@@ -171,8 +171,8 @@ export default function AdminStationsPage() {
                   />
                 </div>
               </Field>
-              <Field label="Login Password" error={errors.ownerPassword}>
-                <Input icon={Lock} type="password" placeholder="Min. 6 characters" value={form.ownerPassword} onChange={(e) => setForm((f) => ({ ...f, ownerPassword: e.target.value }))} />
+              <Field label="Login Password" error={errors.ownerLoginPassword}>
+                <Input icon={Lock} type="password" placeholder="Min. 6 characters" value={form.ownerLoginPassword} onChange={(e) => setForm((f) => ({ ...f, ownerLoginPassword: e.target.value }))} />
               </Field>
 
               <div className="border-t border-gray-100 pt-4">
@@ -222,10 +222,10 @@ export default function AdminStationsPage() {
       {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Total Stations', value: counts.all,       icon: Store,       bg: 'bg-blue-50',    text: 'text-blue-600',    iconBg: 'bg-blue-100'    },
-          { label: 'Active',         value: counts.active,    icon: CheckCircle, bg: 'bg-emerald-50', text: 'text-emerald-600', iconBg: 'bg-emerald-100' },
-          { label: 'Pending',        value: counts.pending,   icon: TrendingUp,  bg: 'bg-amber-50',   text: 'text-amber-600',   iconBg: 'bg-amber-100'   },
-          { label: 'Suspended',      value: counts.suspended, icon: XCircle,     bg: 'bg-orange-50',  text: 'text-orange-600',  iconBg: 'bg-orange-100'  },
+          { label: 'Total Stations', value: counts.all, icon: Store, bg: 'bg-blue-50', text: 'text-blue-600', iconBg: 'bg-blue-100' },
+          { label: 'Active', value: counts.active, icon: CheckCircle, bg: 'bg-emerald-50', text: 'text-emerald-600', iconBg: 'bg-emerald-100' },
+          { label: 'Pending', value: counts.pending, icon: TrendingUp, bg: 'bg-amber-50', text: 'text-amber-600', iconBg: 'bg-amber-100' },
+          { label: 'Suspended', value: counts.suspended, icon: XCircle, bg: 'bg-orange-50', text: 'text-orange-600', iconBg: 'bg-orange-100' },
         ].map(({ label, value, icon: Icon, bg, text, iconBg }) => (
           <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${iconBg}`}>
@@ -268,7 +268,7 @@ export default function AdminStationsPage() {
 
       {/* ── Station list ── */}
       {isLoading ? (
-        <div className="space-y-3">{[1,2,3].map((i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}</div>
+        <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}</div>
       ) : stations.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center shadow-sm">
           <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
@@ -305,9 +305,9 @@ function StationCard({ station, onUpdateStatus, onUpdateCommission, loading }: {
   onUpdateCommission: (commissionPct: number) => void;
   loading: boolean;
 }) {
-  const [expanded, setExpanded]               = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [editingCommission, setEditingCommission] = useState(false);
-  const [newCommission, setNewCommission]     = useState(station.commissionPct || 10);
+  const [newCommission, setNewCommission] = useState(station.commissionPct || 10);
 
   const s = STATUS[station.status] || STATUS.pending;
 
@@ -392,8 +392,8 @@ function StationCard({ station, onUpdateStatus, onUpdateCommission, loading }: {
                     l.stockCount === 0
                       ? 'bg-red-50 border-red-200 text-red-600'
                       : l.stockCount <= l.lowStockThreshold
-                      ? 'bg-amber-50 border-amber-200 text-amber-700'
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        ? 'bg-amber-50 border-amber-200 text-amber-700'
+                        : 'bg-emerald-50 border-emerald-200 text-emerald-700'
                   )}>
                     <span>{l.size}kg</span>
                     <span className="font-normal opacity-70">·</span>

@@ -6,6 +6,7 @@ import '../widgets/complete_profile_sheet.dart';
 import '../widgets/whatsapp_fab.dart';
 import '../utils/profile_helpers.dart';
 import '../providers/auth_provider.dart';
+import '../providers/connectivity_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Shell with mobile bottom nav — mirrors web `user/layout.tsx`.
@@ -47,6 +48,7 @@ class UserShell extends ConsumerWidget {
     final showNav = !hideNav(location);
     final showFab = showWhatsApp(location);
     final user = ref.watch(authProvider).user;
+    final isOnline = ref.watch(isOnlineProvider);
     final showCompleteProfile = user != null && userNeedsProfileCompletion(user);
 
     return Scaffold(
@@ -57,6 +59,11 @@ class UserShell extends ConsumerWidget {
           child,
           if (showFab) const WhatsAppFab(),
           if (showCompleteProfile) const CompleteProfileSheet(),
+          if (!isOnline)
+            const Positioned(
+              bottom: 0, left: 0, right: 0,
+              child: _OfflineBanner(),
+            ),
         ],
       ),
       bottomNavigationBar: showNav
@@ -76,6 +83,68 @@ class UserShell extends ConsumerWidget {
               },
             )
           : null,
+    );
+  }
+}
+
+class _OfflineBanner extends StatefulWidget {
+  const _OfflineBanner();
+
+  @override
+  State<_OfflineBanner> createState() => _OfflineBannerState();
+}
+
+class _OfflineBannerState extends State<_OfflineBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 300));
+    _slide = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slide,
+      child: Material(
+        color: Colors.transparent,
+        child: SafeArea(
+          top: false,
+          child: Container(
+            width: double.infinity,
+            color: const Color(0xFF1F2937),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.wifi_off_rounded, size: 14, color: Colors.white70),
+                SizedBox(width: 8),
+                Text(
+                  'You\'re offline — showing cached data',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

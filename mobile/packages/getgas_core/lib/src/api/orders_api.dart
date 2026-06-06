@@ -13,9 +13,9 @@ class OrdersApi {
     final data = await _client.getJson(
       _prefix,
       query: {
-        if (status != null) 'status': status,
-        if (limit != null) 'limit': limit,
-        if (page != null) 'page': page,
+        'status': ?status,
+        'limit': ?limit,
+        'page': ?page,
       },
     );
     final list = data['orders'] as List<dynamic>? ?? [];
@@ -25,7 +25,7 @@ class OrdersApi {
   Future<GasOrder> getById(String id) async {
     final data = await _client.getJson('$_prefix/$id');
     final orderJson = data['order'] as Map<String, dynamic>? ?? data;
-    return GasOrder.fromJson(orderJson as Map<String, dynamic>);
+    return GasOrder.fromJson(orderJson);
   }
 
   Future<CreateOrderResult> create({
@@ -44,9 +44,9 @@ class OrdersApi {
         'cylinders': cylinders,
         'orderType': orderType,
         'deliveryAddress': deliveryAddress,
-        if (pickupAddress != null) 'pickupAddress': pickupAddress,
+        'pickupAddress': ?pickupAddress,
         'paymentMethod': paymentMethod,
-        if (scheduledFor != null && scheduledFor.isNotEmpty) 'scheduledFor': scheduledFor,
+        'scheduledFor': ?scheduledFor,
       },
     );
 
@@ -69,7 +69,7 @@ class OrdersApi {
       },
     );
     final orderJson = data['order'] as Map<String, dynamic>? ?? data;
-    return GasOrder.fromJson(orderJson as Map<String, dynamic>);
+    return GasOrder.fromJson(orderJson);
   }
 
   Future<GasOrder> confirmDelivery(String id, String otp) async {
@@ -78,8 +78,11 @@ class OrdersApi {
       body: {'otp': otp},
     );
     final orderJson = data['order'] as Map<String, dynamic>? ?? data;
-    return GasOrder.fromJson(orderJson as Map<String, dynamic>);
+    return GasOrder.fromJson(orderJson);
   }
+
+  Future<GasOrder> cancel(String id, {String? reason}) =>
+      updateStatus(id, 'cancelled', note: reason);
 
   Future<GasOrder> rate(String id, int rating, {String? comment}) async {
     final data = await _client.postJson(
@@ -90,7 +93,7 @@ class OrdersApi {
       },
     );
     final orderJson = data['order'] as Map<String, dynamic>? ?? data;
-    return GasOrder.fromJson(orderJson as Map<String, dynamic>);
+    return GasOrder.fromJson(orderJson);
   }
 
   Future<void> reportIssue(String id, String category, String description) async {

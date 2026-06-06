@@ -13,7 +13,7 @@ import { Server as SocketServer } from 'socket.io';
 
 import { connectDB } from './config/database';
 import { errorHandler } from './middleware/errorHandler';
-import { rateLimiter } from './middleware/rateLimiter';
+import { authLimiter, orderLimiter } from './middleware/rateLimiter';
 import { initSocketIO } from './services/realtimeService';
 import { startAllJobs } from './jobs/cronJobs';
 import { swaggerSpec } from './config/swagger';
@@ -41,6 +41,7 @@ const io = new SocketServer(httpServer, {
   },
 });
 
+app.set('trust proxy', 1); // Trust Render/Heroku proxy for correct req.ip
 app.set('io', io);
 initSocketIO(io);
 
@@ -68,11 +69,10 @@ app.use(cors({
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(rateLimiter);
 app.use(passport.initialize());
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
-app.use(`${API}/auth`,          authRoutes);
+app.use(`${API}/auth`,          authLimiter, authRoutes);
 app.use(`${API}/users`,         userRoutes);
 app.use(`${API}/stations`,      stationRoutes);
 app.use(`${API}/riders`,        riderRoutes);

@@ -19,6 +19,8 @@ class GasOrder {
     this.scheduledFor,
     this.paystackReference,
     this.riderRating,
+    this.orderType,
+    this.otpCode,
   });
 
   final String id;
@@ -38,8 +40,32 @@ class GasOrder {
   final String? scheduledFor;
   final String? paystackReference;
   final num? riderRating;
+  final String? orderType;
+  final String? otpCode;
 
   bool get isActive => status != 'delivered' && status != 'cancelled';
+
+  Map<String, dynamic> toJson() => {
+        '_id': id,
+        if (orderNumber != null) 'orderNumber': orderNumber,
+        'status': status,
+        if (estimatedArrival != null) 'estimatedArrival': estimatedArrival,
+        if (totalAmount != null) 'totalAmount': totalAmount,
+        if (finalAmount != null) 'finalAmount': finalAmount,
+        if (deliveryFee != null) 'deliveryFee': deliveryFee,
+        if (createdAt != null) 'createdAt': createdAt,
+        if (paymentMethod != null) 'paymentMethod': paymentMethod,
+        if (orderType != null) 'orderType': orderType,
+        if (scheduledFor != null) 'scheduledFor': scheduledFor,
+        if (paystackReference != null) 'paystackReference': paystackReference,
+        if (riderRating != null) 'riderRating': riderRating,
+        if (otpCode != null) 'otpCode': otpCode,
+        'cylinders': cylinders.map((c) => c.toJson()).toList(),
+        if (deliveryAddress != null) 'deliveryAddress': deliveryAddress!.toJson(),
+        if (pickupAddress != null) 'pickupAddress': pickupAddress!.toJson(),
+        if (station != null) 'stationId': station!.toJson(),
+        if (rider != null) 'riderId': rider!.toJson(),
+      };
 
   String get displayNumber {
     if (orderNumber != null && orderNumber!.isNotEmpty) return orderNumber!;
@@ -64,6 +90,8 @@ class GasOrder {
       scheduledFor: json['scheduledFor']?.toString(),
       paystackReference: json['paystackReference'] as String?,
       riderRating: json['riderRating'] as num?,
+      orderType: json['orderType'] as String?,
+      otpCode: json['otpCode'] as String?,
       cylinders: cylindersRaw
           .map((e) => OrderCylinder.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -76,8 +104,8 @@ class GasOrder {
       station: json['stationId'] != null
           ? OrderStation.fromJson(json['stationId'])
           : null,
-      rider: json['riderId'] != null
-          ? OrderRider.fromJson(json['riderId'] as Map<String, dynamic>?)
+      rider: json['riderId'] is Map
+          ? OrderRider.fromJson(json['riderId'] as Map<String, dynamic>)
           : null,
     );
   }

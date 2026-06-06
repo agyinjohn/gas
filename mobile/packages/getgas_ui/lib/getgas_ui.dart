@@ -1,6 +1,4 @@
-library getgas_ui;
-
-
+// library getgas_ui;
 
 export 'src/theme/getgas_theme.dart';
 export 'src/theme/getgas_colors.dart';
@@ -35,4 +33,3 @@ export 'src/widgets/user/quick_order_card.dart';
 export 'src/widgets/user/refer_earn_card.dart';
 export 'src/widgets/user/home_header.dart';
 export 'src/widgets/dev_api_banner.dart';
-
