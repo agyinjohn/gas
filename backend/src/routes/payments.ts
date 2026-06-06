@@ -2,11 +2,12 @@ import { Router, Request, Response } from 'express';
 import express from 'express';
 import crypto from 'crypto';
 import { Order } from '../models/Order';
-import { verifyPayment } from '../services/paymentService';
+import { verifyPayment, initializePayment, generatePaymentReference } from '../services/paymentService';
 import { dispatchOrder } from '../services/dispatchService';
 import { Notification } from '../models/Notification';
 import { User } from '../models/User';
 import { sendSMS, SMS_TEMPLATES } from '../services/notificationService';
+import { authenticate, AuthRequest } from '../middleware/authenticate';
 
 const router = Router();
 
@@ -98,11 +99,6 @@ router.get('/verify/:reference', async (req: Request, res: Response) => {
 });
 
 // ─── Retry Payment ────────────────────────────────────────────────────────────
-// Allows a user to re-initialize Paystack for an order that is still
-// awaiting_payment (i.e. they abandoned or the payment failed).
-import { authenticate, AuthRequest } from '../middleware/authenticate';
-import { User } from '../models/User';
-import { initializePayment, generatePaymentReference } from '../services/paymentService';
 
 router.post('/retry/:orderId', authenticate, async (req: AuthRequest, res: Response) => {
   const order = await Order.findById(req.params.orderId);
