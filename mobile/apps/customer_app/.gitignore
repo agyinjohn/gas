@@ -46,3 +46,10 @@ app.*.map.json
 
 # Synced from web env (dart run tool/sync_env.dart)
 /assets/env/mobile.json
+
+# Local config (machine-specific)
+config/local.json
+
+# Android signing
+android/key.properties
+android/release.jks

@@ -1,53 +1,124 @@
-name: Rider — Build & Submit to Play Store
+name: Rider — Build & Deploy
 
 on:
   push:
     tags:
-      - 'rider-v*'          # e.g. git tag rider-v1.0.1 && git push --tags
-  workflow_dispatch:        # also triggerable manually from GitHub UI
+      - 'rider-v*'      # git tag rider-v1.0.2 && git push --tags
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'android'
+        type: choice
+        options: [android, ios, both]
 
 jobs:
-  build-and-submit:
-    name: EAS Build + Submit
+  # ── Android ─────────────────────────────────────────────────────────────────
+  android:
+    name: Android — AAB → Play Store
     runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      github.event.inputs.platform == 'android' ||
+      github.event.inputs.platform == 'both'
     defaults:
       run:
         working-directory: mobile/apps/rider_app
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: '3.32.x'
           channel: stable
           cache: true
 
-      - name: Setup EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Write Android keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.jks
-          cat > android/key.properties <<EOF
-          storeFile=release.jks
-          storePassword=${{ secrets.KEY_STORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
-
-      - name: Flutter pub get (shared packages)
+      - name: Flutter pub get — shared packages
         working-directory: mobile
         run: |
           cd packages/getgas_core && flutter pub get
           cd ../getgas_ui && flutter pub get
 
-      - name: Build & submit
-        run: eas build --platform android --profile production --auto-submit --non-interactive
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.RIDER_KEYSTORE_BASE64 }}" | base64 --decode > android/release.jks
+          cat > android/key.properties <<EOF
+          storeFile=release.jks
+          storePassword=${{ secrets.RIDER_STORE_PASSWORD }}
+          keyAlias=${{ secrets.RIDER_KEY_ALIAS }}
+          keyPassword=${{ secrets.RIDER_KEY_PASSWORD }}
+          EOF
+
+      - name: Build AAB
+        run: flutter build appbundle --release
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+      - name: Upload to Play Store (internal track)
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          packageName: com.getgas.getgas_rider
+          releaseFiles: mobile/apps/rider_app/build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+
+  # ── iOS ──────────────────────────────────────────────────────────────────────
+  ios:
+    name: iOS — IPA → App Store
+    runs-on: macos-15
+    if: >
+      github.event_name == 'push' ||
+      github.event.inputs.platform == 'ios' ||
+      github.event.inputs.platform == 'both'
+    defaults:
+      run:
+        working-directory: mobile/apps/rider_app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.x'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get — shared packages
+        working-directory: mobile
+        run: |
+          cd packages/getgas_core && flutter pub get
+          cd ../getgas_ui && flutter pub get
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Import signing certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERT_BASE64 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERT_PASSWORD }}
+
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "${{ secrets.IOS_RIDER_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode \
+            > ~/Library/MobileDevice/Provisioning\ Profiles/rider_app.mobileprovision
+
+      - name: Build IPA
+        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+      - name: Upload to App Store Connect
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: mobile/apps/rider_app/build/ios/ipa/getgas_rider.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}

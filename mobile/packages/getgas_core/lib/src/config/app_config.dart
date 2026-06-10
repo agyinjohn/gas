@@ -24,6 +24,14 @@ class AppConfig {
   // Fallback only — always set API_URL via config/production.json at build time.
   static const defaultApiUrl = 'https://gas-1-io3c.onrender.com';
 
+  static String? _runtimeApiUrl;
+
+  /// Set from bundled env at startup.
+  static void setApiUrl(String url) {
+    final trimmed = url.trim();
+    _runtimeApiUrl = trimmed.isEmpty ? null : trimmed;
+  }
+
   static String? _runtimeGoogleMapsApiKey;
 
   /// Set from bundled env (synced from web) or tests.
@@ -45,8 +53,12 @@ class AppConfig {
   /// Resolve from `--dart-define=API_URL=http://192.168.x.x:4000`.
   factory AppConfig.fromEnvironment() {
     const envUrl = String.fromEnvironment('API_URL');
-    return AppConfig(
-      apiBaseUrl: envUrl.isNotEmpty ? envUrl : defaultApiUrl,
-    );
+    if (envUrl.isNotEmpty) {
+      return AppConfig(apiBaseUrl: envUrl);
+    }
+    if (_runtimeApiUrl != null && _runtimeApiUrl!.isNotEmpty) {
+      return AppConfig(apiBaseUrl: _runtimeApiUrl!);
+    }
+    return AppConfig(apiBaseUrl: defaultApiUrl);
   }
 }

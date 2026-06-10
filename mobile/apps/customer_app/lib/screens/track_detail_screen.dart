@@ -547,9 +547,57 @@ class _TrackDetailScreenState extends ConsumerState<TrackDetailScreen> {
         loading: () => const Center(
           child: CircularProgressIndicator(color: GetGasColors.brand),
         ),
-        error: (_, __) => const Center(
-          child: Text('Could not load order',
-              style: TextStyle(color: Colors.white)),
+        error: (error, __) => SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72, height: 72,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1F2937),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(Icons.wifi_off_rounded, size: 34, color: Color(0xFF6B7280)),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Could not load order',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Check your internet connection and try again.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF), height: 1.5),
+                  ),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity, height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: () => ref.invalidate(_trackOrderProvider(widget.orderId)),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Try Again',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: GetGasColors.brand,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: () => context.go('/'),
+                    icon: const Icon(Icons.arrow_back, size: 16, color: Color(0xFF9CA3AF)),
+                    label: const Text('Go Home',
+                        style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF))),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
         data: (order) {
           _seedRiderLocation(order, tracking);

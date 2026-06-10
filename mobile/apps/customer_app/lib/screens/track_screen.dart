@@ -81,7 +81,63 @@ class _TrackScreenState extends ConsumerState<TrackScreen> {
       backgroundColor: GetGasColors.bg,
       body: ordersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator(color: GetGasColors.brand)),
-        error:   (_, __) => const Center(child: Text('Could not load orders')),
+        error: (error, __) => SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Text('Track Order',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: GetGasColors.text)),
+              ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 72, height: 72,
+                          decoration: BoxDecoration(
+                            color: GetGasColors.bgCard2,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(Icons.wifi_off_rounded, size: 34, color: GetGasColors.textMuted),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text('Could not load orders',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: GetGasColors.text)),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Check your internet connection and try again.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 14, color: GetGasColors.textMuted, height: 1.5),
+                        ),
+                        const SizedBox(height: 28),
+                        SizedBox(
+                          width: double.infinity, height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () => ref.invalidate(_trackOrdersProvider),
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Try Again',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: GetGasColors.brand,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         data: (active) {
           // Auto-redirect once rider is assigned
           if (active != null && ['accepted', 'at_station', 'en_route'].contains(active.status)) {

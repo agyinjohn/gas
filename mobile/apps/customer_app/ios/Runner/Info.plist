@@ -43,6 +43,10 @@
 		</array>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>GetGas uses your location to find nearby gas stations and deliver to your address.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>GetGas uses your location in the background to track your delivery in real time.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>GetGas uses your location in the background to track your delivery in real time.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
