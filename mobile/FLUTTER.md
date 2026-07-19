@@ -16,6 +16,19 @@ mobile/
 
 Legacy Expo apps remain in `apps/customer-mobile` and `apps/rider-mobile` until Flutter reaches Phase 1 parity — then they can be removed.
 
+## Backend URL configuration (embedded at build time)
+
+Each app reads its backend URL and Maps key from a JSON config file that is
+**embedded into the binary** at build time via `--dart-define-from-file`:
+
+- `apps/rider_app/config/production.json` / `local.json`
+- `apps/customer_app/config/production.json` / `local.json`
+
+All `make` targets and the GitHub release workflows use these files, so the
+APK/AAB always carries its backend URL — change the URL in one place and
+rebuild. Explicit `--dart-define=API_URL=...` still overrides the file when
+needed (e.g. `make rider-device LAN_IP=192.168.1.5`).
+
 ## Prerequisites
 
 | Tool | Purpose |

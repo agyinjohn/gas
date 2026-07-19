@@ -12,8 +12,10 @@ class GetGasApiClient {
             Dio(
               BaseOptions(
                 baseUrl: config.apiBaseUrl,
-                connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 30),
+                // Generous timeouts — the production backend (Render free tier)
+                // can cold-start and take 30s+ to answer the first request.
+                connectTimeout: const Duration(seconds: 30),
+                receiveTimeout: const Duration(seconds: 60),
                 headers: {'Content-Type': 'application/json'},
               ),
             ) {
@@ -36,12 +38,29 @@ class GetGasApiClient {
 
   Never _throwFromDio(DioException e) {
     final data = e.response?.data;
-    String message = 'Network error. Check your connection and API URL.';
+    String? message;
     String? code;
 
     if (data is Map) {
-      message = data['message']?.toString() ?? message;
+      message = data['message']?.toString();
       code = data['code']?.toString();
+      // express-validator failures come back as {success, errors: [{msg}]}
+      // with no top-level message — surface the first validation error.
+      if (message == null || message.isEmpty) {
+        final errors = data['errors'];
+        if (errors is List && errors.isNotEmpty && errors.first is Map) {
+          final first = errors.first as Map;
+          message = (first['msg'] ?? first['message'])?.toString();
+        }
+      }
+    }
+
+    if (message == null || message.isEmpty) {
+      final status = e.response?.statusCode;
+      message = status != null
+          ? 'Request failed (HTTP $status). Please try again.'
+          : 'Cannot reach server (${_dio.options.baseUrl}). '
+              'Check your internet connection.';
     }
 
     throw ApiException(

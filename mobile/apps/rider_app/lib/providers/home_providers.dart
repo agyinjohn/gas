@@ -38,7 +38,9 @@ final activeOrdersProvider = FutureProvider.autoDispose<List<GasOrder>>((ref) as
     return orders;
   } catch (_) {
     final cached = await CacheService.loadActiveOrders();
-    if (cached != null) return cached.map(GasOrder.fromJson).toList();
+    if (cached != null) {
+      return cached.map(GasOrder.fromJson).where((o) => o.hasValidId).toList();
+    }
     return [];
   }
 });

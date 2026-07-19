@@ -45,6 +45,12 @@ class GasOrder {
 
   bool get isActive => status != 'delivered' && status != 'cancelled';
 
+  static final _mongoId = RegExp(r'^[0-9a-fA-F]{24}$');
+
+  /// Whether [id] is a valid Mongo ObjectId. Stale/corrupt cache entries can
+  /// carry bad ids — the backend rejects those with a 400 on `/orders/:id`.
+  bool get hasValidId => _mongoId.hasMatch(id);
+
   Map<String, dynamic> toJson() => {
         '_id': id,
         if (orderNumber != null) 'orderNumber': orderNumber,
