@@ -15,10 +15,10 @@ import '../widgets/nav_map.dart';
 // ── Step config ───────────────────────────────────────────────────────────────
 
 const _steps = [
-  (status: 'accepted',   label: 'Go to Customer',         icon: Icons.person_outline),
-  (status: 'at_station', label: 'Go to Station',           icon: Icons.store_outlined),
-  (status: 'en_route',   label: 'Return to Customer',      icon: Icons.two_wheeler_rounded),
-  (status: 'delivered',  label: 'Delivered',               icon: Icons.check_circle_outline),
+  (status: 'accepted',   label: 'Go to Customer',      icon: Icons.person_outline),
+  (status: 'at_station', label: 'Go to Station',        icon: Icons.store_outlined),
+  (status: 'en_route',   label: 'Return to Customer',   icon: Icons.two_wheeler_rounded),
+  (status: 'delivered',  label: 'Delivered',            icon: Icons.check_circle_outline),
 ];
 
 const _statusIndex = {
@@ -26,13 +26,10 @@ const _statusIndex = {
 };
 
 const _statusActions = {
-  'accepted':   (label: 'Confirm Pickup — Enter Customer OTP', next: 'at_station'),
+  'accepted':   (label: 'Collected Cylinder — Head to Station', next: 'at_station'),
   'at_station': (label: 'Cylinder Filled — En Route to Customer', next: 'en_route'),
-  'en_route':   (label: 'Mark as Delivered — Enter Customer OTP', next: 'delivered'),
+  'en_route':   (label: 'Mark as Delivered', next: 'delivered'),
 };
-
-// These transitions require OTP entry before proceeding
-const _otpRequired = {'accepted', 'en_route'};
 
 const _paymentLabels = {
   'mobile_money': 'Mobile Money',
@@ -57,19 +54,22 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final action = _statusActions[order.status];
     if (action == null) return;
 
-    // OTP-gated transitions: show dialog first
-    if (_otpRequired.contains(order.status)) {
+    // Only en_route → delivered requires OTP
+    if (order.status == 'en_route') {
       await _showOtpDialog(order);
       return;
     }
 
-    // Non-OTP transitions (at_station → en_route)
+    // Plain transitions: accepted → at_station, at_station → en_route
     final isOnline = ref.read(isOnlineProvider);
     setState(() => _loading = true);
     try {
       if (!isOnline) {
+        final type = order.status == 'accepted'
+            ? MutationType.orderAtStation
+            : MutationType.orderEnRoute;
         await MutationQueueService.enqueue(QueuedMutation(
-          type: MutationType.orderEnRoute,
+          type: type,
           payload: {'orderId': order.id},
           queuedAt: DateTime.now(),
         ));
@@ -80,7 +80,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         }
         return;
       }
-      await ref.read(ridersApiProvider).departedForDelivery(order.id);
+      if (order.status == 'accepted') {
+        await ref.read(ridersApiProvider).arrivedAtStation(order.id);
+      } else {
+        await ref.read(ridersApiProvider).departedForDelivery(order.id);
+      }
       ref.invalidate(_orderProvider(widget.orderId));
     } catch (e) {
       if (mounted) {
@@ -95,25 +99,22 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   Future<void> _showOtpDialog(GasOrder order) async {
     final ctrl = TextEditingController();
-    final isCash = order.paymentMethod == 'cash';
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          isCash ? 'Confirm Pickup' : 'Confirm Delivery',
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+        title: const Text(
+          'Confirm Delivery',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              isCash
-                  ? 'Ask the customer for their 4-digit OTP to confirm you collected the cash payment.'
-                  : 'Ask the customer for their 4-digit OTP to confirm delivery.',
-              style: const TextStyle(fontSize: 13, color: GetGasColors.textMuted),
+            const Text(
+              'Ask the customer for their 4-digit OTP to confirm delivery.',
+              style: TextStyle(fontSize: 13, color: GetGasColors.textMuted),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -169,11 +170,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     setState(() => _loading = true);
     try {
       if (!isOnline) {
-        final type = order.status == 'accepted'
-            ? MutationType.orderAtStation
-            : MutationType.orderDelivered;
         await MutationQueueService.enqueue(QueuedMutation(
-          type: type,
+          type: MutationType.orderDelivered,
           payload: {'orderId': order.id, 'otp': otp},
           queuedAt: DateTime.now(),
         ));
@@ -187,9 +185,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       await ref.read(ridersApiProvider).confirmOtp(order.id, otp);
       ref.invalidate(_orderProvider(widget.orderId));
       if (mounted) {
-        final msg = isCash ? 'Pickup confirmed! Head to the station 🏍️' : 'Delivery confirmed! 🎉';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-        if (!isCash) context.go('/');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Delivery confirmed! 🎉')),
+        );
+        context.go('/');
       }
     } catch (e) {
       if (mounted) {
@@ -268,7 +267,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                         riderId: riderId,
                         instructionLabel: order.status == 'accepted'
                             ? 'Head to Customer'
-                            : 'Return to Customer',
+                            : order.status == 'at_station'
+                                ? 'Head to Station'
+                                : 'Return to Customer',
                       ),
                       const SizedBox(height: 8),
                       SizedBox(
@@ -355,12 +356,17 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 ({double lat, double lng, String label})? _navDest(GasOrder order) {
   final addr = order.deliveryAddress;
   if (order.status == 'accepted' && addr != null) {
-    return (lat: addr.lat, lng: addr.lng, label: 'Customer — Pickup');
+    return (lat: addr.lat, lng: addr.lng, label: 'Customer — Collect Cylinder');
+  }
+  if (order.status == 'at_station' && order.station != null) {
+    final s = order.station!;
+    if (s.lat != 0 && s.lng != 0) {
+      return (lat: s.lat, lng: s.lng, label: '${s.name} — Fill Gas');
+    }
   }
   if (order.status == 'en_route' && addr != null) {
     return (lat: addr.lat, lng: addr.lng, label: 'Customer — Delivery');
   }
-  // at_station — we don't have station coords in the model yet, skip map
   return null;
 }
 

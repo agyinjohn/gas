@@ -5,20 +5,26 @@ import { Notification } from '../models/Notification';
 const router = Router();
 router.use(authenticate);
 
-/** GET /api/v1/notifications — list for current user */
+/** GET /api/v1/notifications — list for current user or rider */
 router.get('/', async (req: AuthRequest, res: Response) => {
-  if (req.user!.role !== 'user') return res.status(403).json({ success: false, message: 'Forbidden' });
-  const notifications = await Notification.find({ userId: req.user!.id })
+  const { role, id } = req.user!;
+  if (role !== 'user' && role !== 'rider') {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  const notifications = await Notification.find({ userId: id })
     .sort({ createdAt: -1 })
     .limit(50);
-  const unreadCount = await Notification.countDocuments({ userId: req.user!.id, read: false });
+  const unreadCount = await Notification.countDocuments({ userId: id, read: false });
   res.json({ success: true, notifications, unreadCount });
 });
 
 /** PATCH /api/v1/notifications/read-all — mark all read */
 router.patch('/read-all', async (req: AuthRequest, res: Response) => {
-  if (req.user!.role !== 'user') return res.status(403).json({ success: false, message: 'Forbidden' });
-  await Notification.updateMany({ userId: req.user!.id, read: false }, { read: true });
+  const { role, id } = req.user!;
+  if (role !== 'user' && role !== 'rider') {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  await Notification.updateMany({ userId: id, read: false }, { read: true });
   res.json({ success: true });
 });
 

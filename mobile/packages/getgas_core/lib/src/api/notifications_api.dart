@@ -28,4 +28,8 @@ class NotificationsApi {
   Future<void> markAllRead() async {
     await _client.patchJson('$_prefix/read-all', body: {});
   }
+
+  Future<void> markOneRead(String id) async {
+    await _client.patchJson('$_prefix/$id/read', body: {});
+  }
 }

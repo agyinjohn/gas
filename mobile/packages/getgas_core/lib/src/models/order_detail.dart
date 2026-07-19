@@ -111,11 +111,19 @@ class RiderLocation {
 }
 
 class OrderStation {
-  const OrderStation({required this.id, required this.name, required this.address});
+  const OrderStation({
+    required this.id,
+    required this.name,
+    required this.address,
+    this.lat = 0,
+    this.lng = 0,
+  });
 
   final String id;
   final String name;
   final String address;
+  final double lat;
+  final double lng;
 
   factory OrderStation.fromJson(dynamic json) {
     if (json is Map<String, dynamic>) {
@@ -123,6 +131,8 @@ class OrderStation {
         id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
         name: json['name'] as String? ?? '',
         address: json['address'] as String? ?? '',
+        lat: (json['lat'] as num?)?.toDouble() ?? 0,
+        lng: (json['lng'] as num?)?.toDouble() ?? 0,
       );
     }
     return OrderStation(id: json?.toString() ?? '', name: '', address: '');
@@ -132,5 +142,7 @@ class OrderStation {
         '_id': id,
         'name': name,
         'address': address,
+        'lat': lat,
+        'lng': lng,
       };
 }

@@ -4,18 +4,19 @@ import 'package:go_router/go_router.dart';
 import 'package:getgas_ui/getgas_ui.dart';
 
 import 'main.dart' show navigatorKey;
+import 'screens/login_screen.dart';
 import 'providers/auth_provider.dart';
 import 'providers/fcm_provider.dart';
 import 'providers/theme_provider.dart';
-import 'screens/login_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/forgot_password_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/navigation_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/order_detail_screen.dart';
 import 'screens/earnings_screen.dart';
+import 'screens/notifications_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/navigation_screen.dart';
 import 'shell/rider_shell.dart';
 
 const _publicRoutes = {'/login', '/register', '/forgot-password'};
@@ -51,6 +52,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: '/earnings', builder: (_, __) => const EarningsScreen()),
           GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+          GoRoute(
+            path: '/notifications',
+            builder: (_, __) => const NotificationsScreen(),
+          ),
         ],
       ),
       // Full-screen navigation — parentNavigatorKey forces it above the shell
@@ -92,3 +97,4 @@ class _AuthListenable extends ChangeNotifier {
 
   final Ref ref;
 }
+

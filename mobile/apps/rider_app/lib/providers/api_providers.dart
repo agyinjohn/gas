@@ -10,3 +10,7 @@ final ridersApiProvider = Provider<RidersApi>((ref) {
 final ordersApiProvider = Provider<OrdersApi>((ref) {
   return OrdersApi(ref.watch(authRepositoryProvider).client);
 });
+
+final notificationsApiProvider = Provider<NotificationsApi>((ref) {
+  return NotificationsApi(ref.watch(authRepositoryProvider).client);
+});
