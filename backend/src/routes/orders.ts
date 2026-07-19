@@ -564,7 +564,7 @@ router.get('/:id', [param('id').isMongoId()], async (req: AuthRequest, res: Resp
     }
 
     res.json({ success: true, order: {
-      ...order.toObject(),
+      ...order.toObject({ virtuals: true }),
       // Only expose OTP to the order owner (customer needs to show it to rider)
       otpCode: ownedByUser ? order.otpCode : undefined,
     }});

@@ -84,7 +84,7 @@ class GasOrder {
   factory GasOrder.fromJson(Map<String, dynamic> json) {
     final cylindersRaw = json['cylinders'] as List<dynamic>? ?? [];
     return GasOrder(
-      id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
+      id: json['id']?.toString() ?? (json['_id'] is Map ? json['_id']['\$oid']?.toString() : json['_id']?.toString()) ?? '',
       orderNumber: json['orderNumber'] as String?,
       status: json['status'] as String? ?? '',
       estimatedArrival: json['estimatedArrival']?.toString(),
