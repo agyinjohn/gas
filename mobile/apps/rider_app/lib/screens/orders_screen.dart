@@ -68,7 +68,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       final cached = await CacheService.loadOrders(_filter);
       if (mounted) {
         if (cached != null) {
-          setState(() { _orders = cached.map(GasOrder.fromJson).toList(); _loading = false; });
+          setState(() {
+            _orders = cached.map(GasOrder.fromJson).where((o) => o.hasValidId).toList();
+            _loading = false;
+          });
         } else {
           setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
         }

@@ -21,7 +21,7 @@ router.use(authenticate, requireRole('admin'));
 
 function ve(req: any, res: Response): boolean {
   const e = validationResult(req);
-  if (!e.isEmpty()) { res.status(400).json({ success: false, errors: e.array() }); return true; }
+  if (!e.isEmpty()) { res.status(400).json({ success: false, message: e.array()[0]?.msg ?? 'Invalid request', errors: e.array() }); return true; }
   return false;
 }
 
@@ -269,7 +269,7 @@ router.post('/stations',
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, message: errors.array()[0]?.msg ?? 'Invalid request', errors: errors.array() });
 
     const { ownerName, ownerPhone, ownerPassword, stationName, address, city, lat, lng, commissionPct } = req.body;
 

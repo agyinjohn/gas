@@ -54,10 +54,15 @@ jobs:
           keyPassword=${{ secrets.RIDER_KEY_PASSWORD }}
           EOF
 
+      # Backend URL + Maps key come from the committed config/production.json
+      # and are embedded into the binary at build time.
+      - name: Write native Maps key
+        run: |
+          touch android/local.properties
+          echo "GOOGLE_MAPS_API_KEY=$(jq -r .GOOGLE_MAPS_API_KEY config/production.json)" >> android/local.properties
+
       - name: Build AAB
-        run: flutter build appbundle --release
-        env:
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: flutter build appbundle --release --dart-define-from-file=config/production.json
 
       - name: Upload to Play Store (internal track)
         uses: r0adkll/upload-google-play@v1
@@ -110,10 +115,9 @@ jobs:
           echo "${{ secrets.IOS_RIDER_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode \
             > ~/Library/MobileDevice/Provisioning\ Profiles/rider_app.mobileprovision
 
+      # Backend URL + Maps key embedded from committed config/production.json.
       - name: Build IPA
-        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
-        env:
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: flutter build ipa --release --dart-define-from-file=config/production.json --export-options-plist=ios/ExportOptions.plist
 
       - name: Upload to App Store Connect
         uses: apple-actions/upload-testflight-build@v1

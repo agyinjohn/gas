@@ -54,22 +54,15 @@ jobs:
           keyPassword=${{ secrets.CUSTOMER_KEY_PASSWORD }}
           EOF
 
-      - name: Write production config
+      # Backend URL + Maps key come from the committed config/production.json
+      # and are embedded into the binary at build time. The same file is also
+      # bundled as the runtime env asset and used for the native Maps key.
+      - name: Embed production config
         run: |
-          cat > config/production.json <<EOF
-          {
-            "API_URL": "https://gas-1-io3c.onrender.com",
-            "SOCKET_URL": "https://gas-1-io3c.onrender.com",
-            "GOOGLE_MAPS_API_KEY": "${{ secrets.GOOGLE_MAPS_API_KEY }}"
-          }
-          EOF
-          cat > assets/env/mobile.json <<EOF
-          {
-            "API_URL": "https://gas-1-io3c.onrender.com",
-            "SOCKET_URL": "https://gas-1-io3c.onrender.com",
-            "GOOGLE_MAPS_API_KEY": "${{ secrets.GOOGLE_MAPS_API_KEY }}"
-          }
-          EOF
+          mkdir -p assets/env
+          cp config/production.json assets/env/mobile.json
+          touch android/local.properties
+          echo "GOOGLE_MAPS_API_KEY=$(jq -r .GOOGLE_MAPS_API_KEY config/production.json)" >> android/local.properties
 
       - name: Build AAB
         run: flutter build appbundle --release --dart-define-from-file=config/production.json
@@ -125,15 +118,11 @@ jobs:
           echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode \
             > ~/Library/MobileDevice/Provisioning\ Profiles/customer_app.mobileprovision
 
-      - name: Write production config
+      # Backend URL + Maps key embedded from committed config/production.json.
+      - name: Embed production config
         run: |
-          cat > config/production.json <<EOF
-          {
-            "API_URL": "https://gas-1-io3c.onrender.com",
-            "SOCKET_URL": "https://gas-1-io3c.onrender.com",
-            "GOOGLE_MAPS_API_KEY": "${{ secrets.GOOGLE_MAPS_API_KEY }}"
-          }
-          EOF
+          mkdir -p assets/env
+          cp config/production.json assets/env/mobile.json
 
       - name: Build IPA
         run: flutter build ipa --release --dart-define-from-file=config/production.json --export-options-plist=ios/ExportOptions.plist

@@ -614,7 +614,8 @@ final _recentOrdersProvider = FutureProvider.autoDispose<List<GasOrder>>((ref) a
       CacheService.saveOrders('recent', fresh.map((o) => o.toJson()).toList());
       ref.invalidateSelf();
     }).catchError((_) {});
-    return cached.map(GasOrder.fromJson).toList();
+    // Drop cache entries with bad ids — tapping them can't load details.
+    return cached.map(GasOrder.fromJson).where((o) => o.hasValidId).toList();
   }
   final orders = await ref.watch(ordersApiProvider).list(limit: 5);
   await CacheService.saveOrders('recent', orders.map((o) => o.toJson()).toList());

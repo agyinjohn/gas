@@ -46,7 +46,7 @@ router.use(authenticate);
 
 function ve(req: Request, res: Response): boolean {
   const errors = validationResult(req);
-  if (!errors.isEmpty()) { res.status(400).json({ success: false, errors: errors.array() }); return true; }
+  if (!errors.isEmpty()) { res.status(400).json({ success: false, message: errors.array()[0]?.msg ?? 'Invalid request', errors: errors.array() }); return true; }
   return false;
 }
 
