@@ -862,7 +862,7 @@ router.post(
     await createRiderNotification(
       req.user!.id, order._id,
       'Delivery Complete ✅',
-      `Order #${order._id.toString().slice(-6).toUpperCase()} delivered. GH₵${order.riderEarning?.toFixed(2) ?? order.deliveryFee?.toFixed(2)} will be paid out tomorrow at 8AM.`,
+      `Order #${order._id.toString().slice(-6).toUpperCase()} delivered. GH₵${order.deliveryFee?.toFixed(2) ?? '0.00'} will be paid out tomorrow at 8AM.`,
       'delivered'
     ).catch(console.error);
 
