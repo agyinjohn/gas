@@ -11,6 +11,7 @@ import 'services/fcm_service.dart';
 final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
+  
   WidgetsFlutterBinding.ensureInitialized();
 
   const mapsKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
