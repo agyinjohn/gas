@@ -1,4 +1,5 @@
 import { Server as SocketServer, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import jwt from 'jsonwebtoken';
 import redis from '../config/redis';
 import { Order } from '../models/Order';
@@ -9,6 +10,8 @@ let io: SocketServer;
 
 export function initSocketIO(socketServer: SocketServer): void {
   io = socketServer;
+  const pubClient = redis.duplicate();
+  io.adapter(createAdapter(redis, pubClient));
 
   io.use((socket: Socket, next) => {
     const token = socket.handshake.auth?.token;
