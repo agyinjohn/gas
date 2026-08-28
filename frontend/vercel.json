@@ -2,5 +2,4 @@
   "buildCommand": "cd .. && npm run build:packages && npm run build --prefix frontend",
   "installCommand": "cd .. && npm install",
   "outputDirectory": ".next",
-  "nodeVersion": "22.x"
 }
