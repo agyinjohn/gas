@@ -13,7 +13,7 @@
     "dev:customer": "npm run start --workspace=@getgas/customer-mobile",
     "dev:rider": "npm run start --workspace=@getgas/rider-mobile",
     "build": "turbo run build",
-    "build:packages": "npm run build --workspace=@getgas/types --workspace=@getgas/config --workspace=@getgas/domain --workspace=@getgas/api-client --workspace=@getgas/mobile-core --workspace=@getgas/mobile-ui",
+    "build:packages": "npm run build --workspace=@getgas/types --workspace=@getgas/config --workspace=@getgas/domain --workspace=@getgas/api-client",
     "build:web": "npm run build:packages && npm run build --workspace=@getgas/web",
     "lint": "turbo run lint",
     "type-check": "npm run build:packages && turbo run type-check",

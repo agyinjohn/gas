@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   themeColor: '#F97316',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
