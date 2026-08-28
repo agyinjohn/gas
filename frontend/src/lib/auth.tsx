@@ -103,15 +103,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const isRoot         = pathname === '/';
+    const isRoot          = pathname === '/';
     const isRiderRegister = pathname === '/rider/register';
-    const isSetPassword  = pathname === '/set-password';
-    const isRegister     = pathname === '/register';
-    const isForgotPw     = pathname === '/forgot-password';
-    const isPublic       = isRoot || isRiderRegister || isSetPassword || isRegister || isForgotPw;
+    const isSetPassword   = pathname === '/set-password';
+    const isRegister      = pathname === '/register';
+    const isForgotPw      = pathname === '/forgot-password';
+    const isLogin         = pathname === '/login';
+    const isMarketing     = ['/about', '/riders', '/stations', '/contact', '/privacy', '/terms'].some(p => pathname.startsWith(p));
+    const isPublic        = isRoot || isLogin || isRiderRegister || isSetPassword || isRegister || isForgotPw || isMarketing;
 
     if (!user) {
-      if (!isPublic) router.replace('/');
+      if (!isPublic) router.replace('/login');
       return;
     }
 

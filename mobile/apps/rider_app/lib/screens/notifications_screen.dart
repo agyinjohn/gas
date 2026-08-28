@@ -25,7 +25,7 @@ class NotificationsScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text('Notifications',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white)),
         actions: [
           async.maybeWhen(
             data: (result) => result.unreadCount > 0
@@ -195,18 +195,18 @@ class _NotificationTile extends StatelessWidget {
 
   Color _iconBg(String? type) {
     switch (type) {
-      case 'order_accepted': return const Color(0xFFDCFCE7);
-      case 'delivered':      return const Color(0xFFDCFCE7);
-      case 'cancelled':      return const Color(0xFFFEE2E2);
+      case 'order_accepted': return GetGasColors.brand.withValues(alpha: 0.1);
+      case 'delivered':      return GetGasColors.brand.withValues(alpha: 0.1);
+      case 'cancelled':      return GetGasColors.errorBg;
       default:               return GetGasColors.bgCard2;
     }
   }
 
   Color _iconColor(String? type) {
     switch (type) {
-      case 'order_accepted': return const Color(0xFF16A34A);
-      case 'delivered':      return const Color(0xFF16A34A);
-      case 'cancelled':      return const Color(0xFFEF4444);
+      case 'order_accepted': return GetGasColors.brand;
+      case 'delivered':      return GetGasColors.brand;
+      case 'cancelled':      return GetGasColors.error;
       default:               return GetGasColors.textMuted;
     }
   }

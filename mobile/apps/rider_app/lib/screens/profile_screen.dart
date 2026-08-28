@@ -16,37 +16,62 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: GetGasColors.bg,
       body: riderAsync.when(
-        loading: () => const Center(
-            child: CircularProgressIndicator(color: GetGasColors.brand)),
-        error: (_, __) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64, height: 64,
-                  decoration: BoxDecoration(color: GetGasColors.bgCard2, borderRadius: BorderRadius.circular(20)),
-                  child: const Icon(Icons.wifi_off_rounded, size: 30, color: GetGasColors.textMuted),
-                ),
-                const SizedBox(height: 16),
-                const Text('Could not load profile',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () => ref.invalidate(riderProfileProvider),
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Try Again'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: GetGasColors.brand,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        loading: () => Column(
+          children: [
+            Container(
+              color: GetGasColors.brand,
+              child: SafeArea(
+                bottom: false,
+                child: const SizedBox(height: 16),
+              ),
+            ),
+            const Expanded(
+              child: Center(child: CircularProgressIndicator(color: GetGasColors.brand)),
+            ),
+          ],
+        ),
+        error: (_, __) => Column(
+          children: [
+            Container(
+              color: GetGasColors.brand,
+              child: SafeArea(
+                bottom: false,
+                child: const SizedBox(height: 16),
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 64, height: 64,
+                        decoration: BoxDecoration(color: GetGasColors.bgCard2, borderRadius: BorderRadius.circular(20)),
+                        child: const Icon(Icons.wifi_off_rounded, size: 30, color: GetGasColors.textMuted),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Could not load profile',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () => ref.invalidate(riderProfileProvider),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Try Again'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: GetGasColors.brand,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
         data: (rider) => ListView(
           padding: EdgeInsets.zero,

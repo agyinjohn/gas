@@ -74,100 +74,99 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final dashAsync   = ref.watch(riderDashboardProvider);
     final activeAsync = ref.watch(activeOrdersProvider);
 
+    // Use valueOrNull so header always renders — loading/error only affect the body sections
+    final rider = riderAsync.valueOrNull;
+
     return Scaffold(
       backgroundColor: GetGasColors.bg,
-      body: riderAsync.when(
-        loading: () => const Scaffold(
-          backgroundColor: GetGasColors.bg,
-          body: Center(child: CircularProgressIndicator(color: GetGasColors.brand)),
-        ),
-        error: (_, __) => Scaffold(
-          backgroundColor: GetGasColors.bg,
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 72, height: 72,
-                    decoration: BoxDecoration(
-                      color: GetGasColors.bgCard2,
-                      borderRadius: BorderRadius.circular(20),
+      floatingActionButton: rider != null
+          ? _StatusFAB(
+              rider: rider,
+              toggling: _togglingStatus,
+              onToggle: () => _toggleStatus(rider),
+            )
+          : null,
+      body: Column(
+        children: [
+          // Header always visible — uses cached rider or placeholder
+          _HomeHeader(rider: rider),
+          if (rider != null) _StatusBanner(rider: rider),
+          Expanded(
+            child: Builder(builder: (_) {
+              // Show error only when no cached data and not loading
+              if (rider == null && riderAsync.hasError && !riderAsync.isLoading) {
+                return SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 72, height: 72,
+                          decoration: BoxDecoration(
+                            color: GetGasColors.bgCard2,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(Icons.wifi_off_rounded, size: 36, color: GetGasColors.textMuted),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text('Could not connect', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Check your internet connection and try again.',
+                          style: TextStyle(fontSize: 14, color: GetGasColors.textMuted),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 28),
+                        ElevatedButton.icon(
+                          onPressed: () => ref.invalidate(riderProfileProvider),
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Try Again'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: GetGasColors.brand,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(200, 50),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.wifi_off_rounded, size: 36, color: GetGasColors.textMuted),
                   ),
-                  const SizedBox(height: 20),
-                  const Text('Could not connect', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Check your internet connection and try again.',
-                    style: TextStyle(fontSize: 14, color: GetGasColors.textMuted),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 28),
-                  ElevatedButton.icon(
-                    onPressed: () => ref.invalidate(riderProfileProvider),
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Try Again'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: GetGasColors.brand,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(200, 50),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        data: (rider) => Scaffold(
-          backgroundColor: GetGasColors.bg,
-          floatingActionButton: _StatusFAB(
-            rider: rider,
-            toggling: _togglingStatus,
-            onToggle: () => _toggleStatus(rider),
-          ),
-          body: Column(
-            children: [
-              _HomeHeader(rider: rider),
-              // ── Status banner ──────────────────────────────────────────
-              _StatusBanner(rider: rider),
-              Expanded(
-                child: RefreshIndicator(
-                  color: GetGasColors.brand,
-                  onRefresh: _refresh,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                    children: [
-                      dashAsync.when(
-                        loading: () => const _StatsSkeletons(),
-                        error: (_, __) => const SizedBox.shrink(),
-                        data: (dash) => _StatsSection(dash: dash),
+                );
+              }
+              // Show spinner only on first load (no cached data yet)
+              if (rider == null && riderAsync.isLoading) {
+                return const Center(child: CircularProgressIndicator(color: GetGasColors.brand));
+              }
+              final dash    = dashAsync.valueOrNull;
+              final actives = activeAsync.valueOrNull;
+              return RefreshIndicator(
+                color: GetGasColors.brand,
+                onRefresh: _refresh,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                  children: [
+                    dash == null
+                        ? const _StatsSkeletons()
+                        : _StatsSection(dash: dash),
+                    const SizedBox(height: 4),
+                    if (actives == null)
+                      const _ActiveOrdersSkeleton()
+                    else if (actives.isNotEmpty)
+                      _ActiveOrdersSection(
+                        orders: actives,
+                        onTap: (id) => context.push('/orders/$id'),
                       ),
-                      const SizedBox(height: 4),
-                      activeAsync.when(
-                        loading: () => const _ActiveOrdersSkeleton(),
-                        error: (_, __) => const SizedBox.shrink(),
-                        data: (orders) => orders.isEmpty
-                            ? const SizedBox.shrink()
-                            : _ActiveOrdersSection(
-                                orders: orders,
-                                onTap: (id) => context.push('/orders/\$id'),
-                              ),
-                      ),
-                      const SizedBox(height: 16),
-                      _RecentDeliveriesSection(onTap: (id) => context.push('/orders/\$id')),
-                    ],
-                  ),
+                    const SizedBox(height: 16),
+                    _RecentDeliveriesSection(onTap: (id) => context.push('/orders/$id')),
+                  ],
                 ),
-              ),
-            ],
+              );
+            }),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -185,11 +184,11 @@ final _unreadCountProvider = FutureProvider.autoDispose<int>((ref) async {
 
 class _HomeHeader extends ConsumerWidget {
   const _HomeHeader({required this.rider});
-  final Rider rider;
+  final Rider? rider;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isOnline    = rider.isOnline;
+    final isOnline    = rider?.isOnline ?? false;
     final unreadAsync = ref.watch(_unreadCountProvider);
     final unread      = unreadAsync.valueOrNull ?? 0;
 

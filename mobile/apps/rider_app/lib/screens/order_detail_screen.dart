@@ -54,13 +54,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final action = _statusActions[order.status];
     if (action == null) return;
 
-    // Only en_route → delivered requires OTP
     if (order.status == 'en_route') {
       await _showOtpDialog(order);
       return;
     }
 
-    // Plain transitions: accepted → at_station, at_station → en_route
     final isOnline = ref.read(isOnlineProvider);
     setState(() => _loading = true);
     try {
@@ -208,41 +206,116 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     return Scaffold(
       backgroundColor: GetGasColors.bg,
       body: orderAsync.when(
-        loading: () => const Center(
-            child: CircularProgressIndicator(color: GetGasColors.brand)),
-        error: (error, __) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64, height: 64,
-                  decoration: BoxDecoration(color: GetGasColors.bgCard2, borderRadius: BorderRadius.circular(20)),
-                  child: const Icon(Icons.wifi_off_rounded, size: 30, color: GetGasColors.textMuted),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  error is ApiException ? error.message : 'Could not load order',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () => ref.invalidate(_orderProvider(widget.orderId)),
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Try Again'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: GetGasColors.brand,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        loading: () => Column(
+          children: [
+            Container(
+              color: GetGasColors.brand,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => context.canPop() ? context.pop() : context.go('/orders'),
+                        child: Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.arrow_back, size: 18, color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Order Details',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+            const Expanded(
+              child: Center(child: CircularProgressIndicator(color: GetGasColors.brand)),
+            ),
+          ],
         ),
+        error: (error, stack) {
+          debugPrint('[OrderDetail] BUILD error state: $error');
+          debugPrint('[OrderDetail] orderId in widget: "${widget.orderId}"');
+          return Column(
+            children: [
+              Container(
+                color: GetGasColors.brand,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.canPop() ? context.pop() : context.go('/orders'),
+                          child: Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.arrow_back, size: 18, color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text('Order Details',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 64, height: 64,
+                          decoration: BoxDecoration(color: GetGasColors.bgCard2, borderRadius: BorderRadius.circular(20)),
+                          child: const Icon(Icons.wifi_off_rounded, size: 30, color: GetGasColors.textMuted),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          error is ApiException ? error.message : error.toString(),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'orderId: "${widget.orderId}"',
+                          style: const TextStyle(fontSize: 11, color: GetGasColors.textMuted),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          onPressed: () => ref.invalidate(_orderProvider(widget.orderId)),
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Try Again'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: GetGasColors.brand,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
         data: (order) {
           final riderId = ref.watch(riderProfileProvider).valueOrNull?.id ?? '';
           return Column(
@@ -255,7 +328,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   children: [
-                    // Map + Navigate button
                     if (_navDest(order) != null) ...[
                       NavMap(
                         destination: LatLng(
@@ -293,7 +365,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                     ] else
                       const SizedBox.shrink(),
 
-                    // Current action
                     if (_statusActions.containsKey(order.status)) ...[
                       _ActionCard(
                         order: order,
@@ -303,14 +374,12 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Order details
                     _SectionCard(
                       label: 'Order Details',
                       child: _OrderDetails(order: order),
                     ),
                     const SizedBox(height: 12),
 
-                    // Station
                     if (order.station != null) ...[
                       _SectionCard(
                         label: 'Refill Station',
@@ -319,7 +388,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Customer delivery address
                     if (order.deliveryAddress != null) ...[
                       _SectionCard(
                         label: 'Delivery Address',
@@ -355,7 +423,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
 ({double lat, double lng, String label})? _navDest(GasOrder order) {
   final addr = order.deliveryAddress;
-  if (order.status == 'accepted' && addr != null) {
+  if (order.status == 'accepted' && addr != null && addr.lat != 0 && addr.lng != 0) {
     return (lat: addr.lat, lng: addr.lng, label: 'Customer — Collect Cylinder');
   }
   if (order.status == 'at_station' && order.station != null) {
@@ -364,7 +432,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       return (lat: s.lat, lng: s.lng, label: '${s.name} — Fill Gas');
     }
   }
-  if (order.status == 'en_route' && addr != null) {
+  if (order.status == 'en_route' && addr != null && addr.lat != 0 && addr.lng != 0) {
     return (lat: addr.lat, lng: addr.lng, label: 'Customer — Delivery');
   }
   return null;
@@ -433,11 +501,10 @@ class _OrderHeader extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Progress steps
               Row(
                 children: List.generate(_steps.length, (i) {
-                  final done   = i < stepIdx;
-                  final active = i == stepIdx;
+                  final done   = i < stepIdx || order.status == 'delivered';
+                  final active = i == stepIdx && order.status != 'delivered';
                   final isLast = i == _steps.length - 1;
                   return Expanded(
                     child: Row(
@@ -701,14 +768,27 @@ class _SectionCard extends StatelessWidget {
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 final _orderProvider = FutureProvider.family<GasOrder, String>((ref, id) async {
+  debugPrint('[OrderDetail] fetching orderId="$id" (len=${id.length})');
+  final cached = await CacheService.loadOrder(id);
+  if (cached != null) {
+    debugPrint('[OrderDetail] cache hit — returning immediately, refreshing in bg');
+    ref.read(ordersApiProvider).getById(id).then((fresh) {
+      debugPrint('[OrderDetail] bg refresh OK id=${fresh.id}');
+      CacheService.saveOrder(id, fresh.toJson());
+      ref.invalidateSelf();
+    }).catchError((e) {
+      debugPrint('[OrderDetail] bg refresh ERROR: $e');
+    });
+    return GasOrder.fromJson(cached);
+  }
   try {
     final order = await ref.read(ordersApiProvider).getById(id);
+    debugPrint('[OrderDetail] fetch OK id=${order.id} status=${order.status}');
     await CacheService.saveOrder(id, order.toJson());
     return order;
-  } catch (e) {
-    // Network failed — try cache as fallback
-    final cached = await CacheService.loadOrder(id);
-    if (cached != null) return GasOrder.fromJson(cached);
+  } catch (e, st) {
+    debugPrint('[OrderDetail] fetch ERROR: $e');
+    debugPrint('[OrderDetail] stacktrace: $st');
     rethrow;
   }
 });

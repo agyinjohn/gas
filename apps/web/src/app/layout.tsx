@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Sora } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/shared/Providers';
 import { Toaster } from 'react-hot-toast';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const sora = Sora({ subsets: ['latin'], variable: '--font-sora', weight: ['400','600','700','800'] });
 
 export const metadata: Metadata = {
   title: 'GetGas — On-Demand Gas Delivery',
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })()
         ` }} />
       </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${sora.variable} font-sans antialiased`}>
         <Providers>
           {children}
           <Toaster

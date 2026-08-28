@@ -52,6 +52,7 @@ class GasOrder {
   bool get hasValidId => _mongoId.hasMatch(id);
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         '_id': id,
         if (orderNumber != null) 'orderNumber': orderNumber,
         'status': status,

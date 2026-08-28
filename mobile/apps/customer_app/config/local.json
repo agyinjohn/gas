@@ -1,5 +1,5 @@
 {
-  "API_URL": "http://192.168.100.7:4000",
-  "SOCKET_URL": "http://192.168.100.7:4000",
+  "API_URL": "https://backend.mandmservicescorp.org/api-gasgo",
+  "SOCKET_URL": "https://backend.mandmservicescorp.org/api-gasgo",
   "GOOGLE_MAPS_API_KEY": "AIzaSyA8nRLUsBb1J0qNB1XtPKmUm5Sl6txKKko"
 }

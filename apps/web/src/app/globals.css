@@ -1,9 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    --font-sora: 'Sora', sans-serif;
     --brand: #E87722;
     --brand-dark: #D06010;
     --bg: #F5F5F5;
@@ -82,3 +85,20 @@
 .status-en_route   { @apply bg-orange-50 text-orange-700; }
 .status-delivered  { @apply bg-green-50 text-green-700; }
 .status-cancelled  { @apply bg-red-50 text-red-700; }
+
+/* ── Marketing pages ── */
+.text-gradient {
+  background: linear-gradient(135deg, #E87722 0%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.animate-fade-up {
+  opacity: 0;
+  animation: fadeUp 0.6s ease forwards;
+}
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
