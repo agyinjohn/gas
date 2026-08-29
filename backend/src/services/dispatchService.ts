@@ -7,6 +7,7 @@ import { CONSTANTS } from '../config/constants';
 import { getNearbyRiders } from './geoService';
 import { emitOrderToRider, emitOrderToStation, io } from './realtimeService';
 import { sendSMS, sendPushNotification } from './notificationService';
+import redis from '../config/redis';
 
 // Max hard declines before escalating — timeouts don't count toward this
 const MAX_DECLINES = 5;
@@ -18,22 +19,16 @@ const RADIUS_TIERS = [
   CONSTANTS.DISPATCH_RADIUS_KM * 2,
 ];
 
-// Redis-based distributed lock would be ideal at scale;
-// using in-memory map with expiry as a safe fallback for single-instance
-const dispatchLocks = new Map<string, NodeJS.Timeout>();
-
-function acquireLock(orderId: string): boolean {
-  if (dispatchLocks.has(orderId)) return false;
-  // Auto-release lock after 2× timeout to prevent permanent locks on crash
-  const timer = setTimeout(() => dispatchLocks.delete(orderId), CONSTANTS.ORDER_ACCEPT_TIMEOUT_MS * 2);
-  dispatchLocks.set(orderId, timer);
-  return true;
+// Redis-based distributed lock
+async function acquireLock(orderId: string): Promise<boolean> {
+  const key = `dispatch:lock:${orderId}`;
+  const ttl = CONSTANTS.ORDER_ACCEPT_TIMEOUT_MS * 2;
+  const result = await redis.set(key, '1', 'PX', ttl, 'NX');
+  return result === 'OK';
 }
 
-function releaseLock(orderId: string): void {
-  const timer = dispatchLocks.get(orderId);
-  if (timer) clearTimeout(timer);
-  dispatchLocks.delete(orderId);
+async function releaseLock(orderId: string): Promise<void> {
+  await redis.del(`dispatch:lock:${orderId}`);
 }
 
 async function getRiderActiveOrderCount(riderId: mongoose.Types.ObjectId | string): Promise<number> {
@@ -47,20 +42,21 @@ function getVehicleCapacity(vehicleType: string): number {
   return CONSTANTS.VEHICLE_ORDER_LIMITS[vehicleType] ?? 3;
 }
 
-function isRiderOnline(riderId: string): boolean {
-  const roomSize = io?.sockets?.adapter?.rooms?.get(`rider:${riderId}`)?.size ?? 0;
-  return roomSize > 0;
+async function isRiderOnline(riderId: string): Promise<boolean> {
+  if (!io) return false;
+  const sockets = await io.in(`rider:${riderId}`).fetchSockets();
+  return sockets.length > 0;
 }
 
 export async function dispatchOrder(orderId: string): Promise<void> {
-  if (!acquireLock(orderId)) {
+  if (!await acquireLock(orderId)) {
     console.log(`[Dispatch] Order ${orderId} already being dispatched — skipping`);
     return;
   }
   try {
     await _dispatchOrder(orderId);
   } finally {
-    releaseLock(orderId);
+    await releaseLock(orderId);
   }
 }
 
@@ -133,7 +129,7 @@ async function _dispatchOrder(orderId: string): Promise<void> {
   for (const candidate of riderDocs) {
     const capacity    = getVehicleCapacity(candidate.vehicleType);
     const activeCount = await getRiderActiveOrderCount(candidate._id);
-    const online      = isRiderOnline(candidate._id.toString());
+    const online      = await isRiderOnline(candidate._id.toString());
     console.log(`[Dispatch] Candidate ${candidate.name} — active: ${activeCount}/${capacity}, online: ${online}, dist: ${distanceMap.get(candidate._id.toString())?.toFixed(1)}km`);
 
     if (activeCount < capacity) {

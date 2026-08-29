@@ -75,9 +75,11 @@ export default function RiderNavigationPage() {
     try {
       wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
       console.log('[Rider:GPS] Wake lock acquired');
-      wakeLockRef.current.addEventListener('release', () => {
-        console.log('[Rider:GPS] Wake lock released');
-      });
+      if (wakeLockRef.current) {
+        wakeLockRef.current.addEventListener('release', () => {
+          console.log('[Rider:GPS] Wake lock released');
+        });
+      }
     } catch (err) {
       console.warn('[Rider:GPS] Wake lock failed:', err);
     }

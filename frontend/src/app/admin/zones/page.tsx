@@ -345,12 +345,7 @@ export default function AdminZonesPage() {
   return (
     <div className="px-4 lg:px-6 py-6 max-w-5xl mx-auto space-y-5 pb-10">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900">Zones</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Group riders into delivery zones for smarter dispatch</p>
-        </div>
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setModal({ open: true, initial: EMPTY_FORM, editId: null })}
           className="flex items-center gap-2 h-10 px-4 bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-brand-500/20"

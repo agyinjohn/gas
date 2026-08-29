@@ -24,6 +24,10 @@ class RiderShell extends ConsumerStatefulWidget {
 class _RiderShellState extends ConsumerState<RiderShell> {
   Timer? _countdownTimer;
   bool _wasOffline = false;
+  ProviderSubscription<bool>? _connectivitySub;
+  // null = hidden, false = offline (stays), true = back-online (auto-dismisses)
+  bool? _bannerOnline;
+  Timer? _bannerTimer;
 
   @override
   void initState() {
@@ -33,11 +37,32 @@ class _RiderShellState extends ConsumerState<RiderShell> {
       const Duration(seconds: 1),
       (_) => ref.read(incomingOrderProvider.notifier).tick(),
     );
+    _connectivitySub = ref.listenManual<bool>(isOnlineProvider, (prev, next) {
+      if (next && _wasOffline) {
+        MutationQueueService.replay(ref).then((_) {
+          ref.invalidate(riderProfileProvider);
+          ref.invalidate(riderDashboardProvider);
+          ref.invalidate(activeOrdersProvider);
+        });
+        // Show "back online" banner then auto-hide after 2.5s
+        _bannerTimer?.cancel();
+        if (mounted) setState(() => _bannerOnline = true);
+        _bannerTimer = Timer(const Duration(milliseconds: 2500), () {
+          if (mounted) setState(() => _bannerOnline = null);
+        });
+      } else if (!next) {
+        _bannerTimer?.cancel();
+        if (mounted) setState(() => _bannerOnline = false);
+      }
+      _wasOffline = !next;
+    }, fireImmediately: true);
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _connectivitySub?.close();
+    _bannerTimer?.cancel();
     super.dispose();
   }
 
@@ -105,19 +130,6 @@ class _RiderShellState extends ConsumerState<RiderShell> {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
     final incoming = ref.watch(incomingOrderProvider);
-    final isOnline = ref.watch(isOnlineProvider);
-
-    // When back online after being offline — replay queue then refresh providers
-    ref.listen<bool>(isOnlineProvider, (prev, next) {
-      if (next && _wasOffline) {
-        MutationQueueService.replay(ref).then((_) {
-          ref.invalidate(riderProfileProvider);
-          ref.invalidate(riderDashboardProvider);
-          ref.invalidate(activeOrdersProvider);
-        });
-      }
-      _wasOffline = !next;
-    });
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -125,13 +137,8 @@ class _RiderShellState extends ConsumerState<RiderShell> {
         children: [
           widget.child,
 
-          // ── Offline banner ─────────────────────────────────────────────
-          if (!isOnline)
-            const Positioned(
-              bottom: 0, left: 0, right: 0,
-              child: _OfflineBanner(),
-            ),
-
+          // ── Connectivity banner (top) ───────────────────────────────────
+          _ConnectivityBanner(state: _bannerOnline),
 
           // ── Global incoming order overlay ──────────────────────────────
           if (incoming.hasOrder)
@@ -140,7 +147,6 @@ class _RiderShellState extends ConsumerState<RiderShell> {
               onAccept: () => _acceptOrder(incoming.order!.orderId),
               onDecline: () => ref.read(incomingOrderProvider.notifier).dismiss(),
             ),
-
         ],
       ),
       bottomNavigationBar: !_hideNav(location)
@@ -150,16 +156,18 @@ class _RiderShellState extends ConsumerState<RiderShell> {
   }
 }
 
-// ── Offline banner ───────────────────────────────────────────────────────────
+// ── Connectivity banner (top) ────────────────────────────────────────────────
+// state: null = hidden, false = offline, true = back online
 
-class _OfflineBanner extends ConsumerStatefulWidget {
-  const _OfflineBanner();
+class _ConnectivityBanner extends StatefulWidget {
+  const _ConnectivityBanner({required this.state});
+  final bool? state;
 
   @override
-  ConsumerState<_OfflineBanner> createState() => _OfflineBannerState();
+  State<_ConnectivityBanner> createState() => _ConnectivityBannerState();
 }
 
-class _OfflineBannerState extends ConsumerState<_OfflineBanner>
+class _ConnectivityBannerState extends State<_ConnectivityBanner>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<Offset> _slide;
@@ -168,10 +176,20 @@ class _OfflineBannerState extends ConsumerState<_OfflineBanner>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 300));
+        vsync: this, duration: const Duration(milliseconds: 280));
     _slide = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-    _ctrl.forward();
+    if (widget.state != null) _ctrl.forward();
+  }
+
+  @override
+  void didUpdateWidget(_ConnectivityBanner old) {
+    super.didUpdateWidget(old);
+    if (widget.state != null && old.state == null) {
+      _ctrl.forward();
+    } else if (widget.state == null && old.state != null) {
+      _ctrl.reverse();
+    }
   }
 
   @override
@@ -182,30 +200,31 @@ class _OfflineBannerState extends ConsumerState<_OfflineBanner>
 
   @override
   Widget build(BuildContext context) {
-    final pending = ref.watch(pendingMutationsProvider).valueOrNull ?? 0;
-    return SlideTransition(
-      position: _slide,
-      child: Material(
-        color: Colors.transparent,
+    final isOnline = widget.state == true;
+    final bg   = isOnline ? const Color(0xFF16A34A) : const Color(0xFF1F2937);
+    final icon = isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded;
+    final text = isOnline ? 'Back online' : 'You\'re offline — showing cached data';
+
+    return Positioned(
+      bottom: 0, left: 0, right: 0,
+      child: SlideTransition(
+        position: _slide,
         child: SafeArea(
           top: false,
           child: Container(
-            width: double.infinity,
-            color: const Color(0xFF1F2937),
+            color: bg,
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.wifi_off_rounded, size: 14, color: Colors.white70),
+                Icon(icon, size: 14, color: Colors.white),
                 const SizedBox(width: 8),
                 Text(
-                  pending > 0
-                      ? 'Offline — $pending action${pending == 1 ? '' : 's'} queued'
-                      : 'You\'re offline — showing cached data',
+                  text,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white70,
+                    color: Colors.white,
                   ),
                 ),
               ],

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "757657730993",
+    "project_id": "get-gas-customer",
+    "storage_bucket": "get-gas-customer.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:757657730993:android:41d3d5ad7b651ccfe24790",
+        "android_client_info": {
+          "package_name": "com.getgas.getgas_customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCW7GA8hFgGh7Ht0mpJu_KWivitFTEEOr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

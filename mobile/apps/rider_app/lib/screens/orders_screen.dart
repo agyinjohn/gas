@@ -44,17 +44,31 @@ class OrdersScreen extends ConsumerStatefulWidget {
 class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   String _filter = '';
   List<GasOrder> _orders = [];
-  bool _loading = true;
+  bool _loading = true;  // true only until first data/cache is loaded
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetch());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetch(initial: true));
   }
 
-  Future<void> _fetch() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _fetch({bool initial = false}) async {
+    // On filter change or pull-to-refresh: don't show skeleton if we already have data
+    if (initial) { setState(() { _loading = true; _error = null; }); }
+    else { setState(() { _error = null; }); }
+
+    // Load cache immediately so screen isn't blank
+    if (initial) {
+      final cached = await CacheService.loadOrders(_filter);
+      if (cached != null && mounted) {
+        setState(() {
+          _orders = cached.map(GasOrder.fromJson).where((o) => o.hasValidId).toList();
+          _loading = false;
+        });
+      }
+    }
+
     try {
       final orders = await ref.read(ridersApiProvider).getOrders(
         status: _filter.isNotEmpty ? _filter : null,
@@ -62,11 +76,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       );
       await CacheService.saveOrders(_filter, orders.map((o) => o.toJson()).toList());
       if (mounted) setState(() { _orders = orders; _loading = false; });
-    } catch (e, st) {
+    } catch (e) {
       debugPrint('[OrdersScreen] fetch error: $e');
-      debugPrint('[OrdersScreen] $st');
-      final cached = await CacheService.loadOrders(_filter);
-      if (mounted) {
+      if (mounted && _orders.isEmpty) {
+        // Only show error if we have nothing to show
+        final cached = await CacheService.loadOrders(_filter);
         if (cached != null) {
           setState(() {
             _orders = cached.map(GasOrder.fromJson).where((o) => o.hasValidId).toList();
@@ -80,8 +94,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   }
 
   void _onFilterChange(String filter) {
-    setState(() { _filter = filter; _orders = []; });
-    _fetch();
+    setState(() { _filter = filter; });
+    _fetch(initial: true);
   }
 
   @override
@@ -174,7 +188,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                           )
                         : RefreshIndicator(
                             color: GetGasColors.brand,
-                            onRefresh: _fetch,
+                            onRefresh: () => _fetch(),
                             child: ListView.separated(
                               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                               itemCount: _orders.length,
@@ -333,7 +347,7 @@ class _OrderSkeletons extends StatelessWidget {
       itemCount: 4,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (_, __) => Container(
-        height: 110,
+        height: 130,
         decoration: BoxDecoration(
           color: GetGasColors.bgCard2,
           borderRadius: BorderRadius.circular(20),

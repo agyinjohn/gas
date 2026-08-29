@@ -16,20 +16,18 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDQx7NqFzchvZ23hR63nIT50zvlipI-ABE',
-    appId: '1:814529303408:android:7b7d5e1b5b42755e05b5b5',
-    messagingSenderId: '814529303408',
-    projectId: 'getgas-2e09a',
-    storageBucket: 'getgas-2e09a.firebasestorage.app',
+    apiKey: 'AIzaSyCW7GA8hFgGh7Ht0mpJu_KWivitFTEEOr4',
+    appId: '1:757657730993:android:41d3d5ad7b651ccfe24790',
+    messagingSenderId: '757657730993',
+    projectId: 'get-gas-customer',
+    storageBucket: 'get-gas-customer.firebasestorage.app',
   );
-
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDXYo72s7fgQqoucwU4riGiJRC4Boj9WfI',
-    appId: '1:814529303408:web:a8ec5308e0ac680005b5b5',
-    messagingSenderId: '814529303408',
-    projectId: 'getgas-2e09a',
-    authDomain: 'getgas-2e09a.firebaseapp.com',
-    storageBucket: 'getgas-2e09a.firebasestorage.app',
-    measurementId: 'G-GP48H8G7TZ',
+    apiKey: 'AIzaSyApDDjTFpoq-HJ-g0-0Q89NRQL8aD5A8v8',
+    appId: '1:757657730993:web:a53113c7b1fe2051e24790',
+    messagingSenderId: '757657730993',
+    projectId: 'get-gas-customer',
+    authDomain: 'get-gas-customer.firebaseapp.com',
+    storageBucket: 'get-gas-customer.firebasestorage.app',
   );
 }

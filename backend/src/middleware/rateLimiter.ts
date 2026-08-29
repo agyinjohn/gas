@@ -1,5 +1,7 @@
 import rateLimit from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
 import { Request } from 'express';
+import redis from '../config/redis';
 
 const byToken = (req: Request) => {
   const auth = req.headers.authorization;
@@ -18,6 +20,7 @@ export const authLimiter = rateLimit({
   keyGenerator: byToken,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisStore({ sendCommand: (...args: string[]) => (redis as any).call(...args), prefix: 'rl:auth:' }),
   message: { success: false, message: 'Too many auth attempts, please try again in 10 minutes.' },
 });
 
@@ -28,5 +31,6 @@ export const orderLimiter = rateLimit({
   keyGenerator: byToken,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisStore({ sendCommand: (...args: string[]) => (redis as any).call(...args), prefix: 'rl:order:' }),
   message: { success: false, message: 'Too many order requests, please slow down.' },
 });

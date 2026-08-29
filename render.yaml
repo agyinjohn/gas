@@ -8,3 +8,29 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: FRONTEND_URL
+        value: https://gas-pied-xi.vercel.app
+      - key: GOOGLE_CALLBACK_URL
+        value: https://backend.mandmservicescorp.org/api-gasgo/api/v1/auth/google/callback
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: MNOTIFY_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false

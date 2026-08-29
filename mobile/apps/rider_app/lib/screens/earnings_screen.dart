@@ -182,13 +182,16 @@ class _OverviewTab extends ConsumerWidget {
     final dashAsync    = ref.watch(riderDashboardProvider);
     final payoutsAsync = ref.watch(_payoutsProvider);
 
-    return dashAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: GetGasColors.brand)),
-      error: (_, __) => _ErrorView(
+    final dash = dashAsync.valueOrNull;
+    if (dash == null && dashAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator(color: GetGasColors.brand));
+    }
+    if (dash == null) {
+      return _ErrorView(
         message: 'Could not load earnings',
         onRetry: () => ref.invalidate(riderDashboardProvider),
-      ),
-      data: (dash) {
+      );
+    }
         final avgPerTrip = dash.totalTrips > 0 ? dash.totalEarnings / dash.totalTrips : 0.0;
         final weeklyEst  = dash.todayEarnings * 7;
 
@@ -320,8 +323,6 @@ class _OverviewTab extends ConsumerWidget {
             ],
           ],
         );
-      },
-    );
   }
 }
 
@@ -513,69 +514,71 @@ class _PayoutsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final payoutsAsync = ref.watch(_payoutsProvider);
 
-    return payoutsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: GetGasColors.brand)),
-      error: (_, __) => _ErrorView(
+    final payouts = payoutsAsync.valueOrNull;
+    if (payouts == null && payoutsAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator(color: GetGasColors.brand));
+    }
+    if (payouts == null) {
+      return _ErrorView(
         message: 'Could not load payouts',
         onRetry: () => ref.invalidate(_payoutsProvider),
-      ),
-      data: (payouts) {
-        final completed = payouts.where((p) => p.status == 'completed').length;
-        final pending   = payouts.where((p) => p.status == 'pending').length;
-        final failed    = payouts.where((p) => p.status == 'failed').length;
+      );
+    }
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: GetGasColors.bgCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: GetGasColors.border),
-              ),
-              child: Row(
+    final completed = payouts.where((p) => p.status == 'completed').length;
+    final pending   = payouts.where((p) => p.status == 'pending').length;
+    final failed    = payouts.where((p) => p.status == 'failed').length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: GetGasColors.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: GetGasColors.border),
+          ),
+          child: Row(
+            children: [
+              _PayoutStat(label: 'Completed', value: '$completed', color: const Color(0xFF16A34A)),
+              _VertDivider(),
+              _PayoutStat(label: 'Pending',   value: '$pending',   color: const Color(0xFFF59E0B)),
+              _VertDivider(),
+              _PayoutStat(label: 'Failed',    value: '$failed',    color: GetGasColors.error),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        if (payouts.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 48),
+              child: Column(
                 children: [
-                  _PayoutStat(label: 'Completed', value: '$completed', color: const Color(0xFF16A34A)),
-                  _VertDivider(),
-                  _PayoutStat(label: 'Pending',   value: '$pending',   color: const Color(0xFFF59E0B)),
-                  _VertDivider(),
-                  _PayoutStat(label: 'Failed',    value: '$failed',    color: GetGasColors.error),
+                  Container(
+                    width: 64, height: 64,
+                    decoration: BoxDecoration(
+                      color: GetGasColors.bgCard2,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(Icons.credit_card_outlined, size: 32, color: GetGasColors.textMuted),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('No payouts yet',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  const Text('Complete your first delivery to see payouts here',
+                      style: TextStyle(fontSize: 13, color: GetGasColors.textMuted),
+                      textAlign: TextAlign.center),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-
-            if (payouts.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 48),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 64, height: 64,
-                        decoration: BoxDecoration(
-                          color: GetGasColors.bgCard2,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(Icons.credit_card_outlined, size: 32, color: GetGasColors.textMuted),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text('No payouts yet',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      const Text('Complete your first delivery to see payouts here',
-                          style: TextStyle(fontSize: 13, color: GetGasColors.textMuted),
-                          textAlign: TextAlign.center),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ...payouts.map((p) => _PayoutCard(payout: p)),
-          ],
-        );
-      },
+          )
+        else
+          ...payouts.map((p) => _PayoutCard(payout: p)),
+      ],
     );
   }
 }

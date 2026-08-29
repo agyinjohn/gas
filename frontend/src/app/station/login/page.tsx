@@ -1,13 +1,14 @@
 'use client';
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flame, ArrowRight, ChevronLeft } from 'lucide-react';
+import { ArrowRight, ChevronLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/lib/auth';
 import { stationAuthApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useOtpTimer, OtpResend } from '@/hooks/useOtpTimer';
 import Link from 'next/link';
+import Image from 'next/image';
 
 function toE164(local: string) {
   const digits = local.replace(/\D/g, '');
@@ -79,9 +80,7 @@ export default function StationLoginPage() {
       <div className="hidden lg:flex lg:w-[52%] bg-gray-950 flex-col justify-between p-12 relative overflow-hidden">
         <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-brand-500/20 rounded-full blur-[120px] pointer-events-none" />
         <div className="flex items-center gap-3 relative z-10">
-          <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30">
-            <Flame className="w-5 h-5 text-white" />
-          </div>
+          <Image src="/logo.png" alt="GetGas" width={40} height={40} className="rounded-xl" />
           <span className="text-white font-bold text-lg tracking-tight">GasGo</span>
         </div>
         <div className="relative z-10 space-y-4">
@@ -100,9 +99,7 @@ export default function StationLoginPage() {
         <div className="w-full max-w-[400px] space-y-8">
 
           <div className="flex lg:hidden flex-col items-center gap-2">
-            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
-              <Flame className="w-5 h-5 text-white" />
-            </div>
+            <Image src="/logo.png" alt="GetGas" width={40} height={40} className="rounded-xl" />
             <span className="font-black text-gray-900 text-lg">GasGo</span>
           </div>
 

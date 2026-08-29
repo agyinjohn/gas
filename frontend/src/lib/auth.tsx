@@ -1,7 +1,6 @@
 'use client';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import axios from 'axios';
 
 interface AuthUser {
   id: string;
@@ -36,16 +35,31 @@ const ROLE_ALLOWED: Record<string, string[]> = {
   admin:   ['/admin'],
 };
 
-const ME_ENDPOINTS: Record<string, string> = {
-  user:    '/api/v1/users/me',
-  rider:   '/api/v1/riders/me',
-  station: '/api/v1/users/me',
-  admin:   '/api/v1/admin/metrics',
-};
-
 function clearStorage() {
   localStorage.removeItem('gasgo_token');
   localStorage.removeItem('gasgo_user');
+}
+
+function isExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp && payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
+function isPublicPath(pathname: string): boolean {
+  if (pathname.startsWith('/auth/')) return true;
+  if (pathname.startsWith('/about')) return true;
+  if (pathname.startsWith('/riders')) return true;
+  if (pathname.startsWith('/stations')) return true;
+  if (pathname.startsWith('/contact')) return true;
+  if (pathname.startsWith('/privacy')) return true;
+  if (pathname.startsWith('/terms')) return true;
+  return [
+    '/', '/login', '/register', '/forgot-password', '/set-password', '/rider/register',
+  ].includes(pathname);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -55,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
 
+  // On mount: restore session from localStorage, trust JWT expiry client-side
   useEffect(() => {
     const storedToken = localStorage.getItem('gasgo_token');
     const storedUser  = localStorage.getItem('gasgo_user');
@@ -64,54 +79,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    let parsed: AuthUser | null = null;
-    try {
-      parsed = JSON.parse(storedUser);
-    } catch {
+    if (isExpired(storedToken)) {
       clearStorage();
       setIsLoading(false);
       return;
     }
 
-    // Validate token against backend before trusting it
-    const endpoint = ME_ENDPOINTS[parsed!.role];
-    const baseURL  = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-    axios.get(`${baseURL}${endpoint}`, {
-      headers: {
-        Authorization: `Bearer ${storedToken}`,
-        'ngrok-skip-browser-warning': 'true',
-      },
-    }).then(() => {
+    try {
+      const parsed = JSON.parse(storedUser);
       setToken(storedToken);
       setUser(parsed);
-    }).catch((err) => {
-      // Only clear session on explicit 401 — not on network errors (e.g. backend down)
-      if (err.response?.status === 401) {
-        clearStorage();
-      } else {
-        // Network/server error — trust stored session optimistically
-        setToken(storedToken);
-        setUser(parsed);
-      }
-    }).finally(() => {
-      setIsLoading(false);
-    });
+    } catch {
+      clearStorage();
+    }
+
+    setIsLoading(false);
   }, []);
 
   // Guard: enforce route access once loading is done
   useEffect(() => {
     if (isLoading) return;
+    if (pathname.startsWith('/auth/')) return; // let callback page handle itself
 
-    const isRoot         = pathname === '/';
-    const isRiderRegister = pathname === '/rider/register';
-    const isSetPassword  = pathname === '/set-password';
-    const isRegister     = pathname === '/register';
-    const isForgotPw     = pathname === '/forgot-password';
-    const isPublic       = isRoot || isRiderRegister || isSetPassword || isRegister || isForgotPw;
+    const isPublic = isPublicPath(pathname);
 
     if (!user) {
-      if (!isPublic) router.replace('/');
+      if (!isPublic) router.replace('/login');
       return;
     }
 
@@ -148,16 +141,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.replace('/');
   };
 
-  // Keep api.ts 401 interceptor in sync with context logout
   useEffect(() => {
     const handler = () => logout();
     window.addEventListener('gasgo:unauthorized', handler);
     return () => window.removeEventListener('gasgo:unauthorized', handler);
   }, []);
 
+  // Never block /auth/* — the callback page must render to process the token
+  const isAuthCallback = pathname.startsWith('/auth/');
+  const shouldBlock    = !isAuthCallback && (isLoading || (!user && !isPublicPath(pathname)));
+
   return (
     <AuthContext.Provider value={{ user, token, login, logout, updateUser, isLoading }}>
-      {isLoading ? (
+      {shouldBlock ? (
         <div className="min-h-screen flex items-center justify-center bg-white">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin" />

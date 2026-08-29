@@ -1,5 +1,5 @@
 {
-  "API_URL": "https://gas-1-io3c.onrender.com",
-  "SOCKET_URL": "https://gas-1-io3c.onrender.com",
+  "API_URL": "https://backend.mandmservicescorp.org/api-gasgo",
+  "SOCKET_URL": "https://backend.mandmservicescorp.org/api-gasgo",
   "GOOGLE_MAPS_API_KEY": "AIzaSyA8nRLUsBb1J0qNB1XtPKmUm5Sl6txKKko"
 }

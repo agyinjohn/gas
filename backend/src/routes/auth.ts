@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { OAuth2Client } from 'google-auth-library';
 import { User } from '../models/User';
 import { Rider } from '../models/Rider';
 import { Admin } from '../models/Admin';
@@ -49,7 +50,6 @@ passport.use(new GoogleStrategy(
           referralCode,
         });
       } else {
-        // Existing user — update googleId/photo if missing
         if (!user.googleId) user.googleId = googleId;
         if (photo && !user.profilePhoto) user.profilePhoto = photo;
         if (email && !user.email) user.email = email;
@@ -427,7 +427,68 @@ router.post('/user/add-phone',
   }
 );
 
-// ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
+// ─── GOOGLE NATIVE SDK (mobile) ──────────────────────────────────────────────
+
+/**
+ * POST /api/v1/auth/google/token
+ * Accepts a Google ID token from the native google_sign_in Flutter SDK.
+ * Verifies it, finds or creates the user, returns a JWT.
+ */
+router.post('/google/token',
+  [body('idToken').notEmpty()],
+  async (req: Request, res: Response) => {
+    if (ve(req, res)) return;
+    const { idToken } = req.body;
+    try {
+      const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      if (!payload) return res.status(401).json({ success: false, message: 'Invalid Google token' });
+
+      const googleId = payload.sub;
+      const email    = payload.email;
+      const name     = payload.name || payload.given_name || 'User';
+      const photo    = payload.picture;
+
+      let user = await User.findOne({ $or: [{ googleId }, ...(email ? [{ email }] : [])] });
+
+      if (!user) {
+        let referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+        while (await User.exists({ referralCode })) {
+          referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+        }
+        user = await User.create({
+          name, email, googleId,
+          profilePhoto: photo,
+          isVerified: true,
+          referralCode,
+        });
+      } else {
+        if (!user.googleId) user.googleId = googleId;
+        if (photo && !user.profilePhoto) user.profilePhoto = photo;
+        if (email && !user.email) user.email = email;
+        await user.save();
+      }
+
+      const needsPhone = !user.phone || user.phone.startsWith('google_');
+      const token = signToken({ id: user._id, role: 'user', phone: user.phone ?? '' });
+      res.json({
+        success: true,
+        token,
+        user: { id: user._id, name: user.name, phone: user.phone ?? '', role: 'user' },
+        needsPhone: needsPhone ? 1 : 0,
+      });
+    } catch (err: any) {
+      console.error('[Google token]', err.message);
+      res.status(401).json({ success: false, message: 'Google sign-in failed' });
+    }
+  }
+);
+
+// ─── GOOGLE OAUTH (web browser flow) ─────────────────────────────────────────
 
 const DEFAULT_FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -471,8 +532,8 @@ router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: `${DEFAULT_FRONTEND}/?error=google_auth_failed` }),
   (req: AuthRequest, res: Response) => {
     const user = req.user as any;
-    const token = signToken({ id: user._id, role: 'user', phone: user.phone });
-    const needsPhone = !user.phone || user.phone.startsWith('google_') || user.phone === '';
+    const needsPhone = !user.phone || user.phone.startsWith('google_');
+    const token = signToken({ id: user._id, role: 'user', phone: user.phone ?? '' });
 
     const params = new URLSearchParams({
       token,

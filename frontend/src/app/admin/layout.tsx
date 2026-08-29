@@ -13,14 +13,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 
 const NAV = [
-  { href: '/admin',           icon: LayoutDashboard, label: 'Overview',  exact: true  },
-  { href: '/admin/stations',  icon: Store,            label: 'Stations'               },
-  { href: '/admin/riders',    icon: Users,            label: 'Riders'                 },
-  { href: '/admin/zones',     icon: MapPin,           label: 'Zones'                  },
-  { href: '/admin/orders',    icon: Package,          label: 'Orders'                 },
-  { href: '/admin/payments',  icon: CreditCard,       label: 'Payments'               },
-  { href: '/admin/pricing',   icon: DollarSign,       label: 'Pricing'                },
-  { href: '/admin/settings',  icon: Settings,         label: 'Settings'               },
+  { href: '/admin',           icon: LayoutDashboard, label: 'Overview',  subtitle: 'Platform at a glance',                    exact: true  },
+  { href: '/admin/stations',  icon: Store,            label: 'Stations',  subtitle: 'Manage and approve gas stations'                        },
+  { href: '/admin/riders',    icon: Users,            label: 'Riders',    subtitle: 'Rider accounts, KYC and performance'                    },
+  { href: '/admin/zones',     icon: MapPin,           label: 'Zones',     subtitle: 'Delivery zones and coverage areas'                      },
+  { href: '/admin/orders',    icon: Package,          label: 'Orders',    subtitle: 'All customer orders across the platform'                },
+  { href: '/admin/payments',  icon: CreditCard,       label: 'Payments',  subtitle: 'Transactions, payouts and refunds'                      },
+  { href: '/admin/pricing',   icon: DollarSign,       label: 'Pricing',   subtitle: 'Cylinder prices by station and zone'                    },
+  { href: '/admin/settings',  icon: Settings,         label: 'Settings',  subtitle: 'Pricing rules, delivery config and system behaviour'    },
 ];
 
 // ─── Notification Panel ───────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Don't render layout on login page
   if (pathname === '/admin/login') return <>{children}</>;
 
-  const pageTitle = NAV.find((n) => n.exact ? pathname === n.href : pathname.startsWith(n.href))?.label || 'Admin';
+  const activePage = NAV.find((n) => n.exact ? pathname === n.href : pathname.startsWith(n.href));
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -227,7 +227,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
 
         {/* ── Topbar ── */}
-        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 px-4 lg:px-6 h-14 flex items-center gap-4 shadow-sm">
+        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 px-4 lg:px-6 h-16 flex items-center gap-4 shadow-sm">
           {/* Mobile menu button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -236,9 +236,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Menu className="w-5 h-5 text-gray-600" />
           </button>
 
-          {/* Page title */}
-          <div className="flex-1">
-            <h1 className="text-base font-bold text-gray-900">{pageTitle}</h1>
+          {/* Page title + subtitle */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm font-bold text-gray-900 leading-tight">{activePage?.label ?? 'Admin'}</h1>
+            {activePage?.subtitle && (
+              <p className="text-xs text-gray-400 truncate hidden sm:block">{activePage.subtitle}</p>
+            )}
           </div>
 
           {/* Right actions */}

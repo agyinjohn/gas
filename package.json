@@ -13,7 +13,7 @@
     "dev:customer": "npm run start --workspace=@getgas/customer-mobile",
     "dev:rider": "npm run start --workspace=@getgas/rider-mobile",
     "build": "turbo run build",
-    "build:packages": "npm run build --workspace=@getgas/types --workspace=@getgas/config --workspace=@getgas/domain --workspace=@getgas/api-client --workspace=@getgas/mobile-core --workspace=@getgas/mobile-ui",
+    "build:packages": "npm run build --workspace=@getgas/types --workspace=@getgas/config --workspace=@getgas/domain --workspace=@getgas/api-client",
     "build:web": "npm run build:packages && npm run build --workspace=@getgas/web",
     "lint": "turbo run lint",
     "type-check": "npm run build:packages && turbo run type-check",
@@ -24,21 +24,13 @@
     "typescript": "^5.4.5"
   },
   "overrides": {
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "@types/react": "~19.1.0",
     "@expo/metro-runtime": "6.1.2",
     "expo": {
       "@expo/metro-runtime": "6.1.2"
-    },
-    "@getgas/web": {
-      "react": "18.3.1",
-      "react-dom": "18.3.0",
-      "@types/react": "^18.3.1",
-      "@types/react-dom": "^18.3.0"
     }
   },
   "engines": {
-    "node": ">=18 <=22"
-  }
+    "node": ">=18 <=24"
+  },
+  "packageManager": "npm@10.8.2"
 }
