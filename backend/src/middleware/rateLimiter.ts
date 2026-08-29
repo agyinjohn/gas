@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import { Request } from 'express';
 import redis from '../config/redis';
@@ -6,11 +6,13 @@ import redis from '../config/redis';
 const byToken = (req: Request) => {
   const auth = req.headers.authorization;
   if (auth?.startsWith('Bearer ')) return auth.slice(7, 40);
-  return (
+  const ip =
     req.headers['x-forwarded-for']?.toString().split(',')[0].trim() ??
     req.ip ??
-    'unknown'
-  );
+    'unknown';
+  // Collapse IPv6 addresses to their /56 subnet — without this a single IPv6 user
+  // can walk through addresses in their own prefix and bypass the limit.
+  return ipKeyGenerator(ip);
 };
 
 // Auth / OTP — strict, prevents brute force

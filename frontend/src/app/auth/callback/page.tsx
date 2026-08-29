@@ -12,7 +12,6 @@ function CallbackHandler() {
     const token      = params.get('token');
     const userId     = params.get('userId');
     const name       = params.get('name') ?? 'User';
-    const needsPhone = params.get('needsPhone') === '1';
     const error      = params.get('error');
 
     if (error || !token || !userId) {
@@ -27,7 +26,11 @@ function CallbackHandler() {
     } catch {}
 
     login(token, { id: userId, name, phone, role: 'user' });
-    window.location.href = needsPhone ? '/user?addPhone=1' : '/user';
+
+    // A Google user with no phone yet is stopped by CompleteProfileModal (rendered by
+    // the /user layout): the dashboard stays blocked until they enter a number and
+    // confirm the OTP sent to it.
+    window.location.href = '/user';
   }, []);
 
   return null;
