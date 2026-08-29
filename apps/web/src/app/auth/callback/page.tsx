@@ -35,11 +35,8 @@ export default function AuthCallbackPage() {
 
     login(token, { id: userId, name, phone, role: 'user' });
 
-    if (needsPhone) {
-      router.replace('/user?addPhone=1');
-    } else {
-      router.replace('/user');
-    }
+    // Use window.location to bypass the auth guard entirely
+    window.location.href = needsPhone ? '/user?addPhone=1' : '/user';
   }, []);
 
   return (
