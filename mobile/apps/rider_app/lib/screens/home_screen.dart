@@ -20,6 +20,23 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _togglingStatus = false;
+  final _scrollCtrl = ScrollController();
+  bool _scrolled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollCtrl.addListener(() {
+      final s = _scrollCtrl.offset > 10;
+      if (s != _scrolled) setState(() => _scrolled = s);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _toggleStatus(Rider rider) async {
     final goingOnline = !rider.isOnline;
@@ -83,6 +100,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ? _StatusFAB(
               rider: rider,
               toggling: _togglingStatus,
+              expanded: _scrolled,
               onToggle: () => _toggleStatus(rider),
             )
           : null,
@@ -146,6 +164,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: GetGasColors.brand,
                 onRefresh: _refresh,
                 child: ListView(
+                  controller: _scrollCtrl,
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                   children: [
                     dash == null
@@ -325,33 +344,79 @@ class _StatusBanner extends StatelessWidget {
 // ── Status FAB ─────────────────────────────────────────────────────────────────
 
 class _StatusFAB extends StatelessWidget {
-  const _StatusFAB({required this.rider, required this.toggling, required this.onToggle});
+  const _StatusFAB({
+    required this.rider,
+    required this.toggling,
+    required this.expanded,
+    required this.onToggle,
+  });
   final Rider rider;
   final bool toggling;
+  final bool expanded;
   final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final isOnline = rider.isOnline;
     final fabColor = isOnline ? const Color(0xFF1F2937) : const Color(0xFF22C55E);
+    final icon = toggling
+        ? const SizedBox(
+            width: 18, height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+          )
+        : const Icon(Icons.power_settings_new, color: Colors.white, size: 20);
 
-    return FloatingActionButton.extended(
-      onPressed: toggling ? null : onToggle,
-      backgroundColor: fabColor,
-      elevation: 4,
-      icon: toggling
-          ? const SizedBox(
-              width: 18, height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            )
-          : Icon(
-              isOnline ? Icons.power_settings_new : Icons.power_settings_new,
-              color: Colors.white, size: 18,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: toggling ? fabColor.withValues(alpha: 0.7) : fabColor,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: fabColor.withValues(alpha: 0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: toggling ? null : onToggle,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: expanded ? 20 : 14,
+              vertical: 14,
             ),
-      label: Text(
-        isOnline ? 'Go Offline' : 'Go Online',
-        style: const TextStyle(
-          color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                icon,
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeInOut,
+                  child: expanded
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(width: 8),
+                            Text(
+                              isOnline ? 'Go Offline' : 'Go Online',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -626,10 +691,37 @@ class _RecentDeliveriesSection extends ConsumerWidget {
           error: (_, __) => const SizedBox.shrink(),
           data: (orders) {
             if (orders.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: Text('No recent deliveries',
-                    style: TextStyle(color: GetGasColors.textMuted, fontSize: 13))),
+              return Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: GetGasColors.bgCard,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: GetGasColors.border),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 56, height: 56,
+                      decoration: BoxDecoration(
+                        color: GetGasColors.brand.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.two_wheeler_rounded,
+                          size: 26, color: GetGasColors.brand),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('No deliveries yet',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                            color: GetGasColors.text)),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Go online to start receiving orders\nand your deliveries will appear here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: GetGasColors.textMuted, height: 1.5),
+                    ),
+                  ],
+                ),
               );
             }
             return Column(

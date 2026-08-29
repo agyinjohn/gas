@@ -81,7 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isSetPassword  = pathname === '/set-password';
     const isRegister     = pathname === '/register';
     const isForgotPw     = pathname === '/forgot-password';
+    const isAuthCallback = pathname.startsWith('/auth/');
     const isPublic       = isRoot || isRiderRegister || isSetPassword || isRegister || isForgotPw;
+
+    // Let the callback page handle its own navigation
+    if (isAuthCallback) return;
 
     if (!user) {
       if (!isPublic) router.replace('/');
