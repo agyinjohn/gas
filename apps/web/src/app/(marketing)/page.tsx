@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     'Order LPG cooking gas online and get it delivered to your home in Accra, Kumasi, Tamale and more. Real-time tracking, OTP-verified, Mobile Money accepted.',
 }
 
-/* ─── Data ─────────────────────────────────────────────────────────────── */
+/* Data */
 
 const steps = [
   {
@@ -130,12 +130,12 @@ const cities = [
   { name: 'Ashaiman',  active: false },
 ]
 
-/* ─── Page ──────────────────────────────────────────────────────────────── */
+/* Page */
 
 export default function HomePage() {
   return (
     <>
-      {/* ── Hero ── */}
+      {/* Hero */}
       <section className="relative min-h-screen flex items-center bg-white overflow-hidden pt-16">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full bg-orange-50 opacity-70" />
@@ -227,7 +227,7 @@ export default function HomePage() {
 
 
 
-      {/* ── How It Works ── */}
+      {/* How It Works */}
       <section className="py-24 bg-brand-gray" id="how-it-works">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
@@ -258,7 +258,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Features ── */}
+      {/* Features */}
       <section className="py-24 bg-white" id="features">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
@@ -281,7 +281,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Safety Banner ── */}
+      {/* Safety Banner */}
       <section className="py-20 bg-brand-dark">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -312,7 +312,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── For Riders / For Stations ── */}
+      {/* For Riders / For Stations */}
       <section className="py-24 bg-brand-gray">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
@@ -372,7 +372,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Download ── */}
+      {/* Download */}
       <section className="py-24 bg-brand-dark" id="download">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-12 items-center">
           <div>
@@ -424,7 +424,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Coverage ── */}
+      {/* Coverage */}
       <section className="py-24 bg-white" id="coverage">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
           <span className="text-xs font-semibold tracking-widest uppercase text-brand-orange">Where we deliver</span>
@@ -455,7 +455,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Testimonials ── */}
+      {/* Testimonials */}
       <section className="py-24 bg-brand-gray" id="testimonials">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
@@ -487,7 +487,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── FAQ ── */}
+      {/* FAQ */}
       <section className="py-24 bg-white" id="faq">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
@@ -515,7 +515,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Final CTA ── */}
+      {/* Final CTA */}
       <section className="py-24 bg-brand-orange">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="font-display text-4xl sm:text-5xl font-extrabold text-white mb-4">
