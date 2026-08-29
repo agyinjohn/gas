@@ -1,7 +1,5 @@
-import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:getgas_core/getgas_core.dart';
-
-const _googleRedirectUri = 'getgas://auth/callback';
 
 class GoogleAuthResult {
   const GoogleAuthResult({
@@ -22,33 +20,41 @@ class GoogleAuthService {
 
   final AppConfig _config;
 
-  Future<GoogleAuthResult?> signIn() async {
-    final authUrl =
-        '${_config.apiBaseUrl}${AppConfig.apiPrefix}/auth/google?redirect=${Uri.encodeComponent(_googleRedirectUri)}';
+  static final _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    // serverClientId tells the SDK to include an ID token signed for this audience
+    serverClientId: '509102065983-i861hv3bhdd70bc8vlblc2g8cgm1qf8i.apps.googleusercontent.com',
+  );
 
-    final callbackUrl = await FlutterWebAuth2.authenticate(
-      url: authUrl,
-      callbackUrlScheme: 'getgas',
+  Future<GoogleAuthResult?> signIn() async {
+    // Sign out first to force account picker every time
+    await _googleSignIn.signOut();
+
+    final account = await _googleSignIn.signIn();
+    if (account == null) return null;
+
+    final auth = await account.authentication;
+    final idToken = auth.idToken;
+    if (idToken == null) return null;
+
+    // Exchange ID token for a GetGas JWT
+    final client = GetGasApiClient(config: _config);
+    final data = await client.postJson(
+      '${AppConfig.apiPrefix}/auth/google/token',
+      body: {'idToken': idToken},
     );
 
-    return _parseCallback(callbackUrl);
-  }
+    final token  = data['token'] as String?;
+    final userId = (data['user']?['id'] ?? data['user']?['_id'])?.toString();
+    final name   = data['user']?['name'] as String? ?? account.displayName ?? 'User';
 
-  GoogleAuthResult? _parseCallback(String url) {
-    final uri = Uri.parse(url);
-    final error = uri.queryParameters['error'];
-    if (error != null && error.isNotEmpty) return null;
-
-    final token = uri.queryParameters['token'];
-    final userId = uri.queryParameters['userId'];
-    final name = uri.queryParameters['name'] ?? 'User';
     if (token == null || userId == null) return null;
 
     return GoogleAuthResult(
       token: token,
       userId: userId,
       name: name,
-      needsProfile: uri.queryParameters['needsPhone'] == '1',
+      needsProfile: data['needsPhone'] == 1 || data['needsPhone'] == true,
     );
   }
 }
