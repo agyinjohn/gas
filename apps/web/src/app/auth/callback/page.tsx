@@ -30,7 +30,7 @@ export default function AuthCallbackPage() {
     let phone = '';
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      phone = payload.phone ?? '';
+      phone = typeof payload.phone === 'string' ? payload.phone : '';
     } catch {}
 
     login(token, { id: userId, name, phone, role: 'user' });

@@ -11,7 +11,7 @@ import { Rider } from '../models/Rider';
 import { Admin } from '../models/Admin';
 import { LoyaltyTransaction } from '../models/LoyaltyTransaction';
 import { createOTP, verifyOTP } from '../services/otpService';
-import { AuthRequest } from '../middleware/authenticate';
+import { authenticate, AuthRequest } from '../middleware/authenticate';
 import { sendSMS, SMS_TEMPLATES } from '../services/notificationService';
 
 const REFERRAL_REWARD_POINTS = 200;
@@ -36,7 +36,7 @@ passport.use(new GoogleStrategy(
       let user = await User.findOne({ $or: [{ googleId }, ...(email ? [{ email }] : [])] });
 
       if (!user) {
-        // New Google user — create account, phone will be collected later
+        // New Google user — create account without a phone until the user enters one
         let referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
         while (await User.exists({ referralCode })) {
           referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -53,6 +53,9 @@ passport.use(new GoogleStrategy(
         if (!user.googleId) user.googleId = googleId;
         if (photo && !user.profilePhoto) user.profilePhoto = photo;
         if (email && !user.email) user.email = email;
+        if (user.phone?.startsWith('google_')) {
+          user.phone = undefined;
+        }
         await user.save();
       }
 
@@ -325,50 +328,91 @@ router.post('/user/reset-password',
 );
 
 /**
- * Google user: add phone number after sign-in (no OTP needed — already verified via Google)
- * POST /api/v1/auth/user/add-phone
+ * Normalize a Ghanaian phone number into +233XXXXXXXXX form.
+ * Accepts 0XXXXXXXXX, 233XXXXXXXXX, +233XXXXXXXXX or a bare 9-digit local number.
+ */
+function normalizeGhanaPhone(raw: string): { phone: string } | { error: string } {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (digits.length < 9) return { error: 'Phone must be at least 9 digits' };
+  if (digits.startsWith('233') && digits.length === 12) return { phone: '+' + digits };
+  if (digits.startsWith('0') && digits.length === 10) return { phone: '+233' + digits.slice(1) };
+  if (digits.length === 9) return { phone: '+233' + digits };
+  if (raw.startsWith('+')) return { phone: raw };
+  return { error: 'Invalid phone format. Use: 0123456789, 233123456789, or +233123456789' };
+}
+
+/**
+ * Google user, step 1: send an OTP to the phone number they want to attach.
+ * POST /api/v1/auth/user/add-phone/send-otp
  * Body: { phone: "0123456789" | "+233123456789" | "233123456789" }
  */
-router.post('/user/add-phone',
-  [
-    body('phone').trim().notEmpty().withMessage('Phone number is required'),
-  ],
-  async (req: Request, res: Response) => {
+router.post('/user/add-phone/send-otp',
+  authenticate,
+  [body('phone').trim().notEmpty().withMessage('Phone number is required')],
+  async (req: AuthRequest, res: Response) => {
     if (ve(req, res)) return;
 
-    // Must be authenticated
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ success: false, message: 'Authentication required' });
-    let userId: string;
+    const normalized = normalizeGhanaPhone(req.body.phone);
+    if ('error' in normalized) return res.status(400).json({ success: false, message: normalized.error });
+    const { phone } = normalized;
+
+    // Phone must not already belong to another account
+    const existing = await User.findOne({ phone, _id: { $ne: req.user!.id } });
+    if (existing) return res.status(409).json({ success: false, message: 'Phone number already in use' });
+
     try {
-      const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET!) as any;
-      userId = decoded.id;
+      const code = await createOTP(phone, 'registration');
+      try {
+        await sendSMS(phone, SMS_TEMPLATES.otpVerification(code));
+      } catch (smsErr: any) {
+        // In development, log the failure but still return the code
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[add-phone/send-otp] SMS failed (dev mode — continuing):', smsErr?.message);
+        } else {
+          throw smsErr;
+        }
+      }
+      res.json({
+        success: true,
+        message: 'OTP sent',
+        phone,
+        ...(process.env.NODE_ENV === 'development' && { _devCode: code }),
+      });
     } catch {
-      return res.status(401).json({ success: false, message: 'Invalid token' });
+      res.status(500).json({ success: false, message: 'Failed to send OTP' });
     }
+  }
+);
 
-    let phone = req.body.phone;
+/**
+ * Google user, step 2: verify the OTP and attach the phone number to the account.
+ * POST /api/v1/auth/user/add-phone
+ * Body: { phone: "0123456789" | "+233123456789" | "233123456789", otp: "1234" }
+ */
+router.post('/user/add-phone',
+  authenticate,
+  [
+    body('phone').trim().notEmpty().withMessage('Phone number is required'),
+    body('otp').trim().isLength({ min: 4, max: 6 }).withMessage('Enter the verification code sent to your phone'),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    if (ve(req, res)) return;
 
-    // Normalize phone: accept flexible formats (0..., 233..., +233...)
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length < 9) {
-      return res.status(400).json({ success: false, message: 'Phone must be at least 9 digits' });
-    }
-
-    // Normalize to +233 format
-    if (digits.startsWith('233') && digits.length === 12) {
-      phone = '+' + digits;
-    } else if (digits.startsWith('0') && digits.length === 10) {
-      phone = '+233' + digits.slice(1);
-    } else if (digits.length === 9) {
-      phone = '+233' + digits;
-    } else if (!phone.startsWith('+')) {
-      return res.status(400).json({ success: false, message: 'Invalid phone format. Use: 0123456789, 233123456789, or +233123456789' });
-    }
+    const userId = req.user!.id;
+    const normalized = normalizeGhanaPhone(req.body.phone);
+    if ('error' in normalized) return res.status(400).json({ success: false, message: normalized.error });
+    const { phone } = normalized;
 
     // Check phone not taken by another account
     const existing = await User.findOne({ phone, _id: { $ne: userId } });
     if (existing) return res.status(409).json({ success: false, message: 'Phone number already in use' });
+
+    // Phone ownership must be proven by OTP before it is attached to the account
+    try {
+      await verifyOTP(phone, req.body.otp, 'registration');
+    } catch (err: any) {
+      return res.status(400).json({ success: false, message: err.message || 'Invalid OTP' });
+    }
 
     const user = await User.findByIdAndUpdate(userId, { phone, isVerified: true }, { new: true });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });

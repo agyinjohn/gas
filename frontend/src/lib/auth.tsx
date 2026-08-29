@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 interface AuthUser {
   id: string;
   name: string;
-  phone: string;
+  phone?: string;
   role: 'user' | 'rider' | 'station' | 'admin';
   stationId?: string;
 }
