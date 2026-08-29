@@ -157,9 +157,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('gasgo:unauthorized', handler);
   }, []);
 
+  const isRoot          = pathname === '/';
+  const isRiderRegister = pathname === '/rider/register';
+  const isSetPassword   = pathname === '/set-password';
+  const isRegister      = pathname === '/register';
+  const isForgotPw      = pathname === '/forgot-password';
+  const isLogin         = pathname === '/login';
+  const isMarketing     = ['/about', '/riders', '/stations', '/contact', '/privacy', '/terms'].some(p => pathname.startsWith(p));
+  const isPublic        = isRoot || isLogin || isRiderRegister || isSetPassword || isRegister || isForgotPw || isMarketing;
+
+  const shouldBlock = isLoading || (!user && !isPublic);
+
   return (
     <AuthContext.Provider value={{ user, token, login, logout, updateUser, isLoading }}>
-      {isLoading ? (
+      {shouldBlock ? (
         <div className="min-h-screen flex items-center justify-center bg-white">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin" />

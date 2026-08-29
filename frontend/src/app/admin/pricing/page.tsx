@@ -72,11 +72,6 @@ export default function AdminPricingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-100 px-4 pt-12 pb-4">
-        <h1 className="text-xl font-bold text-gray-900">Platform Pricing Controls</h1>
-        <p className="text-sm text-gray-500">Manage delivery fees, surge pricing, and price controls</p>
-      </div>
-
       <div className="px-4 py-4 space-y-4">
         {/* Emergency Controls */}
         <div className="grid grid-cols-2 gap-3">

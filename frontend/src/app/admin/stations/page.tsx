@@ -142,75 +142,114 @@ export default function AdminStationsPage() {
 
       {/* Create Station Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowCreate(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
-              <div>
-                <h2 className="text-base font-bold text-gray-900">New Station</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Create a station and owner account</p>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreate(false)}>
+          <div
+            className="bg-white w-full sm:max-w-xl sm:rounded-2xl rounded-t-3xl shadow-2xl max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-brand-500/10 flex items-center justify-center">
+                  <Store className="w-5 h-5 text-brand-500" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-gray-900">New Station</h2>
+                  <p className="text-xs text-gray-400">Create a station and owner account</p>
+                </div>
               </div>
               <button onClick={() => setShowCreate(false)} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center transition-colors">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Owner Account</p>
-              <Field label="Full Name" error={errors.ownerName}>
-                <Input icon={User} placeholder="Owner's full name" value={form.ownerName} onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))} />
-              </Field>
-              <Field label="Phone Number" error={errors.ownerPhone}>
-                <div className="flex">
-                  <div className="flex items-center gap-1.5 px-3 h-11 bg-gray-50 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-600 shrink-0 select-none">
-                    <Phone className="w-3.5 h-3.5 text-gray-400" /><span>+233</span>
-                  </div>
-                  <input
-                    type="tel" placeholder="XXXXXXXXX"
-                    value={form.ownerPhone.replace('+233', '')}
-                    onChange={(e) => setForm((f) => ({ ...f, ownerPhone: '+233' + e.target.value.replace(/\D/g, '').slice(0, 9) }))}
-                    className="flex-1 h-11 rounded-r-xl border border-gray-200 bg-gray-50 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
-                  />
-                </div>
-              </Field>
-              <Field label="Login Password" error={errors.ownerLoginPassword}>
-                <Input icon={Lock} type="password" placeholder="Min. 6 characters" value={form.ownerLoginPassword} onChange={(e) => setForm((f) => ({ ...f, ownerLoginPassword: e.target.value }))} />
-              </Field>
 
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mb-4">Station Details</p>
-                <div className="space-y-4">
-                  <Field label="Station Name" error={errors.stationName}>
-                    <Input icon={Building} placeholder="e.g. Kumasi Central Gas" value={form.stationName} onChange={(e) => setForm((f) => ({ ...f, stationName: e.target.value }))} />
+            {/* Scrollable body */}
+            <form onSubmit={handleSubmit} className="overflow-y-auto flex-1">
+              {/* Owner section */}
+              <div className="px-6 pt-5 pb-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-black text-white">1</span>
+                  </div>
+                  <p className="text-xs font-black uppercase tracking-widest text-gray-500">Owner Account</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <Field label="Full Name" error={errors.ownerName}>
+                      <Input icon={User} placeholder="Owner's full name" value={form.ownerName} onChange={(e) => setForm((f) => ({ ...f, ownerName: e.target.value }))} />
+                    </Field>
+                  </div>
+                  <Field label="Phone Number" error={errors.ownerPhone}>
+                    <div className="flex">
+                      <div className="flex items-center gap-1.5 px-3 h-11 bg-gray-50 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-600 shrink-0 select-none">
+                        <Phone className="w-3.5 h-3.5 text-gray-400" /><span>+233</span>
+                      </div>
+                      <input
+                        type="tel" placeholder="XXXXXXXXX"
+                        value={form.ownerPhone.replace('+233', '')}
+                        onChange={(e) => setForm((f) => ({ ...f, ownerPhone: '+233' + e.target.value.replace(/\D/g, '').slice(0, 9) }))}
+                        className="flex-1 h-11 rounded-r-xl border border-gray-200 bg-gray-50 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+                      />
+                    </div>
                   </Field>
+                  <Field label="Login Password" error={errors.ownerLoginPassword}>
+                    <Input icon={Lock} type="password" placeholder="Min. 6 characters" value={form.ownerLoginPassword} onChange={(e) => setForm((f) => ({ ...f, ownerLoginPassword: e.target.value }))} />
+                  </Field>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="mx-6 border-t border-dashed border-gray-200" />
+
+              {/* Station section */}
+              <div className="px-6 pt-4 pb-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-black text-white">2</span>
+                  </div>
+                  <p className="text-xs font-black uppercase tracking-widest text-gray-500">Station Details</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <Field label="Station Name" error={errors.stationName}>
+                      <Input icon={Building} placeholder="e.g. Kumasi Central Gas" value={form.stationName} onChange={(e) => setForm((f) => ({ ...f, stationName: e.target.value }))} />
+                    </Field>
+                  </div>
                   <Field label="Commission %" error={undefined}>
-                    <Input icon={DollarSign} type="number" min="0" max="50" step="0.5" value={form.commissionPct} onChange={(e) => setForm((f) => ({ ...f, commissionPct: parseFloat(e.target.value) }))} />
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <input
+                        type="number" min="0" max="50" step="0.5"
+                        value={form.commissionPct}
+                        onChange={(e) => setForm((f) => ({ ...f, commissionPct: parseFloat(e.target.value) }))}
+                        className="w-full h-11 rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm focus:outline-none focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">Platform takes {form.commissionPct}% of each order</p>
                   </Field>
                   <Field label="Location" error={errors.location}>
                     <button type="button" onClick={() => setShowPicker(true)}
                       className={cn(
-                        'w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
-                        form.lat ? 'border-blue-400 bg-blue-50' : 'border-dashed border-gray-200 hover:border-blue-300'
+                        'w-full flex items-center gap-3 h-11 px-3 rounded-xl border-2 text-left transition-all',
+                        form.lat ? 'border-brand-500 bg-brand-500/5' : 'border-dashed border-gray-200 hover:border-brand-500/40'
                       )}>
-                      <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center shrink-0', form.lat ? 'bg-blue-500' : 'bg-gray-100')}>
-                        <MapPin className={cn('w-4 h-4', form.lat ? 'text-white' : 'text-gray-400')} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        {form.lat
-                          ? <><p className="text-sm font-semibold text-gray-900 truncate">{form.address}</p><p className="text-xs text-gray-400">{form.city}</p></>
-                          : <><p className="text-sm font-semibold text-gray-500">Pick location on map</p><p className="text-xs text-gray-400">Tap to open map</p></>
-                        }
-                      </div>
+                      <MapPin className={cn('w-4 h-4 shrink-0', form.lat ? 'text-brand-500' : 'text-gray-400')} />
+                      <span className={cn('text-sm truncate', form.lat ? 'text-gray-900 font-medium' : 'text-gray-400')}>
+                        {form.lat ? form.address || `${form.lat.toFixed(4)}, ${form.lng.toFixed(4)}` : 'Pick on map'}
+                      </span>
                     </button>
                   </Field>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              {/* Footer actions */}
+              <div className="px-6 pb-6 flex gap-3">
                 <button type="button" onClick={() => setShowCreate(false)}
-                  className="flex-1 h-11 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-600 hover:border-gray-300 transition-all">
+                  className="flex-1 h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all">
                   Cancel
                 </button>
                 <button type="submit" disabled={createMutation.isPending}
-                  className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60 transition-all">
+                  className="flex-1 h-11 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold disabled:opacity-60 transition-all shadow-md shadow-brand-500/20">
                   {createMutation.isPending ? 'Creating…' : 'Create Station'}
                 </button>
               </div>
