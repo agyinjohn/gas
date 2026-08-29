@@ -1,9 +1,8 @@
 'use client';
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import axios from 'axios';
 import type { AuthUser } from '@getgas/types';
-import { ME_ENDPOINTS, ROLE_ALLOWED_PREFIXES, ROLE_HOME, STORAGE_KEYS, getApiBaseUrl } from '@getgas/config';
+import { ROLE_ALLOWED_PREFIXES, ROLE_HOME, STORAGE_KEYS } from '@getgas/config';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -40,52 +39,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let parsed: AuthUser | null = null;
     try {
       parsed = JSON.parse(storedUser);
+      // Check JWT expiry client-side (no secret needed)
+      const payload = JSON.parse(atob(storedToken.split('.')[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        clearStorage();
+        setIsLoading(false);
+        return;
+      }
     } catch {
       clearStorage();
       setIsLoading(false);
       return;
     }
 
-    // Validate token against backend before trusting it
-    const endpoint = ME_ENDPOINTS[parsed!.role];
-    const baseURL  = getApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
-
-    axios.get(`${baseURL}${endpoint}`, {
-      headers: {
-        Authorization: `Bearer ${storedToken}`,
-        'ngrok-skip-browser-warning': 'true',
-      },
-    }).then(() => {
-      setToken(storedToken);
-      setUser(parsed);
-    }).catch((err) => {
-      // Only clear session on explicit 401 — not on network errors (e.g. backend down)
-      if (err.response?.status === 401) {
-        clearStorage();
-      } else {
-        // Network/server error — trust stored session optimistically
-        setToken(storedToken);
-        setUser(parsed);
-      }
-    }).finally(() => {
-      setIsLoading(false);
-    });
+    setToken(storedToken);
+    setUser(parsed);
+    setIsLoading(false);
   }, []);
 
   // Guard: enforce route access once loading is done
   useEffect(() => {
     if (isLoading) return;
 
-    const isRoot         = pathname === '/';
-    const isRiderRegister = pathname === '/rider/register';
-    const isSetPassword  = pathname === '/set-password';
-    const isRegister     = pathname === '/register';
-    const isForgotPw     = pathname === '/forgot-password';
     const isAuthCallback = pathname.startsWith('/auth/');
-    const isPublic       = isRoot || isRiderRegister || isSetPassword || isRegister || isForgotPw;
-
-    // Let the callback page handle its own navigation
     if (isAuthCallback) return;
+
+    const isRoot          = pathname === '/';
+    const isLogin         = pathname === '/login';
+    const isRiderRegister = pathname === '/rider/register';
+    const isSetPassword   = pathname === '/set-password';
+    const isRegister      = pathname === '/register';
+    const isForgotPw      = pathname === '/forgot-password';
+    const isPublic        = isRoot || isLogin || isRiderRegister || isSetPassword || isRegister || isForgotPw;
 
     if (!user) {
       if (!isPublic) router.replace('/');
