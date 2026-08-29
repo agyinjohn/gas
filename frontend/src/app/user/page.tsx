@@ -1,11 +1,11 @@
-='use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, ChevronDown, Bell, Flame,
   Navigation, AlertCircle, Loader2, Star, Gift, Map,
-  Sun, Moon, SlidersHorizontal, Truck, ChevronRight,
+  Sun, Moon, SlidersHorizontal, Truck, ChevronRight, X, Phone,
 } from 'lucide-react';
-import { stationsApi, ordersApi, notificationsApi } from '@/lib/api';
+import { stationsApi, ordersApi, notificationsApi, authApi } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
 import { cn, calcDeliveryFee } from '@/lib/utils';
@@ -153,13 +153,88 @@ function StationSkeleton() {
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// Add Phone Modal
+function AddPhoneModal({ onDone }: { onDone: () => void }) {
+  const { login } = useAuth();
+  const [phone, setPhone]     = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
 
+  async function handleAddPhone(e: React.FormEvent) {
+    e.preventDefault();
+    if (phone.replace(/\D/g, '').length < 9) { setError('Enter a valid phone number'); return; }
+    setError('');
+    setLoading(true);
+    try {
+      const res = await authApi.addPhone(phone, '');
+      const { token, user: updatedUser } = res.data;
+      login(token, updatedUser);
+      toast.success('Phone number added!');
+      onDone();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to add phone number');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div className="w-full max-w-sm bg-[var(--bg-card)] rounded-3xl p-6 space-y-5 shadow-2xl">
+        <div>
+          <h2 className="text-lg font-black text-[var(--text-primary)]">Add your phone number</h2>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">Required to place orders and receive updates</p>
+        </div>
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+            <p className="text-xs text-red-500">{error}</p>
+          </div>
+        )}
+        <form onSubmit={handleAddPhone} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase mb-2">Phone number</label>
+            <div className="flex">
+              <div className="flex items-center gap-1.5 px-3 h-12 bg-[var(--bg-card2)] border border-r-0 border-[var(--border)] rounded-l-xl text-sm text-[var(--text-muted)] font-medium shrink-0">
+                <span>🇬🇭</span><span>+233</span>
+              </div>
+              <input
+                type="tel" inputMode="numeric" placeholder="123456789"
+                value={phone}
+                onChange={(e) => { setPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); setError(''); }}
+                autoFocus
+                className="flex-1 h-12 rounded-r-xl border border-[var(--border)] text-sm text-[var(--text-primary)] bg-[var(--bg-card2)] px-4 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+          </div>
+          <button type="submit" disabled={loading || phone.replace(/\D/g, '').length < 9}
+            className="w-full h-12 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 transition-all">
+            {loading
+              ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <><Phone className="w-4 h-4" /> Add Phone Number</>}
+          </button>
+          <button type="button" onClick={onDone}
+            className="w-full h-10 rounded-lg border border-[var(--border)] text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-card2)] transition-all">
+            Skip for now
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Page
 export default function UserHomePage() {
   const { user } = useAuth();
   const { theme, toggle } = useTheme();
   const router = useRouter();
 
+  const [showAddPhone, setShowAddPhone] = useState(false);
+
+  useEffect(() => {
+    if (user && (!user.phone || user.phone.startsWith('google_'))) {
+      setShowAddPhone(true);
+    }
+  }, [user]);
   const [quickOrderAmount, setQuickOrderAmount] = useState('');
   const [quickOrderLoading, setQuickOrderLoading] = useState(false);
 
@@ -419,6 +494,10 @@ export default function UserHomePage() {
 
   return (
     <div className="flex flex-col h-screen bg-[var(--bg)]">
+
+      {showAddPhone && (
+        <AddPhoneModal onDone={() => setShowAddPhone(false)} />
+      )}
 
       {showPicker && (
         <LocationPicker
