@@ -46,12 +46,10 @@ passport.use(new GoogleStrategy(
           email,
           googleId,
           profilePhoto: photo,
-          phone: `google_${googleId}`, // temporary placeholder — replaced when user adds phone
           isVerified: true,
           referralCode,
         });
       } else {
-        // Existing user — update googleId/photo if missing
         if (!user.googleId) user.googleId = googleId;
         if (photo && !user.profilePhoto) user.profilePhoto = photo;
         if (email && !user.email) user.email = email;
@@ -421,7 +419,6 @@ router.post('/google/token',
         user = await User.create({
           name, email, googleId,
           profilePhoto: photo,
-          phone: `google_${googleId}`,
           isVerified: true,
           referralCode,
         });
@@ -433,11 +430,11 @@ router.post('/google/token',
       }
 
       const needsPhone = !user.phone || user.phone.startsWith('google_');
-      const token = signToken({ id: user._id, role: 'user', phone: user.phone });
+      const token = signToken({ id: user._id, role: 'user', phone: user.phone ?? '' });
       res.json({
         success: true,
         token,
-        user: { id: user._id, name: user.name, phone: user.phone, role: 'user' },
+        user: { id: user._id, name: user.name, phone: user.phone ?? '', role: 'user' },
         needsPhone: needsPhone ? 1 : 0,
       });
     } catch (err: any) {
@@ -491,8 +488,8 @@ router.get('/google/callback',
   passport.authenticate('google', { session: false, failureRedirect: `${DEFAULT_FRONTEND}/?error=google_auth_failed` }),
   (req: AuthRequest, res: Response) => {
     const user = req.user as any;
-    const token = signToken({ id: user._id, role: 'user', phone: user.phone });
-    const needsPhone = !user.phone || user.phone.startsWith('google_') || user.phone === '';
+    const needsPhone = !user.phone || user.phone.startsWith('google_');
+    const token = signToken({ id: user._id, role: 'user', phone: user.phone ?? '' });
 
     const params = new URLSearchParams({
       token,

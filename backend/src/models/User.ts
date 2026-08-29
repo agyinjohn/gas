@@ -62,7 +62,7 @@ const PaymentMethodSchema = new Schema<IPaymentMethod>({
 const UserSchema = new Schema<IUser>(
   {
     name: { type: String, trim: true, default: '' },
-    phone: { type: String, required: true, unique: true, trim: true },
+    phone: { type: String, required: false, unique: true, sparse: true, trim: true },
     email: { type: String, sparse: true, lowercase: true, trim: true },
     passwordHash: String,
     googleId: { type: String, sparse: true },

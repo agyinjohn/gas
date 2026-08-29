@@ -196,9 +196,6 @@ function AddPhoneModal({ onDone }: { onDone: () => void }) {
             <h2 className="text-lg font-black text-[var(--text-primary)]">Add your phone number</h2>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">Required to place orders and receive updates</p>
           </div>
-          <button onClick={onDone} className="w-8 h-8 rounded-full bg-[var(--bg-card2)] flex items-center justify-center shrink-0">
-            <X className="w-4 h-4 text-[var(--text-muted)]" />
-          </button>
         </div>
 
         {error && (
@@ -263,7 +260,13 @@ export default function UserHomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [showAddPhone, setShowAddPhone] = useState(searchParams.get('addPhone') === '1');
+  const [showAddPhone, setShowAddPhone] = useState(false);
+
+  useEffect(() => {
+    if (user && (!user.phone || user.phone.startsWith('google_'))) {
+      setShowAddPhone(true);
+    }
+  }, [user]);
   const [quickOrderAmount, setQuickOrderAmount] = useState('');
   const [quickOrderLoading, setQuickOrderLoading] = useState(false);
 
