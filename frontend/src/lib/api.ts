@@ -54,9 +54,13 @@ export const authApi = {
   resetPassword: (phone: string, otp: string, newPassword: string) =>
     api.post('/api/v1/auth/user/reset-password', { phone, otp, newPassword }),
 
-  // Google user: add phone number after sign-in (no OTP needed)
-  addPhone: (phone: string, otp?: string) =>
-    api.post('/api/v1/auth/user/add-phone', { phone }),
+  // Google user, step 1: send an OTP to the phone they want to attach
+  sendAddPhoneOTP: (phone: string) =>
+    api.post('/api/v1/auth/user/add-phone/send-otp', { phone }),
+
+  // Google user, step 2: verify the OTP and attach the phone to the account
+  addPhone: (phone: string, otp: string) =>
+    api.post('/api/v1/auth/user/add-phone', { phone, otp }),
 
   // Initiate Google OAuth (redirects browser to Google)
   googleLogin: () => {

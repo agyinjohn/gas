@@ -174,7 +174,7 @@ export interface User {
 export interface AuthUser {
   id: string;
   name: string;
-  phone: string;
+  phone?: string;
   role: UserRole;
   stationId?: string;
 }

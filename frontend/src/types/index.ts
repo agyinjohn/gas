@@ -163,7 +163,7 @@ export interface PaymentMethodSaved {
 export interface User {
   _id: string;
   name: string;
-  phone: string;
+  phone?: string;
   email?: string;
   profilePhoto?: string;
   savedAddresses: SavedAddress[];

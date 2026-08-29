@@ -21,7 +21,7 @@ export interface IPaymentMethod {
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
-  phone: string;
+  phone?: string;
   email?: string;
   passwordHash?: string;
   googleId?: string;
@@ -62,7 +62,7 @@ const PaymentMethodSchema = new Schema<IPaymentMethod>({
 const UserSchema = new Schema<IUser>(
   {
     name: { type: String, trim: true, default: '' },
-    phone: { type: String, required: true, unique: true, trim: true },
+    phone: { type: String, sparse: true, unique: true, trim: true },
     email: { type: String, sparse: true, lowercase: true, trim: true },
     passwordHash: String,
     googleId: { type: String, sparse: true },
